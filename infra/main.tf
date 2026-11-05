@@ -21,3 +21,13 @@ module "platform" {
   project_id = var.project_id
   region     = var.region
 }
+
+module "poller" {
+  source                = "./modules/poller"
+  project_id            = var.project_id
+  region                = var.region
+  image                 = var.poller_image
+  service_account_email = module.platform.service_account_emails["poller"]
+  state_bucket          = module.storage.bucket_names["weft-snapshots"]
+  items_new_topic       = module.messaging.topic_names["items-new"]
+}

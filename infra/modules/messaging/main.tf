@@ -5,3 +5,7 @@ resource "google_pubsub_topic" "t" {
   project  = var.project_id
   name     = each.key
 }
+
+output "topic_names" {
+  value = { for k, t in google_pubsub_topic.t : k => t.name }
+}
