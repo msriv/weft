@@ -3,6 +3,7 @@ import json
 from typing import Any
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from services.fetcher.app import create_app
@@ -90,3 +91,10 @@ def test_push_endpoint_status_codes() -> None:
     assert _push(c, {**MSG, "source_id": "nope"}).status_code == 204  # unknown source: dropped
     bad = TestClient(create_app(store, client(httpx.Response(500)), {"x": SRC}))
     assert _push(bad, {**MSG, "url": "https://x.test/other"}).status_code == 502  # retried
+
+
+def test_push_logs_one_structured_line(capsys: pytest.CaptureFixture[str]) -> None:
+    c = TestClient(create_app(MemStore(), client(httpx.Response(200, text=HTML)), {"x": SRC}))
+    _push(c, MSG)
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert line == {"event": "item_processed", "source_id": "x", "status": "stored"}

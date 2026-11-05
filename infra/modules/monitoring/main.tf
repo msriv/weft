@@ -56,3 +56,87 @@ resource "google_monitoring_alert_policy" "source_unhealthy" {
 
   notification_channels = [google_monitoring_notification_channel.email.id]
 }
+
+# Fetcher logs one `item_processed` line per message: status is stored, duplicate,
+# extract_failed or skipped.
+resource "google_logging_metric" "items_processed" {
+  project = var.project_id
+  name    = "weft_items_processed"
+  filter  = "resource.type=\"cloud_run_revision\" AND jsonPayload.event=\"item_processed\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    labels {
+      key        = "source_id"
+      value_type = "STRING"
+    }
+    labels {
+      key        = "status"
+      value_type = "STRING"
+    }
+  }
+  label_extractors = {
+    source_id = "EXTRACT(jsonPayload.source_id)"
+    status    = "EXTRACT(jsonPayload.status)"
+  }
+}
+
+resource "google_monitoring_dashboard" "ingestion" {
+  project = var.project_id
+  dashboard_json = jsonencode({
+    displayName = "Weft ingestion"
+    mosaicLayout = {
+      columns = 12
+      tiles = [
+        {
+          width  = 12
+          height = 4
+          widget = {
+            title = "Items stored per source per hour"
+            xyChart = {
+              dataSets = [{
+                plotType = "STACKED_BAR"
+                timeSeriesQuery = {
+                  timeSeriesFilter = {
+                    filter = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.items_processed.name}\" metric.label.status=\"stored\""
+                    aggregation = {
+                      alignmentPeriod    = "3600s"
+                      perSeriesAligner   = "ALIGN_SUM"
+                      crossSeriesReducer = "REDUCE_SUM"
+                      groupByFields      = ["metric.label.source_id"]
+                    }
+                  }
+                }
+              }]
+            }
+          }
+        },
+        {
+          yPos   = 4
+          width  = 12
+          height = 4
+          widget = {
+            title = "Extraction failures per source per hour"
+            xyChart = {
+              dataSets = [{
+                plotType = "STACKED_BAR"
+                timeSeriesQuery = {
+                  timeSeriesFilter = {
+                    filter = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.items_processed.name}\" metric.label.status=\"extract_failed\""
+                    aggregation = {
+                      alignmentPeriod    = "3600s"
+                      perSeriesAligner   = "ALIGN_SUM"
+                      crossSeriesReducer = "REDUCE_SUM"
+                      groupByFields      = ["metric.label.source_id"]
+                    }
+                  }
+                }
+              }]
+            }
+          }
+        },
+      ]
+    }
+  })
+}
