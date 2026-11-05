@@ -23,7 +23,7 @@ class GcpStore:
         self._bucket = storage.Client(project=project).bucket(raw_bucket)
         self._ds = f"{project}.{dataset}"
 
-    def seen(self, canonical_url: str, text_hash: str) -> bool:
+    def seen(self, canonical_url: str | None, text_hash: str) -> bool:
         job = self._bq.query(
             f"SELECT 1 FROM `{self._ds}.raw_items` WHERE canonical_url = @u OR text_hash = @h LIMIT 1",
             job_config=bigquery.QueryJobConfig(
@@ -35,9 +35,11 @@ class GcpStore:
         )
         return bool(job.result().total_rows)
 
-    def save(self, raw_row: dict[str, Any], extracted_row: dict[str, Any], html: bytes) -> None:
-        blob = self._bucket.blob(f"{raw_row['item_id']}.html")
-        blob.upload_from_string(html, content_type="text/html")
+    def save(
+        self, raw_row: dict[str, Any], extracted_row: dict[str, Any], content: bytes, ext: str
+    ) -> None:
+        blob = self._bucket.blob(f"{raw_row['item_id']}.{ext}")
+        blob.upload_from_string(content)
         raw_row["raw_gcs_uri"] = f"gs://{self._bucket.name}/{blob.name}"
         for table, row in (("raw_items", raw_row), ("extracted_items", extracted_row)):
             if errs := self._bq.insert_rows_json(f"{self._ds}.{table}", [row]):
