@@ -30,3 +30,7 @@ resource "google_bigquery_table" "t" {
     field = each.value
   }
 }
+
+output "dataset_id" {
+  value = google_bigquery_dataset.weft.dataset_id
+}
