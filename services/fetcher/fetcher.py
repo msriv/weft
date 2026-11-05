@@ -6,12 +6,14 @@ get the lede only and the paywall is never bypassed.
 """
 
 import hashlib
+import io
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Protocol
 from urllib.parse import urlsplit, urlunsplit
 
+import pdfplumber
 import trafilatura
 
 from weft_core.polite import PoliteClient
@@ -20,9 +22,14 @@ LEDE_CHARS = 500
 
 
 class Store(Protocol):
-    def seen(self, canonical_url: str, text_hash: str) -> bool: ...
-    def save(self, raw_row: dict[str, Any], extracted_row: dict[str, Any], html: bytes) -> None:
-        """Write the raw HTML, set raw_row["raw_gcs_uri"], insert both rows."""
+    def seen(self, canonical_url: str | None, text_hash: str) -> bool:
+        """True if the URL (when given) or the text hash is already stored."""
+        ...
+
+    def save(
+        self, raw_row: dict[str, Any], extracted_row: dict[str, Any], content: bytes, ext: str
+    ) -> None:
+        """Write the raw copy, set raw_row["raw_gcs_uri"], insert both rows."""
 
 
 @dataclass
@@ -39,34 +46,68 @@ def normalize_url(url: str) -> str:
 def fetch_item(
     msg: dict[str, Any], source: dict[str, Any], http: PoliteClient, store: Store
 ) -> Result:
-    rl = source["rate_limit"]
-    resp = http.get(msg["url"], float(rl["per_seconds"] / rl["requests"]), {})
+    resp = http.get(msg["url"], interval(source), {})
     if resp is None:
         return Result("skipped")  # robots, cooldown or 429: caller retries later
+    return ingest(msg, resp.content, resp.headers.get("content-type", ""), resp.status_code, store)
 
+
+def interval(source: dict[str, Any]) -> float:
+    rl = source["rate_limit"]
+    return float(rl["per_seconds"] / rl["requests"])
+
+
+def _extract(content: bytes, url: str, content_type: str) -> tuple[dict[str, Any], str]:
+    """Return (metadata, file extension). PDFs via pdfplumber, everything else via trafilatura."""
+    if "pdf" in content_type or url.lower().endswith(".pdf"):
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        return {"text": text, "title": (pdf.metadata or {}).get("Title")}, "pdf"
+    doc = trafilatura.bare_extraction(
+        content.decode("utf-8", errors="replace"), url=url, with_metadata=True
+    )
+    return ((doc if isinstance(doc, dict) else doc.as_dict()) if doc else {}), "html"
+
+
+def ingest(
+    msg: dict[str, Any],
+    content: bytes,
+    content_type: str,
+    status: int,
+    store: Store,
+    *,
+    versioned: bool = False,
+) -> Result:
+    """Extract and store one document.
+
+    `versioned` is for portals: the same URL changing is a new version, so only the text
+    hash dedupes, and the item id includes it.
+    """
     now = datetime.now(UTC).isoformat()
-    doc = trafilatura.bare_extraction(resp.text, url=msg["url"], with_metadata=True)
-    d: dict[str, Any] = (doc if isinstance(doc, dict) else doc.as_dict()) if doc else {}
+    d, ext = _extract(content, msg["url"], content_type)
     text = d.get("text") or ""
     canonical = normalize_url(d.get("url") or msg["url"])
     item_id = hashlib.sha256(canonical.encode()).hexdigest()[:32]
     if not text.strip():
         # keep a record that extraction failed, for the extraction-failures dashboard
         store.save(
-            _raw(item_id, msg, canonical, now, resp.status_code, "", None),
+            _raw(item_id, msg, canonical, now, status, "", None),
             {"item_id": item_id, "extracted_at": now, "status": "failed", "error": "no text"},
-            resp.content,
+            content,
+            ext,
         )
         return Result("extract_failed", item_id)
 
     text_hash = hashlib.sha256(" ".join(text.split()).encode()).hexdigest()
-    if store.seen(canonical, text_hash):
+    if versioned:
+        item_id = hashlib.sha256((canonical + text_hash).encode()).hexdigest()[:32]
+    if store.seen(None if versioned else canonical, text_hash):
         return Result("duplicate", item_id)
 
     lede = text[:LEDE_CHARS]
     meta = {k: v for k, v in d.items() if k in _META_KEYS and v}
     store.save(
-        _raw(item_id, msg, canonical, now, resp.status_code, text_hash, None),
+        _raw(item_id, msg, canonical, now, status, text_hash, None),
         {
             "item_id": item_id,
             "extracted_at": now,
@@ -76,7 +117,8 @@ def fetch_item(
             "metadata": json.dumps(meta, default=str),
             "status": "ok",
         },
-        resp.content,
+        content,
+        ext,
     )
     return Result("stored", item_id)
 

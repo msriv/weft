@@ -49,3 +49,14 @@ module "monitoring" {
   project_id  = var.project_id
   alert_email = var.alert_email
 }
+
+module "crawler" {
+  source                = "./modules/crawler"
+  project_id            = var.project_id
+  region                = var.region
+  image                 = var.crawler_image
+  service_account_email = module.platform.service_account_emails["crawler"]
+  raw_bucket            = module.storage.bucket_names["weft-raw"]
+  state_bucket          = module.storage.bucket_names["weft-snapshots"]
+  dataset_id            = module.bigquery.dataset_id
+}

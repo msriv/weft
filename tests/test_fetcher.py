@@ -21,14 +21,16 @@ class MemStore:
     def __init__(self) -> None:
         self.rows: list[tuple[dict[str, Any], dict[str, Any], bytes]] = []
 
-    def seen(self, canonical_url: str, text_hash: str) -> bool:
+    def seen(self, canonical_url: str | None, text_hash: str) -> bool:
         return any(
             r[0]["canonical_url"] == canonical_url or r[0]["text_hash"] == text_hash
             for r in self.rows
         )
 
-    def save(self, raw_row: dict[str, Any], extracted_row: dict[str, Any], html: bytes) -> None:
-        self.rows.append((raw_row, extracted_row, html))
+    def save(
+        self, raw_row: dict[str, Any], extracted_row: dict[str, Any], content: bytes, ext: str
+    ) -> None:
+        self.rows.append((raw_row, extracted_row, content))
 
 
 def client(page: httpx.Response) -> PoliteClient:
