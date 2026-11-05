@@ -3,6 +3,7 @@ from typing import Any
 import httpx
 
 from services.poller.poller import FeedState, Poller
+from weft_core.polite import PoliteClient
 
 RSS = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
 <item><title>A</title><link>https://x.test/a</link></item>
@@ -27,10 +28,11 @@ def make(handler: Any, now: list[float] | None = None) -> tuple[Poller, list[dic
     out: list[dict[str, Any]] = []
     mem = Mem()
     t = now if now is not None else [0.0]
-    p = Poller(
-        httpx.Client(transport=httpx.MockTransport(handler)), mem, out.append,
+    polite = PoliteClient(
+        httpx.Client(transport=httpx.MockTransport(handler)),
         sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0],
     )  # fmt: skip
+    p = Poller(polite, mem, out.append)
     return p, out, mem
 
 

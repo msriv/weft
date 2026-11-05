@@ -18,3 +18,8 @@ variable "poller_image" {
   description = "Poller image, e.g. <region>-docker.pkg.dev/<project>/weft/poller:<tag>. Built in CI, not by hand."
   type        = string
 }
+
+variable "fetcher_image" {
+  description = "Fetcher image in Artifact Registry. Built in CI, not by hand."
+  type        = string
+}

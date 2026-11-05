@@ -5,9 +5,10 @@ import os
 import sys
 
 import httpx
-from google.cloud import pubsub_v1, storage
+from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.poller.poller import FeedState, Poller
+from weft_core.polite import PoliteClient
 from weft_core.sources import load_sources
 
 
@@ -37,7 +38,9 @@ def main() -> int:
         publisher.publish(topic, json.dumps(msg).encode()).result()
 
     with httpx.Client(timeout=30, follow_redirects=True) as http:
-        failures = Poller(http, GcsState(os.environ["STATE_BUCKET"]), publish).run(load_sources())
+        failures = Poller(PoliteClient(http), GcsState(os.environ["STATE_BUCKET"]), publish).run(
+            load_sources()
+        )
     for sid, err in failures.items():
         print(f"poll failed: {sid}: {err}", file=sys.stderr)
     return 0
