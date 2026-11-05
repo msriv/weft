@@ -18,6 +18,7 @@ All names, numbers, outlets and stories in them (Aldoria, Veymar, Kessar Strait,
 | `Source.dc.html` | Source profile: weight, reasons, ownership, anomalies | `/sources/{id}` |
 | `Actor.dc.html` | Person page: statements and how they were reported | `/people/{id}` |
 | `World.dc.html` | World desk: coverage threads by country, gaps | `/world` |
+| `Globe.dc.html` | World desk, globe view: stories and coverage gaps as markers on a rotatable globe (design note below; source file lives in the design canvas) | `/world?view=globe` |
 | `Ask.dc.html` | Ask Weft agent with evidence panel | `/ask` |
 | `Method.dc.html` | How we weigh: rules, weights, models, funding, corrections log | `/method` |
 | `Onboard.dc.html` | Onboarding: regions, topics, frequency, how to read a story | `/welcome` |
@@ -48,3 +49,15 @@ All names, numbers, outlets and stories in them (Aldoria, Veymar, Kessar Strait,
 - Dashed circle with a number: a group of reports; the number is how many
 - Orange ring with glow: anomaly (dashed orange = provisional)
 - Dashed orange line between nodes: conflicting reports
+
+## Globe view (World desk)
+
+A second view on `/world`, next to Threads, switched by a Threads / Globe toggle.
+
+- A rotatable orthographic globe, drawn in SVG. Drag to turn it; west/east buttons and Reset view for keyboard and touch users.
+- Each story is a marker placed by country. Size = number of reports. Orange ring with halo = story with anomalies. Dashed ring = coverage gap (a place we can't see well).
+- Hover (or tap) a marker for a pop-up card: kicker (STORY, LIVE · PROVISIONAL, COVERAGE GAP), headline, source and issuer label, time, report and perspective counts, and a link to the event, live story or Threads view. Click pins the card; it has a close button.
+- Filter chips: All, Anomalies, Coverage gaps.
+- Beside the globe: the Coverage gaps panel (same data as Threads view) and a Stories on the globe list. Clicking a row turns the globe to that marker. The list means the globe is never the only way to reach a story.
+- The sample uses fictional landmasses drawn as dots. The real build needs real country shapes (Natural Earth via d3-geo), with GDELT's FIPS country codes mapped to ISO 3166.
+- Copy follows the product rules: coverage language only, no truth claims.
