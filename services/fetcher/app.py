@@ -61,6 +61,12 @@ def create_app(store: Store, http: PoliteClient, sources: dict[str, dict[str, An
             result = fetch_item(msg, source, http, store)
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+        # structured line; log-based metrics for the dashboards count these (infra/modules/monitoring)
+        print(
+            json.dumps(
+                {"event": "item_processed", "source_id": msg["source_id"], "status": result.status}
+            )
+        )
         if result.status == "skipped":
             raise HTTPException(status_code=503, detail="deferred")  # Pub/Sub retries with backoff
         return Response(status_code=204)
