@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Person page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060708}
+a{color:#E8E6E1}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #E8E6E1; background: #060708; min-height: 100vh; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid rgba(232,230,225,0.12)">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.32em">WEFT</span>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em">
+      <a href="Today.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">TODAY</a>
+      <a href="World.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">WORLD</a>
+      <a href="Explore.dc.html" style="text-decoration: none; padding: 12px 14px">STORIES</a>
+      <a href="Source.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">SOURCES</a>
+      <a href="Ask.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">ASK</a>
+      <a href="Method.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">HOW WE WEIGH</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1440px; margin: 0 auto; padding: 40px 32px 64px; box-sizing: border-box">
+    <div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: center">
+      <div style="flex: none; width: 112px; height: 112px; border-radius: 50%; border: 1px solid rgba(232,230,225,0.4); box-shadow: 0 0 0 8px #060708, 0 0 0 9px rgba(232,230,225,0.15); display: flex; align-items: center; justify-content: center; font-family: 'Instrument Serif', serif; font-size: 40px; color: #8E939B" role="img" aria-label="Photo placeholder">DM</div>
+      <div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">PERSON · VEYMAR · DEFENCE MINISTER · FICTIONAL SAMPLE</div>
+        <h1 style="margin: 8px 0 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 64px; line-height: 1">[Defence minister]</h1>
+        <div style="font-size: 14px; color: #B9BDC4; margin-top: 8px">In 3 stories · 9 statements tracked · spoke at 4 proceedings</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 48px; margin-top: 48px; align-items: flex-start">
+      <section aria-label="Statements against the record" style="flex: 999 1 600px; min-width: 0">
+        <h2 style="margin: 0 0 6px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">WHAT THEY SAID, AND HOW IT WAS REPORTED</h2>
+        <div style="position: relative; padding-left: 36px">
+          <div style="position: absolute; left: 7px; top: 24px; bottom: 24px; width: 1px; background: rgba(232,230,225,0.3)"></div>
+          <sc-for list="{{said}}" as="s" hint-placeholder-count="5">
+            <div style="position: relative; padding: 20px 0; border-bottom: 1px solid rgba(232,230,225,0.12)">
+              <sc-if value="{{s.held}}" hint-placeholder-val="{{ true }}"><span style="position: absolute; left: -36px; top: 26px; width: 15px; height: 15px; border-radius: 50%; background: #E8E6E1; box-shadow: 0 0 0 4px #060708"></span></sc-if>
+              <sc-if value="{{s.open}}" hint-placeholder-val="{{ false }}"><span style="position: absolute; left: -36px; top: 26px; width: 15px; height: 15px; border-radius: 50%; border: 1.5px dashed #E8E6E1; background: #060708; box-sizing: border-box; box-shadow: 0 0 0 4px #060708"></span></sc-if>
+              <sc-if value="{{s.broke}}" hint-placeholder-val="{{ false }}"><span style="position: absolute; left: -36px; top: 26px; width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid #FF7A45; background: #060708; box-sizing: border-box; box-shadow: 0 0 0 4px #060708, 0 0 14px rgba(255,122,69,0.5)"></span></sc-if>
+              <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B"><span>{{s.when}}</span><span>{{s.status}}</span></div>
+              <div style="font-family: 'Instrument Serif', serif; font-size: 26px; line-height: 1.2; margin-top: 6px">{{s.quote}}</div>
+              <div style="font-size: 13px; color: #B9BDC4; margin-top: 6px; line-height: 1.5">{{s.note}}</div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 36px">
+        <section aria-label="How each side's press describes them">
+          <h2 style="margin: 0 0 14px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">HOW EACH SIDE'S PRESS DESCRIBES THEM</h2>
+          <div style="display: flex; flex-direction: column; gap: 16px">
+            <div><div style="font-size: 13px; margin-bottom: 8px">Veymari press</div><div style="display: flex; flex-wrap: wrap; gap: 6px"><span style="font-size: 13px; padding: 4px 10px; border: 1px solid rgba(232,230,225,0.3); border-radius: 14px">steady</span><span style="font-size: 13px; padding: 4px 10px; border: 1px solid rgba(232,230,225,0.3); border-radius: 14px">defender</span><span style="font-size: 13px; padding: 4px 10px; border: 1px solid rgba(232,230,225,0.3); border-radius: 14px">veteran</span></div></div>
+            <div><div style="font-size: 13px; margin-bottom: 8px">Aldorian press</div><div style="display: flex; flex-wrap: wrap; gap: 6px"><span style="font-size: 13px; padding: 4px 10px; border: 1px solid rgba(232,230,225,0.3); border-radius: 14px">hardliner</span><span style="font-size: 13px; padding: 4px 10px; border: 1px solid rgba(232,230,225,0.3); border-radius: 14px">provocative</span></div></div>
+            <div><div style="font-size: 13px; margin-bottom: 8px">International wire</div><div style="display: flex; flex-wrap: wrap; gap: 6px"><span style="font-size: 13px; padding: 4px 10px; border: 1px solid rgba(232,230,225,0.3); border-radius: 14px">defence minister</span></div></div>
+          </div>
+        </section>
+        <section aria-label="Appears in">
+          <h2 style="margin: 0 0 6px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">APPEARS IN</h2>
+          <a href="Main.dc.html" style="display: block; padding: 14px 0; border-bottom: 1px solid rgba(232,230,225,0.12); text-decoration: none; font-family: 'Instrument Serif', serif; font-size: 22px">The Kessar Strait standoff</a>
+          <a href="Proceeding.dc.html" style="display: block; padding: 14px 0; border-bottom: 1px solid rgba(232,230,225,0.12); text-decoration: none; font-family: 'Instrument Serif', serif; font-size: 22px">Veymar emergency sitting</a>
+          <a href="Explore.dc.html" style="display: block; padding: 14px 0; border-bottom: 1px solid rgba(232,230,225,0.12); text-decoration: none; font-family: 'Instrument Serif', serif; font-size: 22px">Defence procurement review</a>
+        </section>
+        <button type="button" style="font: inherit; font-size: 14px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1; align-self: flex-start">Follow this person</button>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    function s(kind, when, status, quote, note) { return { held: kind === 'held', open: kind === 'open', broke: kind === 'broke', when: when, status: status, quote: quote, note: note }; }
+    return {
+      said: [
+        s('open', 'KESSAR · DAY 1 · TV STATEMENT', 'REPORTED BY ONE PERSPECTIVE', '“They fired first. We responded.”', 'Repeated by Veymari press. Aldorian press reports the opposite.'),
+        s('broke', 'KESSAR · DAY 5 · PARLIAMENT, 00:12', 'CONFLICTS WITH OTHER REPORTS', '“Our patrol never left our waters.”', '5 wire reports describe satellite images placing both ships in the disputed zone.'),
+        s('held', 'KESSAR · DAY 5 · PARLIAMENT, 01:47', 'IN THE TRANSCRIPT', '“The navy log is classified.”', 'Reported the same way by all perspectives.'),
+        s('held', 'PROCUREMENT · MONTH 2', 'MATCHES A PUBLISHED DOCUMENT', '“Frigate order will be cut by two.”', 'Same figure as the published defence budget.'),
+        s('broke', 'PROCUREMENT · MONTH 1', 'CHANGED POSITION', '“No cuts to the fleet.”', 'Differs from their own statement a month later.')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

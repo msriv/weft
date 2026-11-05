@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Welcome to Weft</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060708}
+a{color:#E8E6E1}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #E8E6E1; background: #060708; min-height: 100vh; box-sizing: border-box">
+  <header style="padding: 18px 32px; border-bottom: 1px solid rgba(232,230,225,0.12); display: flex; justify-content: space-between; align-items: center">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.32em">WEFT</span>
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.16em; color: #8E939B">STEP 1 OF 2</span>
+  </header>
+  <div style="max-width: 1100px; margin: 0 auto; padding: 56px 32px 64px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 64px">
+    <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 40px">
+      <div>
+        <h1 style="margin: 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 64px; line-height: 1">What do you want to follow?</h1>
+        <p style="margin: 14px 0 0; font-size: 17px; color: #B9BDC4; line-height: 1.55">You'll still see every story. This decides what reaches your Today page and notifications.</p>
+      </div>
+      <fieldset style="border: 0; margin: 0; padding: 0">
+        <legend style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B; margin-bottom: 14px">REGIONS</legend>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-for list="{{regions}}" as="r" hint-placeholder-count="8">
+            <button type="button" aria-pressed="{{r.on}}" onClick="{{r.toggle}}" style="font: inherit; font-size: 14px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid {{r.border}}; background: {{r.bg}}; color: {{r.fg}}; cursor: pointer">{{r.name}}</button>
+          </sc-for>
+        </div>
+      </fieldset>
+      <fieldset style="border: 0; margin: 0; padding: 0">
+        <legend style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B; margin-bottom: 14px">TOPICS</legend>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-for list="{{topics}}" as="t" hint-placeholder-count="7">
+            <button type="button" aria-pressed="{{t.on}}" onClick="{{t.toggle}}" style="font: inherit; font-size: 14px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid {{t.border}}; background: {{t.bg}}; color: {{t.fg}}; cursor: pointer">{{t.name}}</button>
+          </sc-for>
+        </div>
+      </fieldset>
+      <fieldset style="border: 0; margin: 0; padding: 0">
+        <legend style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B; margin-bottom: 10px">HOW OFTEN</legend>
+        <label style="display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: 15px"><input type="radio" name="freq" checked style="width: 18px; height: 18px; accent-color: #E8E6E1">A morning digest</label>
+        <label style="display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: 15px"><input type="radio" name="freq" style="width: 18px; height: 18px; accent-color: #E8E6E1">Live, only for stories I follow</label>
+        <label style="display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: 15px"><input type="radio" name="freq" style="width: 18px; height: 18px; accent-color: #E8E6E1">Once a week</label>
+      </fieldset>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap">
+        <a href="Today.dc.html" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 24px; border-radius: 24px; background: #E8E6E1; color: #060708; text-decoration: none; font-weight: 500">Continue</a>
+        <a href="Today.dc.html" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 16px; color: #8E939B; font-size: 14px">Skip for now</a>
+      </div>
+    </div>
+
+    <aside aria-label="How to read Weft" style="flex: 1 1 320px; min-width: 0; border: 1px solid rgba(232,230,225,0.15); padding: 28px; align-self: flex-start">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">HOW TO READ A STORY</div>
+      <div style="display: flex; flex-direction: column; gap: 22px; margin-top: 22px">
+        <div style="display: flex; gap: 16px; align-items: flex-start"><span style="flex: none; width: 20px; height: 20px; border-radius: 50%; background: #9A9FA7; margin-top: 2px"></span><span style="font-size: 14px; line-height: 1.5"><strong style="font-weight: 600">Documents from a party.</strong> A government or body involved in the story. It's their account.</span></div>
+        <div style="display: flex; gap: 16px; align-items: flex-start"><span style="flex: none; width: 20px; height: 20px; border-radius: 50%; background: #E8E6E1; box-shadow: 0 0 0 3px #060708, 0 0 0 4px #E8E6E1; margin-top: 2px"></span><span style="font-size: 14px; line-height: 1.5"><strong style="font-weight: 600">Independent documents.</strong> Courts, international bodies, others not involved.</span></div>
+        <div style="display: flex; gap: 16px; align-items: flex-start"><span style="flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px dashed #E8E6E1; box-sizing: border-box; margin-top: 2px"></span><span style="font-size: 14px; line-height: 1.5"><strong style="font-weight: 600">Reports.</strong> Press coverage grouped together. The number is how many reports.</span></div>
+        <div style="display: flex; gap: 16px; align-items: flex-start"><span style="flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #FF7A45; box-sizing: border-box; margin-top: 2px; box-shadow: 0 0 12px rgba(255,122,69,0.5)"></span><span style="font-size: 14px; line-height: 1.5"><strong style="font-weight: 600">Anomalies.</strong> Where reports don't line up with each other. Tap one to see the rule behind it.</span></div>
+      </div>
+      <p style="margin: 24px 0 0; padding-top: 18px; border-top: 1px solid rgba(232,230,225,0.12); font-size: 13px; color: #8E939B; line-height: 1.55">Weft never tells you what's true. It shows you who said what. <a href="Method.dc.html">How we weigh</a></p>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: { 'Kessar region': true, 'Norland': true, 'Conflict': true, 'Economy': true } };
+  }
+  chips(names) {
+    var self = this;
+    return names.map(function (n) {
+      var on = !!self.state.picked[n];
+      return {
+        name: n, on: on ? 'true' : 'false',
+        bg: on ? '#E8E6E1' : 'transparent', fg: on ? '#060708' : '#E8E6E1', border: on ? '#E8E6E1' : 'rgba(232,230,225,0.3)',
+        toggle: function () { var p = Object.assign({}, self.state.picked); p[n] = !on; self.setState({ picked: p }); }
+      };
+    });
+  }
+  renderVals() {
+    return {
+      regions: this.chips(['Kessar region', 'Norland', 'Tamsin', 'Ostia', 'Brevia', 'Calder Isles', 'Everywhere']),
+      topics: this.chips(['Conflict', 'Economy', 'Elections', 'Climate', 'Labour', 'Trade', 'Courts'])
+    };
+  }
+}
+</script>
+</body>
+</html>

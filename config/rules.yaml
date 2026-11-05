@@ -1,0 +1,42 @@
+# Anomaly rule thresholds. Published on How we weigh.
+# Bump `version` on any change; every anomaly records the version that fired it.
+# These are starting points, to tune against an editor-labelled set before launch.
+version: 1
+
+provisional:
+  min_sources: 5
+  min_perspectives: 2
+  min_hours_since_first_report: 6
+
+rules:
+  omission:
+    enabled: true
+    min_share_of_event_reports: 0.60   # claim group present in >= 60% of reports
+    absent_from_whole_perspective: true
+    exclude_paywalled_sources: true
+  numbers_differ:
+    enabled: true
+    min_relative_difference: 0.20
+  silence:
+    enabled: true
+    outlet_quiet_hours: 48
+    story_coverage_within: 0.50       # story's coverage stays within 50% of prior window
+    skip_unhealthy_feeds: true
+  copied_text:
+    enabled: true
+    min_outlets: 3
+    min_jaccard: 0.80
+    shingle_words: 5
+    window_hours: 12
+    require_different_owners: true
+    ignore_credited_wire_copy: true
+  silent_edit:
+    enabled: true
+    refetch_after: ["1h", "24h", "7d"]
+  loaded_wording:        # v2
+    enabled: false
+    min_weighted_log_odds: 3.0
+    exclude_paywalled_sources: true
+  unattributed:          # v2
+    enabled: false
+    min_attributed_versions: 2

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>One event, every telling</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060708}
+a{color:#E8E6E1}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #E8E6E1; background: #060708; min-height: 100vh; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid rgba(232,230,225,0.12)">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.32em">WEFT</span>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em">
+      <a href="Today.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">TODAY</a>
+      <a href="World.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">WORLD</a>
+      <a href="Explore.dc.html" style="text-decoration: none; padding: 12px 14px">STORIES</a>
+      <a href="Source.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">SOURCES</a>
+      <a href="Ask.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">ASK</a>
+      <a href="Method.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">HOW WE WEIGH</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1440px; margin: 0 auto; padding: 40px 32px 64px; box-sizing: border-box">
+    <a href="Main.dc.html" style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.16em; color: #8E939B; text-decoration: none; padding: 6px 0">← THE KESSAR STRAIT STANDOFF</a>
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B; margin-top: 18px">EVENT · DAY 1 · 4 PERSPECTIVES · 71 REPORTS · FICTIONAL SAMPLE</div>
+    <h1 style="margin: 10px 0 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 64px; line-height: 1">Contact in the Kessar Strait</h1>
+
+    <section aria-label="What is established" style="margin-top: 36px; display: flex; flex-wrap: wrap; gap: 24px; align-items: center; padding: 24px 28px; border: 1px solid #E8E6E1; box-shadow: 0 0 40px rgba(232,230,225,0.08)">
+      <span style="flex: none; width: 22px; height: 22px; border-radius: 50%; background: #E8E6E1; box-shadow: 0 0 0 5px #060708, 0 0 0 6px rgba(232,230,225,0.35), 0 0 20px rgba(232,230,225,0.4)"></span>
+      <div style="flex: 1 1 400px; min-width: 0">
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #8E939B">REPORTED BY ALL 4 PERSPECTIVES</div>
+        <div style="font-family: 'Instrument Serif', serif; font-size: 28px; line-height: 1.25; margin-top: 6px">An Aldorian patrol and a Veymari vessel made contact at night. Shots were fired. No one died.</div>
+      </div>
+      <div style="flex: 0 1 260px; font-size: 13px; color: #B9BDC4; line-height: 1.5"><span style="color: #FF7A45">Reports conflict on:</span> who fired first, and whose waters the contact happened in.</div>
+    </section>
+
+    <section aria-label="Perspectives" style="margin-top: 40px">
+      <h2 style="margin: 0 0 16px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">HOW EACH SIDE TOLD IT</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1px; background: rgba(232,230,225,0.12); border: 1px solid rgba(232,230,225,0.12)">
+        <sc-for list="{{views}}" as="v" hint-placeholder-count="4">
+          <div style="background: #060708; padding: 24px; display: flex; flex-direction: column; gap: 18px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+              <span style="font-size: 16px; font-weight: 600">{{v.name}}</span>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">{{v.count}}</span>
+            </div>
+            <div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; color: #8E939B">TYPICAL HEADLINE · TRANSLATED</div>
+              <div style="font-family: 'Instrument Serif', serif; font-size: 26px; line-height: 1.15; margin-top: 6px">{{v.headline}}</div>
+            </div>
+            <div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; color: #8E939B; margin-bottom: 8px">WORDS THEY USE</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                <sc-for list="{{v.words}}" as="w" hint-placeholder-count="3"><span style="font-size: 13px; padding: 4px 10px; border: 1px solid rgba(232,230,225,0.3); border-radius: 14px">{{w}}</span></sc-for>
+              </div>
+            </div>
+            <div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; color: #8E939B">LEADS WITH</div>
+              <div style="font-size: 14px; line-height: 1.5; margin-top: 4px">{{v.leads}}</div>
+            </div>
+            <sc-if value="{{v.hasOmit}}" hint-placeholder-val="{{ true }}">
+              <div style="background: rgba(255,122,69,0.1); padding: 12px 14px">
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; color: #FF7A45">ANOMALY · OMISSION</div>
+                <div style="font-size: 13px; line-height: 1.5; margin-top: 4px; color: #FFD3C0">{{v.omits}}</div>
+              </div>
+            </sc-if>
+            <a href="Source.dc.html" style="margin-top: auto; font-size: 13px; color: #8E939B; padding: 6px 0">See all {{v.n}} reports</a>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 28px">
+      <a href="Ask.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 22px; background: #E8E6E1; color: #060708; text-decoration: none; font-size: 14px; font-weight: 500">Ask why they differ</a>
+      <button type="button" style="font: inherit; font-size: 14px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1">Show original-language headlines</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      views: [
+        { name: 'Aldorian press', count: '22 REPORTS · 7 STATE-RUN', n: 22, headline: 'Veymari vessel opens fire on our patrol', words: ['attack', 'unprovoked', 'our waters'], leads: 'Crew safety and the navy statement.', hasOmit: true, omits: 'That the ministry report doesn’t name who fired first. 71% of other reports mention it.' },
+        { name: 'Veymari press', count: '19 REPORTS · 11 STATE-RUN', n: 19, headline: 'Aldorian patrol intrudes, navy responds', words: ['incursion', 'defended', 'sovereignty'], leads: 'Where the patrol was and the map of the claimed boundary.', hasOmit: true, omits: 'That their navy hasn’t released its log. 64% of other reports mention it.' },
+        { name: 'Kessarian press', count: '8 REPORTS', n: 8, headline: 'Fishing fleet halted as navies clash nearby', words: ['clash', 'fishermen', 'closure'], leads: 'Local fishing and shipping disruption.', hasOmit: false, omits: '' },
+        { name: 'International wire', count: '22 REPORTS', n: 22, headline: 'Shots fired as rival ships meet in disputed strait', words: ['incident', 'disputed', 'both sides say'], leads: 'Both governments’ statements, side by side.', hasOmit: true, omits: 'The fishing closure. Every Kessarian report mentions it.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

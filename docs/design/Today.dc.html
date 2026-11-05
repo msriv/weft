@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060708}
+a{color:#E8E6E1}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #E8E6E1; background: #060708; min-height: 100vh; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid rgba(232,230,225,0.12)">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.32em">WEFT</span>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em">
+      <a href="#" style="text-decoration: none; padding: 12px 14px">TODAY</a>
+      <a href="World.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">WORLD</a>
+      <a href="Explore.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">STORIES</a>
+      <a href="Source.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">SOURCES</a>
+      <a href="Ask.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">ASK</a>
+      <a href="Method.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">HOW WE WEIGH</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1440px; margin: 0 auto; padding: 40px 32px 64px; box-sizing: border-box">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">OVERNIGHT BATCH · COMPLETED 04:12 · SAMPLE DATA</div>
+    <h1 style="margin: 10px 0 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 72px; line-height: 1">Wednesday, 4 November</h1>
+    <div style="display: flex; flex-wrap: wrap; gap: 36px; margin-top: 24px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.12em; color: #8E939B">
+      <span><span style="display: block; font-size: 22px; color: #E8E6E1; letter-spacing: 0">3,418</span>REPORTS READ</span>
+      <span><span style="display: block; font-size: 22px; color: #E8E6E1; letter-spacing: 0">27</span>NEW OFFICIAL DOCUMENTS</span>
+      <span><span style="display: block; font-size: 22px; color: #E8E6E1; letter-spacing: 0">41</span>STORIES UPDATED</span>
+      <span><span style="display: block; font-size: 22px; color: #E8E6E1; letter-spacing: 0">6</span>STORIES GAINED A PERSPECTIVE</span>
+      <span><span style="display: block; font-size: 22px; color: #FF7A45; letter-spacing: 0">5</span>NEW ANOMALIES</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 48px; margin-top: 48px; align-items: flex-start">
+      <section aria-label="What changed overnight" style="flex: 999 1 600px; min-width: 0">
+        <h2 style="margin: 0 0 4px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">WHAT CHANGED OVERNIGHT</h2>
+        <sc-for list="{{stories}}" as="s" hint-placeholder-count="4">
+          <a href="Main.dc.html" style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center; padding: 26px 0; border-bottom: 1px solid rgba(232,230,225,0.12); text-decoration: none">
+            <svg width="160" height="48" viewBox="0 0 160 48" aria-hidden="true" style="flex: none; fill: none">
+              <path d="M4 24 L156 24" stroke="rgba(232,230,225,0.4)" stroke-width="1"></path>
+              <path d="M30 24 C30 10 60 10 60 6 M90 24 C90 38 120 38 120 42" stroke="rgba(232,230,225,0.3)" stroke-width="1"></path>
+              <circle cx="30" cy="24" r="4" fill="#E8E6E1"></circle><circle cx="90" cy="24" r="4" fill="#E8E6E1"></circle><circle cx="140" cy="24" r="4" fill="#E8E6E1"></circle>
+              <circle cx="60" cy="6" r="4" stroke="#E8E6E1" stroke-dasharray="2 2"></circle><circle cx="120" cy="42" r="4" stroke="#FF7A45"></circle>
+            </svg>
+            <div style="flex: 1 1 300px; min-width: 0">
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; color: #8E939B">{{s.beat}} · DAY {{s.day}}</div>
+              <div style="font-family: 'Instrument Serif', serif; font-size: 34px; line-height: 1.1; margin-top: 4px">{{s.title}}</div>
+              <div style="font-size: 14px; color: #B9BDC4; margin-top: 6px; line-height: 1.5">{{s.line}}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; min-width: 170px">
+              <span>{{s.events}}</span>
+              <span>{{s.resolved}}</span>
+              <sc-if value="{{s.hasDiv}}" hint-placeholder-val="{{ false }}"><span style="color: #FF7A45">{{s.div}}</span></sc-if>
+            </div>
+          </a>
+        </sc-for>
+      </section>
+
+      <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 36px">
+        <a href="Live.dc.html" style="display: block; border: 1px solid #FF7A45; padding: 18px; text-decoration: none">
+          <span style="display: flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #FF7A45"><span style="width: 8px; height: 8px; border-radius: 50%; background: #FF7A45"></span>BREAKING NOW · 47 MIN · 9 REPORTS</span>
+          <span style="display: block; font-family: 'Instrument Serif', serif; font-size: 26px; line-height: 1.15; margin-top: 8px">Explosion reported at Ostia grain port</span>
+        </a>
+        <section aria-label="Your blind spots">
+          <h2 style="margin: 0 0 14px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">YOUR BLIND SPOTS · LAST 30 DAYS</h2>
+          <div style="font-family: 'Instrument Serif', serif; font-size: 28px; line-height: 1.2">You've read Aldorian coverage four times more than Veymari.</div>
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 18px; font-size: 13px">
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 40px; gap: 12px; align-items: center"><span>Aldorian press</span><span style="height: 2px; background: rgba(232,230,225,0.15)"><span style="display: block; height: 100%; width: 80%; background: #E8E6E1"></span></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px">80%</span></div>
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 40px; gap: 12px; align-items: center"><span>Veymari press</span><span style="height: 2px; background: rgba(232,230,225,0.15)"><span style="display: block; height: 100%; width: 20%; background: #E8E6E1"></span></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px">20%</span></div>
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 40px; gap: 12px; align-items: center"><span>Public record</span><span style="height: 2px; background: rgba(232,230,225,0.15)"><span style="display: block; height: 100%; width: 35%; background: #E8E6E1"></span></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px">35%</span></div>
+          </div>
+          <a href="Main.dc.html" style="display: inline-block; margin-top: 16px; font-size: 13px; padding: 6px 0">Open the side you skip →</a>
+        </section>
+
+        <section aria-label="Following">
+          <h2 style="margin: 0 0 6px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">BRANCHES YOU FOLLOW</h2>
+          <div style="padding: 14px 0; border-bottom: 1px solid rgba(232,230,225,0.12)"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">NOW REPORTED BY ALL PERSPECTIVES · KESSAR STRAIT</span><span style="font-size: 14px; line-height: 1.45">Both vessels were inside the disputed zone</span></div>
+          <div style="padding: 14px 0; border-bottom: 1px solid rgba(232,230,225,0.12)"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">CORRECTION PUBLISHED · BUDGET 2027</span><span style="font-size: 14px; line-height: 1.45">An outlet corrected its “defence spending doubled” report</span></div>
+          <div style="padding: 14px 0; border-bottom: 1px solid rgba(232,230,225,0.12)"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">NEW DOCUMENT · RIVERTON</span><span style="font-size: 14px; line-height: 1.45">Water board hearing transcript published</span></div>
+        </section>
+
+        <section aria-label="Open questions">
+          <h2 style="margin: 0 0 6px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">NO SOURCE HAS REPORTED YET</h2>
+          <ul style="margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.45; color: #B9BDC4">
+            <li>Who fired first in the strait?</li>
+            <li>Where the tariff revenue is earmarked</li>
+            <li>Whether the rail strike talks resume this week</li>
+          </ul>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      stories: [
+        { beat: 'KESSAR STRAIT', day: 9, title: 'The Kessar Strait standoff', line: 'Maritime tribunal issues an interim order. Each capital’s press reports it as a win.', events: '+3 EVENTS', resolved: 'NEW INDEPENDENT DOCUMENT', hasDiv: true, div: '1 NEW ANOMALY' },
+        { beat: 'RIVERTON CIVIC', day: 5, title: 'Riverton water tariff revision', line: 'Final order published. Reports from every outlet now give the same slab rates.', events: '+1 EVENT', resolved: 'NEW DOCUMENT', hasDiv: false, div: '' },
+        { beat: 'BUDGET 2027', day: 12, title: 'National budget 2027', line: 'Committee hearing transcripts added. Two outlets published corrections to spending figures.', events: '+4 EVENTS', resolved: '+1 PERSPECTIVE', hasDiv: true, div: '2 NEW ANOMALIES' },
+        { beat: 'LABOUR', day: 3, title: 'Northern rail strike', line: 'Union and ministry statements give different accounts of the offer.', events: '+2 EVENTS', resolved: 'NO NEW DOCUMENTS', hasDiv: true, div: '2 NEW ANOMALIES' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Story view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060708}
+a{color:#E8E6E1}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #E8E6E1; background: #060708; min-height: 100vh; box-sizing: border-box">
+
+  <header style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid rgba(232,230,225,0.12)">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.32em">WEFT</span>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em">
+      <a href="Today.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">TODAY</a>
+      <a href="World.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">WORLD</a>
+      <a href="Explore.dc.html" style="text-decoration: none; padding: 12px 14px">STORIES</a>
+      <a href="Source.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">SOURCES</a>
+      <a href="Ask.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">ASK</a>
+      <a href="Method.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">HOW WE WEIGH</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1440px; margin: 0 auto; padding: 32px 32px 56px; box-sizing: border-box">
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; justify-content: space-between">
+      <div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">CONFLICT · KESSAR REGION · DAY 1 — 9 · FICTIONAL SAMPLE</div>
+        <h1 style="margin: 10px 0 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 64px; line-height: 1; letter-spacing: -0.01em">The Kessar Strait standoff</h1>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+        <div role="group" aria-label="View" style="display: flex; border: 1px solid rgba(232,230,225,0.3); border-radius: 22px; overflow: hidden">
+          <button type="button" aria-pressed="true" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border: 0; background: #E8E6E1; color: #060708">Network</button>
+          <button type="button" aria-pressed="false" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: #E8E6E1">List</button>
+        </div>
+        <a href="Live.dc.html" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.3); text-decoration: none; font-size: 13px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #8E939B"></span>Go live</a>
+        <button type="button" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1">Follow</button>
+      </div>
+    </div>
+
+    <section aria-label="The short version" style="margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1px; background: rgba(232,230,225,0.12); border: 1px solid rgba(232,230,225,0.12)">
+      <div style="background: #060708; padding: 20px 22px">
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #8E939B">REPORTED BY ALL 4 PERSPECTIVES</div>
+        <div style="font-size: 15px; line-height: 1.55; margin-top: 8px">An Aldorian patrol and a Veymari vessel made contact at night. Shots were fired. No deaths reported. A ceasefire was announced on Day 7.</div>
+      </div>
+      <div style="background: #060708; padding: 20px 22px">
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #8E939B">REPORTS CONFLICT ON</div>
+        <div style="font-size: 15px; line-height: 1.55; margin-top: 8px">Who fired first. Whose waters the contact happened in. What the tribunal's order means.</div>
+      </div>
+      <div style="background: #060708; padding: 20px 22px">
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #8E939B">NO SOURCE HAS PUBLISHED</div>
+        <div style="font-size: 15px; line-height: 1.55; margin-top: 8px">Either navy's log of the incident.</div>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin-top: 28px">
+
+      <section aria-label="Story network" style="flex: 999 1 640px; min-width: 0">
+        <div style="overflow-x: auto; border: 1px solid rgba(232,230,225,0.12); border-radius: 4px">
+          <div style="position: relative; width: 1000px; height: 660px; margin: 0 auto">
+
+            <svg width="1000" height="660" viewBox="0 0 1000 660" style="position: absolute; left: 0; top: 0; width: 1000px; height: 660px; fill: none" aria-hidden="true">
+              <path d="M120 40 L120 600 M220 40 L220 600 M320 40 L320 600 M420 40 L420 600 M520 40 L520 600 M620 40 L620 600 M720 40 L720 600 M820 40 L820 600 M920 40 L920 600" stroke="rgba(232,230,225,0.05)" stroke-width="1"></path>
+              <path d="M100 320 L960 320" stroke="rgba(232,230,225,0.45)" stroke-width="1"></path>
+              <path d="M220 170 C220 245 120 245 120 320" stroke="rgba(232,230,225,0.7)" stroke-width="1.2"></path>
+              <path d="M420 100 C420 210 320 210 320 320" stroke="rgba(232,230,225,0.35)" stroke-width="1"></path>
+              <path d="M630 170 C630 245 720 245 720 320" stroke="rgba(232,230,225,0.35)" stroke-width="1"></path>
+              <path d="M830 110 C830 260 140 190 120 320" stroke="rgba(232,230,225,0.25)" stroke-width="1" stroke-dasharray="2 5"></path>
+              <path d="M220 480 C220 400 120 400 120 320" stroke="rgba(232,230,225,0.35)" stroke-width="1"></path>
+              <path d="M520 520 L520 320" stroke="rgba(232,230,225,0.35)" stroke-width="1"></path>
+              <path d="M900 470 C900 395 920 395 920 320" stroke="rgba(232,230,225,0.35)" stroke-width="1"></path>
+              <path d="M250 190 C300 290 300 360 250 460" stroke="#FF7A45" stroke-width="1.2" stroke-dasharray="4 5"></path>
+            </svg>
+
+            <div style="position: absolute; left: 16px; top: 16px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.2em; color: #8E939B">ALDORIAN PRESS<br>31 OUTLETS · 9 STATE-RUN</div>
+            <div style="position: absolute; left: 16px; top: 294px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.2em; color: #E8E6E1">OFFICIAL<br>DOCUMENTS</div>
+            <div style="position: absolute; left: 16px; top: 572px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.2em; color: #8E939B">VEYMARI PRESS<br>24 OUTLETS · 11 STATE-RUN</div>
+            <div style="position: absolute; left: 282px; top: 312px; width: 96px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: #FF7A45; background: #060708">CONFLICTING</div>
+
+            <!-- official documents: grey = issued by a party, bright ringed = independent body -->
+            <div style="position: absolute; left: 106px; top: 306px; width: 28px; height: 28px; border-radius: 50%; background: #9A9FA7; box-shadow: 0 0 0 5px #060708"></div>
+            <div style="position: absolute; left: 306px; top: 306px; width: 28px; height: 28px; border-radius: 50%; background: #E8E6E1; box-shadow: 0 0 0 5px #060708, 0 0 0 7px #E8E6E1, 0 0 22px rgba(232,230,225,0.4)"></div>
+            <div style="position: absolute; left: 506px; top: 306px; width: 28px; height: 28px; border-radius: 50%; background: #9A9FA7; box-shadow: 0 0 0 5px #060708"></div>
+            <div style="position: absolute; left: 706px; top: 306px; width: 28px; height: 28px; border-radius: 50%; background: #9A9FA7; box-shadow: 0 0 0 5px #060708"></div>
+            <div style="position: absolute; left: 906px; top: 306px; width: 28px; height: 28px; border-radius: 50%; background: #E8E6E1; box-shadow: 0 0 0 5px #060708, 0 0 0 7px #E8E6E1, 0 0 22px rgba(232,230,225,0.4)"></div>
+            <div style="position: absolute; left: 60px; top: 344px; width: 120px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">ALDORIA GOV · PARTY</span><span style="font-size: 12px; line-height: 1.35">Defence ministry incident report</span></div>
+            <div style="position: absolute; left: 260px; top: 344px; width: 120px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">UN · INDEPENDENT</span><span style="font-size: 12px; line-height: 1.35">Security Council session transcript</span></div>
+            <div style="position: absolute; left: 436px; top: 344px; width: 78px; text-align: right; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">VEYMAR · PARTY</span><a href="Proceeding.dc.html" style="font-size: 12px; line-height: 1.35">Parliament emergency sitting</a></div>
+            <div style="position: absolute; left: 660px; top: 344px; width: 120px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">BOTH PARTIES</span><span style="font-size: 12px; line-height: 1.35">Joint ceasefire communiqué</span></div>
+            <div style="position: absolute; left: 860px; top: 344px; width: 120px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">TRIBUNAL · INDEPENDENT</span><span style="font-size: 12px; line-height: 1.35">Maritime tribunal interim order</span></div>
+
+            <!-- Aldorian press -->
+            <div style="position: absolute; left: 190px; top: 140px; width: 60px; height: 60px; border-radius: 50%; box-sizing: border-box; border: 1.5px dashed rgba(232,230,225,0.85); background: #060708; box-shadow: 0 0 0 6px #060708, 0 0 0 7px #E8E6E1, 0 0 30px rgba(232,230,225,0.25); display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 15px">12</div>
+            <div style="position: absolute; left: 145px; top: 214px; width: 150px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">CONFLICTING REPORTS</span><span style="font-size: 13px; line-height: 1.35">“Unprovoked attack on our patrol”</span></div>
+
+            <div style="position: absolute; left: 390px; top: 70px; width: 60px; height: 60px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid #FF7A45; background: #060708; box-shadow: 0 0 26px rgba(255,122,69,0.45); display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #FFB08F">9</div>
+            <div style="position: absolute; left: 345px; top: 140px; width: 150px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #FF7A45">ANOMALY · OMISSION</span><span style="font-size: 13px; line-height: 1.35">Allies' objection at the Council left out</span></div>
+
+            <div style="position: absolute; left: 600px; top: 140px; width: 60px; height: 60px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid #FF7A45; background: #060708; box-shadow: 0 0 26px rgba(255,122,69,0.45); display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #FFB08F">6</div>
+            <div style="position: absolute; left: 555px; top: 210px; width: 150px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #FF7A45">ANOMALY · COPIED TEXT</span><span style="font-size: 13px; line-height: 1.35">6 outlets ran near-identical ceasefire copy</span></div>
+
+            <div style="position: absolute; left: 800px; top: 80px; width: 60px; height: 60px; border-radius: 50%; box-sizing: border-box; background: #E8E6E1; color: #060708; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 15px">5</div>
+            <div style="position: absolute; left: 755px; top: 150px; width: 150px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">WIRE · ALL REPORTS MATCH</span><span style="font-size: 13px; line-height: 1.35">Satellite images show both ships in disputed zone</span></div>
+
+            <!-- Veymari press -->
+            <div style="position: absolute; left: 190px; top: 450px; width: 60px; height: 60px; border-radius: 50%; box-sizing: border-box; border: 1.5px dashed rgba(232,230,225,0.7); background: #060708; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 15px">10</div>
+            <div style="position: absolute; left: 145px; top: 520px; width: 150px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">CONFLICTING REPORTS</span><span style="font-size: 13px; line-height: 1.35">“Their patrol crossed into our waters”</span></div>
+
+            <div style="position: absolute; left: 490px; top: 490px; width: 60px; height: 60px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid #FF7A45; background: #060708; box-shadow: 0 0 26px rgba(255,122,69,0.45); display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #FFB08F">7</div>
+            <div style="position: absolute; left: 445px; top: 560px; width: 150px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #FF7A45">ANOMALY · SILENCE</span><span style="font-size: 13px; line-height: 1.35">State TV skips dissent in the sitting</span></div>
+
+            <div style="position: absolute; left: 870px; top: 440px; width: 60px; height: 60px; border-radius: 50%; box-sizing: border-box; border: 1.5px dashed rgba(232,230,225,0.7); background: #060708; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 15px">8</div>
+            <div style="position: absolute; left: 825px; top: 510px; width: 150px; text-align: center; background: #060708; padding: 2px 0"><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">ONE PERSPECTIVE ONLY</span><span style="font-size: 13px; line-height: 1.35">“Tribunal vindicates our position”</span></div>
+
+            <!-- days -->
+            <div style="position: absolute; left: 90px; top: 624px; width: 60px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">DAY 1</div>
+            <div style="position: absolute; left: 190px; top: 624px; width: 60px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">DAY 2</div>
+            <div style="position: absolute; left: 290px; top: 624px; width: 60px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">DAY 3</div>
+            <div style="position: absolute; left: 390px; top: 624px; width: 60px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">DAY 4</div>
+            <div style="position: absolute; left: 490px; top: 624px; width: 60px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">DAY 5</div>
+            <div style="position: absolute; left: 590px; top: 624px; width: 60px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">DAY 6</div>
+            <div style="position: absolute; left: 690px; top: 624px; width: 60px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">DAY 7</div>
+            <div style="position: absolute; left: 790px; top: 624px; width: 60px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">DAY 8</div>
+            <div style="position: absolute; left: 890px; top: 624px; width: 60px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #E8E6E1">DAY 9</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; margin-top: 18px">
+          <label for="replay" style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.16em; color: #8E939B">REPLAY</label>
+          <input id="replay" type="range" min="1" max="9" value="9" style="flex: 1 1 200px; accent-color: #E8E6E1">
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 14px; font-size: 12px; color: #8E939B">
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #9A9FA7"></span>Document from a party to the story</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #E8E6E1; box-shadow: 0 0 0 2px #060708, 0 0 0 3px #E8E6E1"></span>Document from an independent body</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 50%; border: 1.5px dashed #E8E6E1; box-sizing: border-box"></span>Reports · number = how many</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #FF7A45; box-sizing: border-box"></span>Anomaly</span>
+        </div>
+
+        <div style="margin-top: 36px">
+          <h2 style="margin: 0 0 16px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">WHAT THIS STORY IS BUILT FROM</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: rgba(232,230,225,0.12); border: 1px solid rgba(232,230,225,0.12)">
+            <div style="background: #060708; padding: 16px"><div style="font-family: 'Instrument Serif', serif; font-size: 34px; line-height: 1">6</div><div style="font-size: 13px; margin-top: 6px">Documents from parties</div><div style="font-size: 12px; color: #8E939B; margin-top: 2px">Ministries, parliaments</div></div>
+            <div style="background: #060708; padding: 16px"><div style="font-family: 'Instrument Serif', serif; font-size: 34px; line-height: 1">4</div><div style="font-size: 13px; margin-top: 6px">Independent documents</div><div style="font-size: 12px; color: #8E939B; margin-top: 2px">UN, tribunal</div></div>
+            <div style="background: #060708; padding: 16px"><div style="font-family: 'Instrument Serif', serif; font-size: 34px; line-height: 1">31</div><div style="font-size: 13px; margin-top: 6px">Aldorian press</div><div style="font-size: 12px; color: #8E939B; margin-top: 2px">9 state-run</div></div>
+            <div style="background: #060708; padding: 16px"><div style="font-family: 'Instrument Serif', serif; font-size: 34px; line-height: 1">24</div><div style="font-size: 13px; margin-top: 6px">Veymari press</div><div style="font-size: 12px; color: #8E939B; margin-top: 2px">11 state-run</div></div>
+            <div style="background: #060708; padding: 16px"><div style="font-family: 'Instrument Serif', serif; font-size: 34px; line-height: 1">18</div><div style="font-size: 13px; margin-top: 6px">International wire</div><div style="font-size: 12px; color: #8E939B; margin-top: 2px">Third countries</div></div>
+            <div style="background: #060708; padding: 16px"><div style="font-family: 'Instrument Serif', serif; font-size: 34px; line-height: 1">9</div><div style="font-size: 13px; margin-top: 6px">Blogs &amp; analysts</div><div style="font-size: 12px; color: #8E939B; margin-top: 2px">Weighted lower</div></div>
+          </div>
+        </div>
+      </section>
+
+      <aside aria-label="Selected reports" style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+        <div style="border-top: 1px solid #E8E6E1; padding-top: 18px">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #8E939B">CONFLICTING REPORTS · ALDORIAN PRESS · DAY 2</div>
+          <h2 style="margin: 12px 0 8px; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 36px; line-height: 1.05">“Unprovoked attack on our patrol”</h2>
+          <p style="margin: 0; font-size: 12px; color: #8E939B">Translated summary from Aldorian · machine translation, high confidence. Not the outlets' text.</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; margin-top: 14px; font-size: 13px">
+            <span>Grouped from 12 reports · 9 news, 3 op-ed</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #8E939B">GROUPING CONFIDENCE: HIGH</span>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #8E939B; margin-bottom: 10px">OFFICIAL DOCUMENTS ON THIS MOMENT</div>
+          <div style="border: 1px solid rgba(232,230,225,0.2); padding: 14px">
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">ISSUED BY A PARTY · ALDORIA DEFENCE MINISTRY</div>
+            <div style="font-size: 14px; line-height: 1.5; margin-top: 6px">The report describes contact and shots fired. It does not state which side fired first.</div>
+            <a href="#" style="display: inline-block; margin-top: 10px; font-size: 12px; padding: 4px 0">Read the document at source ↗</a>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #8E939B; margin-bottom: 10px">SAME MOMENT, OTHER PERSPECTIVES</div>
+          <div style="display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.45">
+            <div><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">VEYMARI PRESS · 10 REPORTS</span>“Their patrol crossed into our waters”</div>
+            <div><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B">INTERNATIONAL WIRE · 5 REPORTS</span>Satellite images show both ships in the disputed zone</div>
+          </div>
+          <div style="margin-top: 12px; background: rgba(255,122,69,0.1); padding: 12px 14px; font-size: 13px; line-height: 1.5; color: #FFD3C0">
+            <span style="color: #FF7A45; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; display: block; margin-bottom: 4px">ANOMALY · OMISSION</span>71% of other reports mention that the ministry's report doesn't name who fired first. None of these 12 do.
+            <a href="Method.dc.html" style="display: block; margin-top: 6px; color: #FFB08F; font-size: 12px">See the rule that flagged this</a>
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #8E939B">TOP SOURCES · WEIGHT</span>
+            <a href="Method.dc.html" style="font-size: 12px; color: #8E939B; padding: 4px 0">How we weigh</a>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 76px 70px; gap: 10px; align-items: center"><a href="Source.dc.html" style="text-decoration: none">Aldor Herald</a><span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #8E939B">NEWS</span><span style="height: 2px; background: rgba(232,230,225,0.15)"><span style="display: block; height: 100%; width: 74%; background: #E8E6E1"></span></span></div>
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 76px 70px; gap: 10px; align-items: center"><span>Capital Broadcast</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #FFB08F">STATE-RUN</span><span style="height: 2px; background: rgba(232,230,225,0.15)"><span style="display: block; height: 100%; width: 48%; background: #E8E6E1"></span></span></div>
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 76px 70px; gap: 10px; align-items: center"><span>The Northern Post</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #8E939B">OP-ED</span><span style="height: 2px; background: rgba(232,230,225,0.15)"><span style="display: block; height: 100%; width: 28%; background: #E8E6E1"></span></span></div>
+          </div>
+          <p style="margin: 10px 0 0; font-size: 11px; color: #8E939B">Weight changes ordering only. No report is hidden.</p>
+        </div>
+
+        <div style="border: 1px solid rgba(232,230,225,0.2); padding: 18px">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; color: #8E939B">ASK THE STORY</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px">
+            <a href="Ask.dc.html" style="display: inline-flex; align-items: center; font-size: 12px; min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.25); text-decoration: none">Who fired first?</a>
+            <button type="button" style="font: inherit; font-size: 12px; min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.25); background: transparent; color: #E8E6E1">Catch me up from Day 5</button>
+            <a href="Event.dc.html" style="display: inline-flex; align-items: center; font-size: 12px; min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.25); text-decoration: none">How did each side tell it?</a>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 12px">
+            <label for="ask" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Ask a question about this story</label>
+            <input id="ask" type="text" placeholder="Ask anything about this story…" style="flex: 1; min-width: 0; font: inherit; font-size: 14px; min-height: 44px; padding: 0 12px; border: 0; border-bottom: 1px solid rgba(232,230,225,0.35); background: transparent; color: #E8E6E1">
+            <button type="button" aria-label="Send" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid #E8E6E1; background: transparent; color: #E8E6E1; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+          </div>
+        </div>
+        <a href="Method.dc.html" style="font-size: 12px; color: #8E939B; padding: 6px 0">Something wrong here? Report a problem with this grouping or translation</a>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

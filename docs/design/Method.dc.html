@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How we weigh</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060708}
+a{color:#E8E6E1}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #E8E6E1; background: #060708; min-height: 100vh; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid rgba(232,230,225,0.12)">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.32em">WEFT</span>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em">
+      <a href="Today.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">TODAY</a>
+      <a href="World.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">WORLD</a>
+      <a href="Explore.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">STORIES</a>
+      <a href="Source.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">SOURCES</a>
+      <a href="Ask.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">ASK</a>
+      <a href="#" style="text-decoration: none; padding: 12px 14px">HOW WE WEIGH</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1100px; margin: 0 auto; padding: 56px 32px 80px; box-sizing: border-box; display: flex; flex-direction: column; gap: 64px">
+    <div>
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">HOW WE WEIGH · LAST UPDATED [DATE]</div>
+      <h1 style="margin: 12px 0 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 72px; line-height: 1">We don't decide what's true.</h1>
+      <p style="margin: 20px 0 0; font-size: 20px; line-height: 1.55; color: #B9BDC4; max-width: 760px">Weft shows who reported what, when, and from where. We flag places where reports don't line up. Every flag comes from a written rule you can read below.</p>
+    </div>
+
+    <section aria-labelledby="h-collect">
+      <h2 id="h-collect" style="margin: 0 0 20px; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 36px">What we collect</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: rgba(232,230,225,0.12); border: 1px solid rgba(232,230,225,0.12)">
+        <div style="background: #060708; padding: 20px"><div style="font-weight: 600">News outlets</div><div style="font-size: 14px; color: #B9BDC4; line-height: 1.55; margin-top: 6px">From every country involved, in their own language. State-run outlets are labelled as state-run everywhere they appear.</div></div>
+        <div style="background: #060708; padding: 20px"><div style="font-weight: 600">Official documents</div><div style="font-size: 14px; color: #B9BDC4; line-height: 1.55; margin-top: 6px">Government releases, parliament and court records. Each is labelled by who issued it, and whether that body is a party to the story.</div></div>
+        <div style="background: #060708; padding: 20px"><div style="font-weight: 600">Blogs and analysts</div><div style="font-size: 14px; color: #B9BDC4; line-height: 1.55; margin-top: 6px">Included, weighted lower, and always marked as opinion or analysis.</div></div>
+      </div>
+      <p style="margin: 16px 0 0; font-size: 14px; color: #8E939B">We store summaries and links, not full articles. Every node links to its original.</p>
+    </section>
+
+    <section aria-labelledby="h-weight">
+      <h2 id="h-weight" style="margin: 0 0 8px; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 36px">How a source's weight is set</h2>
+      <p style="margin: 0 0 20px; font-size: 15px; color: #B9BDC4; line-height: 1.55; max-width: 760px">Weight only changes the order things appear in. No report is ever hidden. We never score a source on whether it was “right”, only on how it reports.</p>
+      <div style="display: flex; flex-direction: column">
+        <sc-for list="{{factors}}" as="f" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 80px; gap: 24px; padding: 16px 0; border-top: 1px solid rgba(232,230,225,0.12); font-size: 15px; align-items: baseline">
+            <span style="font-weight: 500">{{f.name}}</span><span style="color: #B9BDC4; font-size: 14px; line-height: 1.5">{{f.how}}</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; text-align: right">{{f.dir}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-rules">
+      <h2 id="h-rules" style="margin: 0 0 8px; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 36px">The anomaly rules</h2>
+      <p style="margin: 0 0 20px; font-size: 15px; color: #B9BDC4; line-height: 1.55; max-width: 760px">Anomalies compare reports with other reports, never with “the truth”. No AI model flags anomalies. For the first hours of a story they stay provisional, until at least 5 sources from 2 perspectives have reported.</p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px">
+        <sc-for list="{{rules}}" as="r" hint-placeholder-count="7">
+          <div style="border: 1px solid rgba(255,122,69,0.5); padding: 18px">
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.16em; color: #FF7A45">{{r.name}}</div>
+            <div style="font-size: 14px; line-height: 1.55; margin-top: 8px">{{r.rule}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-models">
+      <h2 id="h-models" style="margin: 0 0 8px; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 36px">Where we use AI models</h2>
+      <p style="margin: 0 0 20px; font-size: 15px; color: #B9BDC4; line-height: 1.55; max-width: 760px">We run open-weight models on our own servers, pinned to exact versions. Every input and output is logged, so any result can be traced.</p>
+      <div style="display: flex; flex-direction: column">
+        <sc-for list="{{models}}" as="m" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 120px; gap: 24px; padding: 16px 0; border-top: 1px solid rgba(232,230,225,0.12); font-size: 15px; align-items: baseline">
+            <span style="font-weight: 500">{{m.job}}</span><span style="color: #B9BDC4; font-size: 14px; line-height: 1.5">{{m.how}}</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-align: right; color: #8E939B">{{m.model}}</span>
+          </div>
+        </sc-for>
+        <div style="padding: 16px 0; border-top: 1px solid #FF7A45; font-size: 15px; color: #FFD3C0">Never used for: flagging anomalies, scoring sources, or deciding what a story is about.</div>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-fund">
+      <h2 id="h-fund" style="margin: 0 0 12px; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 36px">Who pays for Weft</h2>
+      <p style="margin: 0; font-size: 17px; line-height: 1.6; max-width: 760px">[Reader subscriptions and donations]. No advertising, because ads reward exactly the engagement we're trying not to create. No funding from governments or parties covered in our stories.</p>
+    </section>
+
+    <section aria-labelledby="h-ours">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px">
+        <h2 id="h-ours" style="margin: 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 36px">Our own mistakes</h2>
+        <a href="#" style="font-size: 14px; padding: 6px 0">Report a problem</a>
+      </div>
+      <p style="margin: 0 0 20px; font-size: 15px; color: #B9BDC4; line-height: 1.55">Every correction Weft makes to its own groupings, translations or flags.</p>
+      <sc-for list="{{log}}" as="l" hint-placeholder-count="4">
+        <div style="display: grid; grid-template-columns: 100px 150px minmax(0, 1fr); gap: 20px; padding: 14px 0; border-top: 1px solid rgba(232,230,225,0.12); font-size: 14px; line-height: 1.5; align-items: baseline">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #8E939B">{{l.date}}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em">{{l.kind}}</span>
+          <span>{{l.what}}</span>
+        </div>
+      </sc-for>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2300}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      factors: [
+        { name: 'Names its sources', how: 'Share of claims attributed to a named person, document or outlet', dir: 'RAISES' },
+        { name: 'Links what it cites', how: 'Share of references to official documents that link to them', dir: 'RAISES' },
+        { name: 'Corrects in the open', how: 'Corrections published with a visible note', dir: 'RAISES' },
+        { name: 'Silent edits', how: 'Changes to published text with no note, found by comparing saved copies', dir: 'LOWERS' },
+        { name: 'Copied wording', how: 'Text near-identical to another outlet, without credit', dir: 'LOWERS' },
+        { name: 'Opinion share', how: 'Share of output that is op-ed or commentary', dir: 'LOWERS' }
+      ],
+      rules: [
+        { name: 'OMISSION', rule: 'A fact appears in at least 60% of reports on an event but is missing from every report in one perspective.' },
+        { name: 'NUMBERS DIFFER', rule: 'Reports of the same event give figures (casualties, amounts, dates) that differ by more than 20%.' },
+        { name: 'SILENCE', rule: 'An outlet that covered a story stops, while coverage elsewhere continues at the same level.' },
+        { name: 'COPIED TEXT', rule: 'Several supposedly independent outlets publish near-identical wording within hours.' },
+        { name: 'LOADED WORDING', rule: 'One perspective uses words for an event far more often than everyone else does, measured statistically.' },
+        { name: 'UNATTRIBUTED', rule: 'A claim is presented with no named source (“sources say”) when others name one.' },
+        { name: 'SILENT EDIT', rule: 'Published text changed with no correction note.' }
+      ],
+      models: [
+        { job: 'Pulling claims out of reports', how: 'Each claim keeps a link to the exact sentence it came from', model: '[OPEN MODEL]' },
+        { job: 'Checking event groupings', how: 'Confirms or rejects merges suggested by rules and similarity search', model: '[OPEN MODEL]' },
+        { job: 'Translation', how: 'Every translated text is labelled, with a confidence level', model: '[OPEN MODEL]' },
+        { job: 'Ask Weft and digests', how: 'Answers only from what’s in the story graph, citing every node', model: '[OPEN MODEL]' }
+      ],
+      log: [
+        { date: '[DATE]', kind: 'WRONG GROUPING', what: 'Two separate incidents in the strait were merged into one event. Split.' },
+        { date: '[DATE]', kind: 'TRANSLATION', what: '“Incursion” was translated as “invasion” in 4 Veymari summaries. Fixed.' },
+        { date: '[DATE]', kind: 'FALSE FLAG', what: 'A silence anomaly fired because one outlet’s feed broke, not its coverage. Removed.' },
+        { date: '[DATE]', kind: 'LABEL', what: 'An outlet was marked state-run after a change of ownership.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

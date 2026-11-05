@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>World desk</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060708}
+a{color:#E8E6E1}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #E8E6E1; background: #060708; min-height: 100vh; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid rgba(232,230,225,0.12)">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.32em">WEFT</span>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em">
+      <a href="Today.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">TODAY</a>
+      <a href="#" style="text-decoration: none; padding: 12px 14px">WORLD</a>
+      <a href="Explore.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">STORIES</a>
+      <a href="Source.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">SOURCES</a>
+      <a href="Ask.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">ASK</a>
+      <a href="Method.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">HOW WE WEIGH</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1440px; margin: 0 auto; padding: 40px 32px 64px; box-sizing: border-box">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">WORLD DESK · 168 OUTLETS · 23 LANGUAGES · FICTIONAL SAMPLE</div>
+    <h1 style="margin: 10px 0 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 64px; line-height: 1">The world, by who's telling it</h1>
+    <p style="margin: 14px 0 0; font-size: 15px; color: #B9BDC4; max-width: 640px; line-height: 1.55">Each thread is one country's press covering a story. Orange threads are where that country's press shows an anomaly compared with the rest of the coverage.</p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 40px; margin-top: 40px; align-items: flex-start">
+      <section aria-label="Coverage threads" style="flex: 999 1 640px; min-width: 0; overflow-x: auto">
+        <div style="position: relative; width: 1000px; height: 700px">
+          <svg width="1000" height="700" viewBox="0 0 1000 700" aria-hidden="true" style="position: absolute; left: 0; top: 0; fill: none">
+            <g stroke="rgba(232,230,225,0.28)" stroke-width="1">
+              <path d="M260 60 C500 60 500 400 740 400"></path>
+              <path d="M260 220 C500 220 500 70 740 70"></path>
+              <path d="M260 220 C500 220 500 176 740 176"></path>
+              <path d="M260 220 C500 220 500 282 740 282"></path>
+              <path d="M260 380 C500 380 500 70 740 70"></path>
+              <path d="M260 460 C500 460 500 494 740 494"></path>
+              <path d="M260 540 C500 540 500 400 740 400"></path>
+              <path d="M260 540 C500 540 500 600 740 600"></path>
+              <path d="M260 620 C500 620 500 400 740 400"></path>
+              <path d="M260 60 C500 60 500 600 740 600"></path>
+            </g>
+            <g stroke="#FF7A45" stroke-width="1.3">
+              <path d="M260 60 C500 60 500 70 740 70"></path>
+              <path d="M260 140 C500 140 500 70 740 70"></path>
+              <path d="M260 300 C500 300 500 600 740 600"></path>
+              <path d="M260 460 C500 460 500 494 740 494" stroke-dasharray="4 4"></path>
+            </g>
+          </svg>
+
+          <sc-for list="{{countries}}" as="c" hint-placeholder-count="8">
+            <div style="position: absolute; left: 20px; top: {{c.top}}; width: 252px; height: 40px; display: flex; align-items: center; justify-content: flex-end; gap: 14px">
+              <span style="text-align: right"><span style="display: block; font-size: 15px">{{c.name}}</span><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">{{c.meta}}</span></span>
+              <span style="flex: none; width: 12px; height: 12px; border-radius: 50%; background: #E8E6E1; box-shadow: 0 0 0 4px #060708, 0 0 14px rgba(232,230,225,0.4)"></span>
+            </div>
+          </sc-for>
+
+          <sc-for list="{{stories}}" as="s" hint-placeholder-count="6">
+            <a href="Main.dc.html" style="position: absolute; left: 728px; top: {{s.top}}; width: 272px; height: 52px; display: flex; align-items: center; gap: 14px; text-decoration: none">
+              <span style="flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1.5px dashed #E8E6E1; background: #060708; box-sizing: border-box"></span>
+              <span><span style="display: block; font-family: 'Instrument Serif', serif; font-size: 22px; line-height: 1.1">{{s.title}}</span><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B; margin-top: 3px">{{s.meta}}</span></span>
+            </a>
+          </sc-for>
+        </div>
+      </section>
+
+      <aside style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 36px">
+        <section aria-label="Coverage gaps">
+          <h2 style="margin: 0 0 6px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">COVERAGE GAPS</h2>
+          <div style="padding: 16px 0; border-bottom: 1px solid rgba(232,230,225,0.12)"><span style="display: block; font-family: 'Instrument Serif', serif; font-size: 22px; line-height: 1.2">Ostia drought</span><span style="display: block; font-size: 13px; color: #B9BDC4; margin-top: 4px; line-height: 1.5">Covered by Ostian and Calder press only. No wire service yet.</span></div>
+          <div style="padding: 16px 0; border-bottom: 1px solid rgba(232,230,225,0.12)"><span style="display: block; font-family: 'Instrument Serif', serif; font-size: 22px; line-height: 1.2">Tamsin recount</span><span style="display: block; font-size: 13px; color: #B9BDC4; margin-top: 4px; line-height: 1.5">Only one side's press. The other party's outlets haven't published.</span></div>
+          <div style="padding: 16px 0; border-bottom: 1px solid rgba(232,230,225,0.12)"><span style="display: block; font-family: 'Instrument Serif', serif; font-size: 22px; line-height: 1.2">Calder Isles</span><span style="display: block; font-size: 13px; color: #B9BDC4; margin-top: 4px; line-height: 1.5">6 outlets indexed. We can't reach their government records portal.</span></div>
+        </section>
+        <section aria-label="Filter">
+          <h2 style="margin: 0 0 14px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">SHOW</h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <button type="button" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #E8E6E1; background: #E8E6E1; color: #060708">All threads</button>
+            <button type="button" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1">Divergent only</button>
+            <button type="button" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1">My region</button>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var cs = [['Aldoria','31 OUTLETS · ALDORIAN'],['Veymar','24 OUTLETS · VEYMARI'],['Norland','40 OUTLETS · NORSK, ENGLISH'],['Tamsin','22 OUTLETS · TAMSI'],['Kessaria','12 OUTLETS · KESSARI'],['Ostia','18 OUTLETS · OSTIAN'],['Brevia','15 OUTLETS · BREVIAN'],['Calder Isles','6 OUTLETS · ENGLISH']];
+    var ss = [['Kessar Strait standoff','6 COUNTRIES · DAY 9'],['National budget 2027','NORLAND · DAY 12'],['Northern rail strike','NORLAND · DAY 3'],['Ostia drought','3 COUNTRIES · DAY 6'],['Brevia–Ostia trade pact','3 COUNTRIES · DAY 2'],['Tamsin election recount','2 COUNTRIES · DAY 4']];
+    return {
+      countries: cs.map(function (c, i) { return { name: c[0], meta: c[1], top: (40 + i * 80) + 'px' }; }),
+      stories: ss.map(function (s, i) { return { title: s[0], meta: s[1], top: (44 + i * 106) + 'px' }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

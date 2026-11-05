@@ -1,0 +1,32 @@
+# Example source entry. One file per source, or one file per country/beat with a list.
+# Every factual field (ownership, state_run) must cite where it came from.
+# Fictional example — replace with real sources for the launch beat.
+- id: aldor-herald
+  name: Aldor Herald
+  homepage: https://example.org/aldor-herald
+  country: AL            # ISO 3166-1 alpha-2
+  languages: [al]        # ISO 639
+  type: news             # news | wire | blog | gov | parliament | court | intl_body
+  state_run: false
+  owner_id: owner-group-x
+  ownership_source: https://example.org/filing
+  feeds:
+    - https://example.org/aldor-herald/rss
+  sitemaps:
+    - https://example.org/aldor-herald/news-sitemap.xml
+  rate_limit: { requests: 1, per_seconds: 10 }
+  paywalled: false
+
+- id: aldoria-defence-ministry
+  name: Aldoria Ministry of Defence
+  homepage: https://example.org/aldoria-mod
+  country: AL
+  languages: [al]
+  type: gov
+  state_run: true
+  crawl:
+    start_urls: [https://example.org/aldoria-mod/press]
+    allow: ["/press/"]
+    max_depth: 2
+  rate_limit: { requests: 1, per_seconds: 10 }
+  paywalled: false

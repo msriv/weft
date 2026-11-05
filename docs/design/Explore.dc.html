@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>All stories</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060708}
+a{color:#E8E6E1}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #E8E6E1; background: #060708; min-height: 100vh; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid rgba(232,230,225,0.12)">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.32em">WEFT</span>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em">
+      <a href="Today.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">TODAY</a>
+      <a href="World.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">WORLD</a>
+      <a href="#" style="text-decoration: none; padding: 12px 14px">STORIES</a>
+      <a href="Source.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">SOURCES</a>
+      <a href="Ask.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">ASK</a>
+      <a href="Method.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">HOW WE WEIGH</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1440px; margin: 0 auto; padding: 40px 32px 64px; box-sizing: border-box">
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; justify-content: space-between">
+      <div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">142 STORIES TRACKED · FICTIONAL SAMPLE</div>
+        <h1 style="margin: 10px 0 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 64px; line-height: 1">All stories</h1>
+      </div>
+      <div style="display: flex; gap: 8px; flex: 0 1 420px">
+        <label for="find" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search stories</label>
+        <input id="find" type="search" placeholder="Search a story, place or person" style="flex: 1; min-width: 0; font: inherit; font-size: 15px; min-height: 48px; padding: 0 4px; border: 0; border-bottom: 1px solid rgba(232,230,225,0.35); background: transparent; color: #E8E6E1">
+      </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; align-items: center">
+      <button type="button" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #E8E6E1; background: #E8E6E1; color: #060708">Developing</button>
+      <button type="button" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1">Quiet</button>
+      <button type="button" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1">Most anomalies</button>
+      <span style="width: 1px; height: 24px; background: rgba(232,230,225,0.2); margin: 0 8px"></span>
+      <label style="display: flex; align-items: center; gap: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.12em; color: #8E939B">REGION
+        <select style="font: inherit; font-size: 13px; letter-spacing: 0; color: #E8E6E1; background: #060708; border: 1px solid rgba(232,230,225,0.3); border-radius: 22px; min-height: 44px; padding: 0 14px"><option>Everywhere</option><option>Kessar region</option><option>Norland</option></select>
+      </label>
+      <label style="display: flex; align-items: center; gap: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.12em; color: #8E939B">TOPIC
+        <select style="font: inherit; font-size: 13px; letter-spacing: 0; color: #E8E6E1; background: #060708; border: 1px solid rgba(232,230,225,0.3); border-radius: 22px; min-height: 44px; padding: 0 14px"><option>All</option><option>Conflict</option><option>Economy</option><option>Elections</option></select>
+      </label>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1px; background: rgba(232,230,225,0.12); border: 1px solid rgba(232,230,225,0.12); margin-top: 32px">
+      <sc-for list="{{stories}}" as="s" hint-placeholder-count="6">
+        <a href="Main.dc.html" style="background: #060708; padding: 26px; text-decoration: none; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; justify-content: space-between; gap: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em; color: #8E939B"><span>{{s.where}}</span><span>DAY {{s.day}}</span></div>
+          <div style="font-family: 'Instrument Serif', serif; font-size: 32px; line-height: 1.08">{{s.title}}</div>
+          <svg width="100%" height="40" viewBox="0 0 320 40" preserveAspectRatio="none" aria-hidden="true" style="fill: none">
+            <path d="M0 20 L320 20" stroke="rgba(232,230,225,0.35)"></path>
+            <path d="M40 20 C40 6 80 6 90 4 M150 20 C150 34 190 34 200 36 M240 20 C240 6 270 6 280 4" stroke="rgba(232,230,225,0.25)"></path>
+          </svg>
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #B9BDC4; margin-bottom: 6px"><span>Reports that match across perspectives</span><span style="font-family: 'IBM Plex Mono', monospace">{{s.settledLabel}}</span></div>
+            <div style="height: 2px; background: rgba(232,230,225,0.15)"><div style="height: 100%; width: {{s.settled}}; background: #E8E6E1"></div></div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em">
+            <span>{{s.views}}</span>
+            <span style="color: #FF7A45">{{s.div}}</span>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    function s(where, day, title, pct, views, div) { return { where: where, day: day, title: title, settled: pct + '%', settledLabel: pct + '%', views: views, div: div }; }
+    return {
+      stories: [
+        s('KESSAR REGION · CONFLICT', 9, 'The Kessar Strait standoff', 42, '4 PERSPECTIVES', '3 ANOMALIES'),
+        s('NORLAND · ECONOMY', 12, 'National budget 2027', 71, '3 PERSPECTIVES', '2 ANOMALIES'),
+        s('TAMSIN · ELECTIONS', 4, 'Tamsin election recount', 18, '2 PERSPECTIVES', '4 ANOMALIES'),
+        s('OSTIA · CLIMATE', 6, 'Ostia drought and grain exports', 55, '3 PERSPECTIVES', '1 ANOMALY'),
+        s('NORLAND · LABOUR', 3, 'Northern rail strike', 30, '2 PERSPECTIVES', '2 ANOMALIES'),
+        s('BREVIA, OSTIA · TRADE', 2, 'Brevia–Ostia trade pact', 64, '3 PERSPECTIVES', '1 ANOMALY')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

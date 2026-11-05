@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>What else to build</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1240px; box-sizing: border-box; padding: 48px; background: #F4F5F7; color: #15181D; font-family: 'IBM Plex Sans', system-ui, sans-serif; display: flex; flex-direction: column; gap: 28px">
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
+    <div>
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #4B5361; letter-spacing: 0.06em">BEYOND THE INITIAL IDEA</div>
+      <h1 style="margin: 6px 0 0; font-size: 40px; letter-spacing: -0.02em">What else to build</h1>
+    </div>
+    <div style="display: flex; gap: 16px; font-family: 'IBM Plex Mono', monospace; font-size: 12px">
+      <span style="padding: 4px 10px; border-radius: 6px; background: #15181D; color: #FFFFFF">MVP</span>
+      <span style="padding: 4px 10px; border-radius: 6px; background: #DBE5FF; color: #1E3A8A">V2</span>
+      <span style="padding: 4px 10px; border-radius: 6px; background: #E3E6EA; color: #333A45">LATER</span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; flex: 1; min-height: 0">
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 18px; padding-bottom: 8px; border-bottom: 2px solid #15181D">{{g.name}}</h2>
+        <sc-for list="{{g.items}}" as="it" hint-placeholder-count="4">
+          <div style="background: #FFFFFF; border: 1px solid #DDE1E6; border-radius: 10px; padding: 14px">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px">
+              <div style="font-weight: 600; font-size: 15px; line-height: 1.3">{{it.t}}</div>
+              <sc-if value="{{it.mvp}}" hint-placeholder-val="{{ false }}"><span style="flex: none; font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 2px 8px; border-radius: 5px; background: #15181D; color: #FFFFFF">MVP</span></sc-if>
+              <sc-if value="{{it.v2}}" hint-placeholder-val="{{ false }}"><span style="flex: none; font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 2px 8px; border-radius: 5px; background: #DBE5FF; color: #1E3A8A">V2</span></sc-if>
+              <sc-if value="{{it.later}}" hint-placeholder-val="{{ false }}"><span style="flex: none; font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 2px 8px; border-radius: 5px; background: #E3E6EA; color: #333A45">LATER</span></sc-if>
+            </div>
+            <div style="margin-top: 6px; font-size: 13px; line-height: 1.5; color: #333A45">{{it.d}}</div>
+          </div>
+        </sc-for>
+      </section>
+    </sc-for>
+  </div>
+
+  <section style="background: #FFF4EC; border: 1px solid #F4B48A; border-radius: 12px; padding: 18px 22px">
+    <h2 style="margin: 0 0 10px; font-size: 16px; color: #431407">Hard parts to respect</h2>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; font-size: 13px; line-height: 1.5; color: #431407">
+      <div><strong>Event clustering.</strong> Deciding that 40 articles describe the same event is the real engine. Everything else sits on it.</div>
+      <div><strong>“Neutral” draws fire.</strong> Both sides will call the scores biased. Open methodology is the only defence that holds.</div>
+      <div><strong>Legal exposure.</strong> Scraping terms, copyright, and naming an outlet's coverage an “anomaly” all need care.</div>
+      <div><strong>Daily LLM cost.</strong> Claim extraction across every source, every day, adds up fast. Narrow the beat first.</div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    function i(tag, t, d) { return { t: t, d: d, mvp: tag === 'mvp', v2: tag === 'v2', later: tag === 'later' }; }
+    return {
+      groups: [
+        { name: 'Smarter tree', items: [
+          i('mvp', 'Claims, not articles', 'Nodes are single claims tied to evidence. An article is just a bundle of claims.'),
+          i('mvp', 'Omission detection', 'Most bias is what gets left out. Compare what each perspective reports with everyone else.'),
+          i('mvp', 'Distance from source', 'Every node traces back to a filing, dataset or court order, or shows that it can’t.'),
+          i('v2', 'Stealth edits', 'Snapshot articles. Show silent rewrites, corrections and retractions on the node.'),
+          i('v2', 'Live mode', 'Watch a breaking story grow as reports arrive. Anomalies stay provisional early on.')
+        ]},
+        { name: 'Earned trust', items: [
+          i('mvp', 'Open methodology', 'Publish the weighting formula and why each source scored what it did.'),
+          i('mvp', 'How-they-report scores', 'Weight comes from attribution, open corrections and silent edits. Never from “being right”.'),
+          i('v2', 'Ownership cards', 'Who owns and funds each outlet, on every source chip.'),
+          i('later', 'Adjustable lens', 'Readers change the weights and watch the tree shift. Shows nothing is hidden.')
+        ]},
+        { name: 'For the reader', items: [
+          i('mvp', 'Catch-up mode', '“I missed a week.” The agent covers only what changed since your last visit.'),
+          i('mvp', 'Open questions', 'An explicit list of what’s still unknown. Items close when evidence lands.'),
+          i('v2', 'Blind-spot meter', 'Detroit-style % of the tree explored, nudging you to the lanes you skip.'),
+          i('v2', 'Follow a branch', 'Get notified when a disputed claim is confirmed or dies.'),
+          i('v2', 'Steelman cards', 'The strongest cited version of each side, written by the agent.')
+        ]},
+        { name: 'Coverage', items: [
+          i('mvp', 'Records & proceedings', 'Government records, parliament and council sessions, court orders, with plain summaries. They form the spine.'),
+          i('mvp', 'Every side’s own press', 'In a conflict, pull each country’s media, translated, alongside third-country wires.'),
+          i('mvp', 'Claims + links, not text', 'Store extracted claims and links, not full articles. Safer and cheaper.'),
+          i('v2', 'Silence detection', 'Outlets that drop a story halfway through are a signal too.'),
+          i('later', 'Actor graph', 'People and organisations in a story, with their positions over time.')
+        ]}
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
