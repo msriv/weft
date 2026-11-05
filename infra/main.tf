@@ -60,3 +60,9 @@ module "crawler" {
   state_bucket          = module.storage.bucket_names["weft-snapshots"]
   dataset_id            = module.bigquery.dataset_id
 }
+
+module "gdelt" {
+  source      = "./modules/gdelt"
+  project_id  = var.project_id
+  theme_regex = var.gdelt_theme_regex
+}
