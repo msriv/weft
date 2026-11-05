@@ -12,17 +12,17 @@ Phase 1 and 2 are broken into tasks. Later phases stay at milestone level until 
 
 Exit: one beat's feeds ingesting reliably for a week.
 
-- [ ] Repo skeleton: `weft_core` Python package, `services/`, `pipeline/`, `infra/`, `web/`, `evals/`; uv or pip-tools for deps; ruff + pytest + mypy in CI
-- [ ] Terraform: `weft-dev` project, GCS buckets (`weft-raw` with 30-day lifecycle, `weft-snapshots`, `weft-models`), BigQuery dataset and tables (`raw_items`, `extracted_items`, `model_calls`, `batch_runs`), Pub/Sub topics, Artifact Registry, service accounts
-- [ ] Source registry: JSON Schema for `config/sources/*.yaml`, validator in CI, loader in `weft_core`
+- [x] Repo skeleton: `weft_core` Python package, `services/`, `pipeline/`, `infra/`, `web/`, `evals/`; uv or pip-tools for deps; ruff + pytest + mypy in CI
+- [x] Terraform: `weft-dev` project, GCS buckets (`weft-raw` with 30-day lifecycle, `weft-snapshots`, `weft-models`), BigQuery dataset and tables (`raw_items`, `extracted_items`, `model_calls`, `batch_runs`), Pub/Sub topics, Artifact Registry, service accounts
+- [x] Source registry: JSON Schema for `config/sources/*.yaml`, validator in CI, loader in `weft_core`
 - [ ] Seed 20–40 sources for the first beat across its perspectives, plus its government and parliament portals
-- [ ] `poller` Cloud Run job: RSS/Atom with conditional GET, news sitemaps, per-domain rate limit, robots.txt, publishes `items.new`
-- [ ] `fetcher` service: fetch, `trafilatura` extract, schema.org metadata, raw to GCS, row to `raw_items`, dedupe by canonical URL + text hash
-- [ ] Feed health: per-source last success, mark unhealthy, alert
-- [ ] `crawler` job for portals and transcripts (HTML + PDF, change detection by hash)
-- [ ] GDELT read: scheduled BigQuery query → `gdelt_candidates`
-- [ ] Model client in `weft_core`: OpenAI-compatible, pinned model + revision, temperature 0, seed, logs every call to `model_calls`
-- [ ] Dashboards: items per source per hour, extraction failures
+- [x] `poller` Cloud Run job: RSS/Atom with conditional GET, news sitemaps, per-domain rate limit, robots.txt, publishes `items.new`
+- [x] `fetcher` service: fetch, `trafilatura` extract, schema.org metadata, raw to GCS, row to `raw_items`, dedupe by canonical URL + text hash
+- [x] Feed health: per-source last success, mark unhealthy, alert
+- [x] `crawler` job for portals and transcripts (HTML + PDF, change detection by hash)
+- [x] GDELT read: scheduled BigQuery query → `gdelt_candidates`
+- [x] Model client in `weft_core`: OpenAI-compatible, pinned model + revision, temperature 0, seed, logs every call to `model_calls`
+- [x] Dashboards: items per source per hour, extraction failures
 
 ## Phase 2: Nightly graph
 
