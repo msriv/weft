@@ -6,6 +6,7 @@ variable "image" {
 }
 variable "service_account_email" { type = string }
 variable "state_bucket" { type = string }
+variable "dataset_id" { type = string }
 variable "items_new_topic" { type = string }
 variable "schedule" {
   description = "Cron for the poll run. Spec cadence for news feeds is every 5-15 minutes."
@@ -91,4 +92,18 @@ resource "google_cloud_scheduler_job" "poller" {
   }
 
   depends_on = [google_project_service.apis]
+}
+
+# Feed health: the poller appends to source_health and reads last success per source.
+resource "google_bigquery_dataset_iam_member" "health" {
+  project    = var.project_id
+  dataset_id = var.dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${var.service_account_email}"
+}
+
+resource "google_project_iam_member" "bq_jobs" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${var.service_account_email}"
 }

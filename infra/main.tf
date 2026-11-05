@@ -29,6 +29,7 @@ module "poller" {
   image                 = var.poller_image
   service_account_email = module.platform.service_account_emails["poller"]
   state_bucket          = module.storage.bucket_names["weft-snapshots"]
+  dataset_id            = module.bigquery.dataset_id
   items_new_topic       = module.messaging.topic_names["items-new"]
 }
 
@@ -41,4 +42,10 @@ module "fetcher" {
   raw_bucket            = module.storage.bucket_names["weft-raw"]
   dataset_id            = module.bigquery.dataset_id
   items_new_topic       = module.messaging.topic_names["items-new"]
+}
+
+module "monitoring" {
+  source      = "./modules/monitoring"
+  project_id  = var.project_id
+  alert_email = var.alert_email
 }
