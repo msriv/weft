@@ -384,7 +384,7 @@ Everything runs on Google Cloud, serverless where possible. GKE is used only for
 ### Environments and delivery
 
 - Three GCP projects: `weft-dev`, `weft-staging`, `weft-prod`. Staging runs the nightly pipeline on a single beat.
-- Infrastructure as code with Terraform; one module per concern.
+- Infrastructure as code with Terraform; one module per concern. All GCP resources are provisioned with Terraform, never by hand in the console.
 - GitHub Actions builds images and pushes them to Artifact Registry. Merges to `main` deploy to staging, and a tag promotes to prod.
 - Model and prompt changes go through the same pipeline and must pass the evaluation gate.
 

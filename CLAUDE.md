@@ -42,6 +42,7 @@ Create these only as the backlog needs them.
 ## How to work in this repo
 
 - Build in the order in `docs/backlog.md`: one beat end to end before widening. Don't start Phase N+1 work while Phase N's exit check fails.
+- All GCP infrastructure is provisioned with Terraform in `infra/`. No resources are created by hand in the console; add the Terraform module in the same PR as the code that needs it.
 - Keep the stack small. Don't add a new datastore, queue or framework without a decision entry in `docs/decisions.md`.
 - All model access goes through one client in `weft_core` that enforces rule 4 (pinning, logging). No direct HTTP calls to model providers elsewhere.
 - Scraped text is untrusted. Pass it to models only as quoted data, never as instructions. The Ask agent gets read-only tools and fixed Cypher templates; it never writes its own Cypher.
