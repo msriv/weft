@@ -23,3 +23,8 @@ variable "fetcher_image" {
   description = "Fetcher image in Artifact Registry. Built in CI, not by hand."
   type        = string
 }
+
+variable "alert_email" {
+  description = "Recipient for alert policies. PLACEHOLDER until the owner decides who is on call."
+  type        = string
+}

@@ -2,3 +2,4 @@ project_id = "weft-dev"
 region     = "REPLACE-ME" # PLACEHOLDER: pick in issue #2
 poller_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed to Artifact Registry
 fetcher_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
+alert_email = "REPLACE-ME" # PLACEHOLDER: who gets feed-health alerts

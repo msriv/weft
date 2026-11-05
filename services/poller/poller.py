@@ -16,6 +16,10 @@ import httpx
 from weft_core.polite import PoliteClient
 
 
+class PollSkipped(Exception):
+    """robots.txt, a cooldown or a 429 stopped the request: not a success for feed health."""
+
+
 @dataclass
 class FeedState:
     etag: str | None = None
@@ -42,7 +46,9 @@ class Poller:
         if st.last_modified:
             headers["If-Modified-Since"] = st.last_modified
         resp = self._http.get(url, interval, headers)
-        if resp is None or resp.status_code == 304:
+        if resp is None:
+            raise PollSkipped(f"{url}: blocked by robots.txt or backing off")
+        if resp.status_code == 304:
             return None
         self._state.put(url, FeedState(resp.headers.get("ETag"), resp.headers.get("Last-Modified")))
         return resp
@@ -74,18 +80,19 @@ class Poller:
             {"source_id": source["id"], "url": url, "title": title, "published": published}
         )
 
-    def run(self, sources: list[dict[str, Any]]) -> dict[str, str]:
-        """Poll every source once. Returns {source_id: error} for sources that failed."""
-        failures: dict[str, str] = {}
+    def run(self, sources: list[dict[str, Any]]) -> dict[str, str | None]:
+        """Poll every source once. Returns {source_id: error}, with None for a healthy source."""
+        out: dict[str, str | None] = {}
         for s in sources:
             try:
                 for u in s.get("feeds", []):
                     self.poll_feed(s, u)
                 for u in s.get("sitemaps", []):
                     self.poll_sitemap(s, u)
-            except (httpx.HTTPError, ET.ParseError) as exc:
-                failures[s["id"]] = str(exc)
-        return failures
+                out[s["id"]] = None
+            except (httpx.HTTPError, ET.ParseError, PollSkipped) as exc:
+                out[s["id"]] = str(exc)
+        return out
 
 
 def _interval(source: dict[str, Any]) -> float:

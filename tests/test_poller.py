@@ -1,8 +1,9 @@
 from typing import Any
 
 import httpx
+import pytest
 
-from services.poller.poller import FeedState, Poller
+from services.poller.poller import FeedState, Poller, PollSkipped
 from weft_core.polite import PoliteClient
 
 RSS = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
@@ -74,12 +75,15 @@ def test_sitemap() -> None:
 
 def test_robots_disallow_is_obeyed() -> None:
     p, out, _ = make(site(httpx.Response(200, content=RSS), "User-agent: *\nDisallow: /"))
-    assert p.poll_feed(SRC, "https://x.test/rss") == 0 and out == []
+    with pytest.raises(PollSkipped):
+        p.poll_feed(SRC, "https://x.test/rss")
+    assert out == []
 
 
 def test_robots_5xx_means_do_not_poll() -> None:
     p, _, _ = make(lambda r: httpx.Response(503))
-    assert p.poll_feed(SRC, "https://x.test/rss") == 0
+    with pytest.raises(PollSkipped):
+        p.poll_feed(SRC, "https://x.test/rss")
 
 
 def test_429_backs_off_host() -> None:
@@ -93,11 +97,14 @@ def test_429_backs_off_host() -> None:
 
     t = [0.0]
     p, _, _ = make(h, t)
-    p.poll_feed(SRC, "https://x.test/rss")
-    p.poll_feed(SRC, "https://x.test/rss2")  # inside cooldown: no request
+    with pytest.raises(PollSkipped):
+        p.poll_feed(SRC, "https://x.test/rss")
+    with pytest.raises(PollSkipped):
+        p.poll_feed(SRC, "https://x.test/rss2")  # inside cooldown: no request
     assert calls == ["/rss"]
     t[0] = 200.0
-    p.poll_feed(SRC, "https://x.test/rss2")
+    with pytest.raises(PollSkipped):  # still 429, but the request was made again
+        p.poll_feed(SRC, "https://x.test/rss2")
     assert calls == ["/rss", "/rss2"]
 
 
@@ -118,4 +125,5 @@ def test_run_reports_failing_source_and_continues() -> None:
     p, out, _ = make(h)
     bad = {**SRC, "id": "bad", "feeds": ["https://bad.test/rss"]}
     good = {**SRC, "id": "good", "feeds": ["https://x.test/rss"]}
-    assert list(p.run([bad, good])) == ["bad"] and len(out) == 2
+    res = p.run([bad, good])
+    assert res["bad"] and res["good"] is None and len(out) == 2

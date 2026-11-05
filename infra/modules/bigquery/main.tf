@@ -8,6 +8,7 @@ locals {
     extracted_items = "extracted_at"
     model_calls     = "called_at"
     batch_runs      = "started_at"
+    source_health   = "checked_at"
   }
 }
 
