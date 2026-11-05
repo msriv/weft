@@ -33,3 +33,8 @@ variable "crawler_image" {
   description = "Crawler image in Artifact Registry. Built in CI, not by hand."
   type        = string
 }
+
+variable "gdelt_theme_regex" {
+  description = "Regex over GDELT themes for the first beat. PLACEHOLDER until the beat is chosen (issue #1)."
+  type        = string
+}
