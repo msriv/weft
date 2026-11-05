@@ -13,3 +13,8 @@ variable "raw_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "poller_image" {
+  description = "Poller image, e.g. <region>-docker.pkg.dev/<project>/weft/poller:<tag>. Built in CI, not by hand."
+  type        = string
+}

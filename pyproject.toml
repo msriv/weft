@@ -3,6 +3,9 @@ name = "weft"
 version = "0.0.0"
 requires-python = ">=3.12"
 dependencies = [
+    "feedparser>=6.0.14",
+    "google-cloud-pubsub>=2.43.0",
+    "google-cloud-storage>=3.17.1",
     "httpx>=0.28.1",
     "jsonschema>=4.26.0",
     "pyyaml>=6.0.3",
@@ -30,4 +33,11 @@ target-version = "py312"
 
 [tool.mypy]
 strict = true
-files = ["weft_core", "tests"]
+files = ["weft_core", "services", "tests"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[[tool.mypy.overrides]]
+module = ["feedparser", "google.cloud.*"]
+ignore_missing_imports = true

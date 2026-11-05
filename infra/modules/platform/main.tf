@@ -15,3 +15,7 @@ resource "google_service_account" "sa" {
   account_id   = "weft-${each.key}"
   display_name = "Weft ${each.key}"
 }
+
+output "service_account_emails" {
+  value = { for k, a in google_service_account.sa : k => a.email }
+}
