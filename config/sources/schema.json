@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Weft source registry entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "homepage", "country", "languages", "type", "state_run", "rate_limit", "paywalled"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+    "name": {"type": "string", "minLength": 1},
+    "homepage": {"type": "string", "pattern": "^https?://"},
+    "country": {"type": "string", "pattern": "^[A-Z]{2}$"},
+    "languages": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z]{2,3}$"}},
+    "type": {"enum": ["news", "wire", "blog", "gov", "parliament", "court", "intl_body"]},
+    "state_run": {"type": "boolean"},
+    "state_run_source": {"type": "string", "pattern": "^https?://"},
+    "owner_id": {"type": "string"},
+    "ownership_source": {"type": "string", "pattern": "^https?://"},
+    "feeds": {"type": "array", "items": {"type": "string", "pattern": "^https?://"}},
+    "sitemaps": {"type": "array", "items": {"type": "string", "pattern": "^https?://"}},
+    "crawl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_urls"],
+      "properties": {
+        "start_urls": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^https?://"}},
+        "allow": {"type": "array", "items": {"type": "string"}},
+        "max_depth": {"type": "integer", "minimum": 0}
+      }
+    },
+    "rate_limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "per_seconds"],
+      "properties": {
+        "requests": {"type": "integer", "minimum": 1},
+        "per_seconds": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "paywalled": {"type": "boolean"}
+  },
+  "dependentRequired": {
+    "owner_id": ["ownership_source"]
+  },
+  "allOf": [
+    {"if": {"properties": {"state_run": {"const": true}}}, "then": {"required": ["state_run_source"]}},
+    {"anyOf": [{"required": ["feeds"]}, {"required": ["sitemaps"]}, {"required": ["crawl"]}]}
+  ]
+}

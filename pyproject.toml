@@ -2,10 +2,19 @@
 name = "weft"
 version = "0.0.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "jsonschema>=4.26.0",
+    "pyyaml>=6.0.3",
+]
 
 [dependency-groups]
-dev = ["ruff", "pytest", "mypy"]
+dev = [
+    "ruff",
+    "pytest",
+    "mypy",
+    "types-pyyaml>=6.0.12.20261103",
+    "types-jsonschema>=4.26.0.20261006",
+]
 
 [build-system]
 requires = ["hatchling"]

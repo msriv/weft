@@ -1,5 +1,5 @@
 # Example source entry. One file per source, or one file per country/beat with a list.
-# Every factual field (ownership, state_run) must cite where it came from.
+# Every factual field must cite where it came from: owner_id needs ownership_source, state_run: true needs state_run_source.
 # Fictional example — replace with real sources for the launch beat.
 - id: aldor-herald
   name: Aldor Herald
@@ -24,6 +24,7 @@
   languages: [al]
   type: gov
   state_run: true
+  state_run_source: https://example.org/mod-about   # cite where state ownership is stated
   crawl:
     start_urls: [https://example.org/aldoria-mod/press]
     allow: ["/press/"]
