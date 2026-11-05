@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>World desk, globe</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060708}
+a{color:#E8E6E1}a:hover{color:#FFFFFF}
+</style>
+</helmet>
+<div style="font-family: Inter, system-ui, sans-serif; color: #E8E6E1; background: #060708; min-height: 100vh; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid rgba(232,230,225,0.12)">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.32em">WEFT</span>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em">
+      <a href="Today.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">TODAY</a>
+      <a href="World.dc.html" style="text-decoration: none; padding: 12px 14px">WORLD</a>
+      <a href="Explore.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">STORIES</a>
+      <a href="Source.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">SOURCES</a>
+      <a href="Ask.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">ASK</a>
+      <a href="Method.dc.html" style="text-decoration: none; padding: 12px 14px; color: #8E939B">HOW WE WEIGH</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1440px; margin: 0 auto; padding: 40px 32px 64px; box-sizing: border-box">
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; justify-content: space-between">
+      <div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">WORLD DESK · GLOBE VIEW · FICTIONAL SAMPLE</div>
+        <h1 style="margin: 10px 0 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 64px; line-height: 1">Where the news is, and where it isn't</h1>
+        <p style="margin: 14px 0 0; font-size: 15px; color: #B9BDC4; max-width: 640px; line-height: 1.55">Drag to turn the globe. Hover or tap a marker for the latest headline. Dashed rings are coverage gaps: places we can't yet see well.</p>
+      </div>
+      <div role="group" aria-label="World desk view" style="display: flex; border: 1px solid rgba(232,230,225,0.3); border-radius: 22px; overflow: hidden">
+        <a href="World.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; text-decoration: none; font-size: 13px; color: #E8E6E1">Threads</a>
+        <span aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; font-size: 13px; background: #E8E6E1; color: #060708">Globe</span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 40px; margin-top: 32px; align-items: flex-start">
+      <section aria-label="Globe" style="flex: 999 1 640px; min-width: 0">
+        <div style="overflow-x: auto">
+          <div style="position: relative; width: 640px; height: 640px; margin: 0 auto">
+            <svg width="640" height="640" viewBox="0 0 640 640" role="img" aria-label="Rotatable globe of current stories and coverage gaps. The same stories are listed beside it." onPointerDown="{{down}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerLeave="{{up}}" style="display: block; touch-action: none; cursor: grab">
+              <circle cx="320" cy="320" r="296" fill="none" stroke="rgba(232,230,225,0.06)" stroke-width="10"></circle>
+              <circle cx="320" cy="320" r="290" fill="#0B0D10" stroke="rgba(232,230,225,0.28)" stroke-width="1"></circle>
+              <sc-for list="{{grat}}" as="g" hint-placeholder-count="10">
+                <path d="{{g}}" fill="none" stroke="rgba(232,230,225,0.07)" stroke-width="1"></path>
+              </sc-for>
+              <sc-for list="{{dots}}" as="d" hint-placeholder-count="0">
+                <circle cx="{{d.x}}" cy="{{d.y}}" r="1.7" fill="#8E939B" fill-opacity="{{d.o}}"></circle>
+              </sc-for>
+              <sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+                <g onMouseEnter="{{m.enter}}" onMouseLeave="{{m.leave}}" onClick="{{m.pick}}" style="cursor: pointer">
+                  <sc-if value="{{m.active}}" hint-placeholder-val="{{ false }}">
+                    <circle cx="{{m.x}}" cy="{{m.y}}" r="{{m.ring}}" fill="none" stroke="#E8E6E1" stroke-width="1"></circle>
+                  </sc-if>
+                  <sc-if value="{{m.gap}}" hint-placeholder-val="{{ false }}">
+                    <circle cx="{{m.x}}" cy="{{m.y}}" r="{{m.r}}" fill="none" stroke="#B9BDC4" stroke-width="1.5" stroke-dasharray="3 3"></circle>
+                  </sc-if>
+                  <sc-if value="{{m.anom}}" hint-placeholder-val="{{ false }}">
+                    <circle cx="{{m.x}}" cy="{{m.y}}" r="{{m.halo}}" fill="#FF7A45" fill-opacity="0.16"></circle>
+                    <circle cx="{{m.x}}" cy="{{m.y}}" r="{{m.r}}" fill="#060708" stroke="#FF7A45" stroke-width="1.6"></circle>
+                  </sc-if>
+                  <sc-if value="{{m.plain}}" hint-placeholder-val="{{ false }}">
+                    <circle cx="{{m.x}}" cy="{{m.y}}" r="{{m.r}}" fill="#E8E6E1"></circle>
+                  </sc-if>
+                  <circle cx="{{m.x}}" cy="{{m.y}}" r="18" fill="#000000" fill-opacity="0"></circle>
+                </g>
+              </sc-for>
+            </svg>
+
+            <sc-if value="{{hasPop}}" hint-placeholder-val="{{ false }}">
+              <div role="dialog" aria-label="{{pop.headline}}" style="position: absolute; left: {{pop.left}}; top: {{pop.top}}; width: 272px; box-sizing: border-box; padding: 16px 18px; background: #0E1013; border: 1px solid {{pop.border}}; box-shadow: 0 12px 40px rgba(0,0,0,0.6)">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; color: {{pop.kickerColor}}">{{pop.kicker}}</span>
+                  <sc-if value="{{pop.pinned}}" hint-placeholder-val="{{ false }}">
+                    <button type="button" aria-label="Close" onClick="{{close}}" style="width: 32px; height: 32px; margin: -8px -10px -8px 0; border: 0; background: transparent; color: #8E939B; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+                  </sc-if>
+                </div>
+                <div style="font-family: 'Instrument Serif', serif; font-size: 24px; line-height: 1.12; margin-top: 8px">{{pop.headline}}</div>
+                <div style="font-size: 13px; color: #B9BDC4; line-height: 1.5; margin-top: 8px">{{pop.source}}</div>
+                <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: #8E939B"><span>{{pop.time}}</span><span>{{pop.meta}}</span></div>
+                <a href="{{pop.href}}" style="display: inline-block; margin-top: 12px; padding: 6px 0; font-size: 13px">{{pop.linkText}}</a>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin-top: 16px">
+          <button type="button" aria-label="Turn globe west" onClick="{{west}}" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></button>
+          <button type="button" onClick="{{reset}}" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1; cursor: pointer">Reset view</button>
+          <button type="button" aria-label="Turn globe east" onClick="{{east}}" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(232,230,225,0.3); background: transparent; color: #E8E6E1; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+          <span style="width: 1px; height: 24px; background: rgba(232,230,225,0.2); margin: 0 8px"></span>
+          <sc-for list="{{filters}}" as="f" hint-placeholder-count="3">
+            <button type="button" aria-pressed="{{f.on}}" onClick="{{f.pick}}" style="font: inherit; font-size: 13px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid {{f.border}}; background: {{f.bg}}; color: {{f.fg}}; cursor: pointer">{{f.label}}</button>
+          </sc-for>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; margin-top: 18px; font-size: 12px; color: #8E939B">
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #E8E6E1"></span>Story · size = reports</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #FF7A45; box-sizing: border-box; box-shadow: 0 0 8px rgba(255,122,69,0.6)"></span>Story with anomalies</span>
+          <span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 50%; border: 1.5px dashed #B9BDC4; box-sizing: border-box"></span>Coverage gap</span>
+        </div>
+      </section>
+
+      <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 36px">
+        <section aria-label="Coverage gaps">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px">
+            <h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">COVERAGE GAPS</h2>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: #8E939B">SAME PANEL AS THREADS VIEW</span>
+          </div>
+          <sc-for list="{{gapList}}" as="g" hint-placeholder-count="3">
+            <button type="button" onClick="{{g.focus}}" style="display: block; width: 100%; text-align: left; font: inherit; color: #E8E6E1; background: transparent; border: 0; border-bottom: 1px solid rgba(232,230,225,0.12); padding: 16px 0; cursor: pointer">
+              <span style="display: flex; align-items: center; gap: 10px"><span style="flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1.5px dashed #B9BDC4; box-sizing: border-box"></span><span style="font-family: 'Instrument Serif', serif; font-size: 22px; line-height: 1.2">{{g.headline}}</span></span>
+              <span style="display: block; font-size: 13px; color: #B9BDC4; margin-top: 4px; line-height: 1.5; padding-left: 20px">{{g.source}}</span>
+            </button>
+          </sc-for>
+        </section>
+
+        <section aria-label="Stories on the globe">
+          <h2 style="margin: 0 0 6px; font-family: 'IBM Plex Mono', monospace; font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: #8E939B">STORIES ON THE GLOBE</h2>
+          <sc-for list="{{storyList}}" as="s" hint-placeholder-count="6">
+            <button type="button" onClick="{{s.focus}}" style="display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; width: 100%; text-align: left; font: inherit; color: #E8E6E1; background: transparent; border: 0; border-bottom: 1px solid rgba(232,230,225,0.12); padding: 12px 0; cursor: pointer">
+              <span style="width: 9px; height: 9px; border-radius: 50%; background: {{s.dot}}; box-sizing: border-box"></span>
+              <span><span style="display: block; font-size: 14px; line-height: 1.4">{{s.headline}}</span><span style="display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: #8E939B; margin-top: 2px">{{s.place}}</span></span>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #8E939B">{{s.time}}</span>
+            </button>
+          </sc-for>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { lon: 22, lat: 24, hover: null, pinned: null, filter: 'all' };
+    this.drag = null;
+    this.moved = false;
+    // shortcut: fictional landmasses as dot ellipses; real build uses Natural Earth country shapes via d3-geo.
+    var blobs = [[42, 14, 15, 30], [27, 40, 12, 22], [21, 24, 4, 6], [56, -24, 10, 28], [-6, 64, 18, 26], [-22, 90, 10, 18], [6, -66, 26, 18], [-34, 128, 4, 6], [-39, 134, 3, 5]];
+    var land = [];
+    for (var la = -80; la <= 80; la += 3.5) {
+      var step = 3.5 / Math.max(0.3, Math.cos(la * Math.PI / 180));
+      for (var lo = -180; lo < 180; lo += step) {
+        for (var i = 0; i < blobs.length; i++) {
+          var b = blobs[i], dl = (la - b[0]) / b[2], dn = (lo - b[1]) / b[3];
+          if (dl * dl + dn * dn <= 1 + 0.2 * Math.sin(lo * 0.35) * Math.cos(la * 0.5)) { land.push([la, lo]); break; }
+        }
+      }
+    }
+    this.land = land;
+    this.marks = [
+      { id: 'kessar', lat: 33, lon: 27, kind: 'story', anom: true, n: 212, place: 'KESSAR STRAIT', kicker: 'STORY · 3 ANOMALIES', headline: 'Maritime tribunal issues interim order', source: 'Kessar Maritime Tribunal · independent document', time: '2 H AGO · DAY 9', meta: '212 REPORTS · 4 PERSPECTIVES', href: 'Event.dc.html', linkText: 'Open event →' },
+      { id: 'ostia-port', lat: -3, lon: 62, kind: 'story', anom: true, n: 9, place: 'OSTIA · LIVE', kicker: 'LIVE · PROVISIONAL', headline: 'Explosion reported at Ostia grain port', source: 'Ostia Herald · news report', time: '47 MIN AGO', meta: '9 REPORTS · 3 PERSPECTIVES', href: 'Live.dc.html', linkText: 'Open live story →' },
+      { id: 'norland-budget', lat: 57, lon: -22, kind: 'story', anom: true, n: 88, place: 'NORLAND', kicker: 'STORY · 2 ANOMALIES', headline: 'Committee hearing on budget 2027', source: 'Norland Parliament · document from a party', time: '6 H AGO · DAY 12', meta: '88 REPORTS · 3 PERSPECTIVES', href: 'Event.dc.html', linkText: 'Open event →' },
+      { id: 'norland-rail', lat: 63, lon: -10, kind: 'story', anom: false, n: 31, place: 'NORLAND', kicker: 'STORY', headline: 'Rail union rejects ministry offer', source: 'The Northern Post · news report', time: '3 H AGO · DAY 3', meta: '31 REPORTS · 2 PERSPECTIVES', href: 'Event.dc.html', linkText: 'Open event →' },
+      { id: 'tamsin', lat: 8, lon: -68, kind: 'story', anom: true, n: 54, place: 'TAMSIN', kicker: 'STORY · 4 ANOMALIES', headline: 'Election recount enters third day', source: 'Tamsin Electoral Commission · document from a party', time: '9 H AGO · DAY 4', meta: '54 REPORTS · 2 PERSPECTIVES', href: 'Event.dc.html', linkText: 'Open event →' },
+      { id: 'brevia', lat: -21, lon: 88, kind: 'story', anom: false, n: 22, place: 'BREVIA', kicker: 'STORY', headline: 'Trade pact text published', source: 'Brevian Wire · news report', time: '1 DAY AGO · DAY 2', meta: '22 REPORTS · 3 PERSPECTIVES', href: 'Event.dc.html', linkText: 'Open event →' },
+      { id: 'gap-calder', lat: -35, lon: 129, kind: 'gap', anom: false, n: 0, place: 'CALDER ISLES', kicker: 'COVERAGE GAP', headline: 'Calder Isles', source: '6 outlets indexed. We can’t reach their government records portal.', time: 'FLAGGED 3 DAYS AGO', meta: 'NO WIRE COVERAGE', href: 'World.dc.html', linkText: 'See in threads view →' },
+      { id: 'gap-ostia', lat: -12, lon: 70, kind: 'gap', anom: false, n: 0, place: 'OSTIA', kicker: 'COVERAGE GAP', headline: 'Ostia drought', source: 'Covered by Ostian and Calder press only. No wire service yet.', time: 'FLAGGED TODAY', meta: '1 PERSPECTIVE', href: 'World.dc.html', linkText: 'See in threads view →' },
+      { id: 'gap-tamsin', lat: 16, lon: -60, kind: 'gap', anom: false, n: 0, place: 'TAMSIN', kicker: 'COVERAGE GAP', headline: 'Tamsin recount', source: 'Only one side’s press. The other party’s outlets haven’t published.', time: 'FLAGGED TODAY', meta: '1 OF 2 PARTIES', href: 'World.dc.html', linkText: 'See in threads view →' }
+    ];
+  }
+  proj(la, lo) {
+    var r = Math.PI / 180, p = la * r, l = (lo - this.state.lon) * r, p0 = this.state.lat * r;
+    var z = Math.sin(p0) * Math.sin(p) + Math.cos(p0) * Math.cos(p) * Math.cos(l);
+    var x = Math.cos(p) * Math.sin(l);
+    var y = Math.cos(p0) * Math.sin(p) - Math.sin(p0) * Math.cos(p) * Math.cos(l);
+    return { x: 320 + 290 * x, y: 320 - 290 * y, z: z };
+  }
+  line(pts) {
+    var d = '', pen = false;
+    for (var i = 0; i < pts.length; i++) {
+      var q = this.proj(pts[i][0], pts[i][1]);
+      if (q.z > 0) { d += (pen ? 'L' : 'M') + q.x.toFixed(1) + ' ' + q.y.toFixed(1) + ' '; pen = true; } else { pen = false; }
+    }
+    return d;
+  }
+  focusOn(m) {
+    this.setState({ lon: m.lon, lat: Math.max(-60, Math.min(60, m.lat)), pinned: m.id, hover: null });
+  }
+  renderVals() {
+    var self = this, st = this.state;
+    var grat = [];
+    for (var lo = -180; lo < 180; lo += 30) { var a = []; for (var la = -90; la <= 90; la += 3) a.push([la, lo]); var d = this.line(a); if (d) grat.push(d); }
+    for (var la2 = -60; la2 <= 60; la2 += 30) { var b = []; for (var lo2 = -180; lo2 <= 180; lo2 += 3) b.push([la2, lo2]); var d2 = this.line(b); if (d2) grat.push(d2); }
+    var dots = [];
+    for (var i = 0; i < this.land.length; i++) {
+      var q = this.proj(this.land[i][0], this.land[i][1]);
+      if (q.z > 0.02) dots.push({ x: q.x.toFixed(1), y: q.y.toFixed(1), o: (0.2 + 0.7 * q.z).toFixed(2) });
+    }
+    var show = function (m) { return st.filter === 'all' || (st.filter === 'anom' && m.anom) || (st.filter === 'gaps' && m.kind === 'gap'); };
+    var activeId = st.pinned || st.hover;
+    var marks = [];
+    this.marks.forEach(function (m) {
+      if (!show(m)) return;
+      var q = self.proj(m.lat, m.lon);
+      if (q.z <= 0.05) return;
+      var r = m.kind === 'gap' ? 9 : 5 + Math.sqrt(m.n) / 1.8;
+      marks.push({
+        x: q.x.toFixed(1), y: q.y.toFixed(1), r: r.toFixed(1), halo: (r + 9).toFixed(1), ring: (r + 6).toFixed(1),
+        gap: m.kind === 'gap', anom: m.anom, plain: m.kind === 'story' && !m.anom, active: m.id === activeId,
+        enter: function () { if (!self.drag) self.setState({ hover: m.id }); },
+        leave: function () { if (st.hover === m.id) self.setState({ hover: null }); },
+        pick: function () { if (self.moved) return; self.setState({ pinned: st.pinned === m.id ? null : m.id }); }
+      });
+    });
+    var pop = null;
+    var am = this.marks.find(function (m) { return m.id === activeId; });
+    if (am && show(am)) {
+      var pq = this.proj(am.lat, am.lon);
+      if (pq.z > 0.05) {
+        var left = pq.x > 360 ? pq.x - 296 : pq.x + 24;
+        var top = Math.max(8, Math.min(640 - 230, pq.y - 40));
+        pop = Object.assign({}, am, {
+          left: Math.round(left) + 'px', top: Math.round(top) + 'px', pinned: st.pinned === am.id,
+          border: am.anom ? 'rgba(255,122,69,0.6)' : 'rgba(232,230,225,0.25)',
+          kickerColor: am.anom ? '#FF7A45' : '#8E939B'
+        });
+      }
+    }
+    var fdefs = [['all', 'All'], ['anom', 'Anomalies'], ['gaps', 'Coverage gaps']];
+    var filters = fdefs.map(function (f) {
+      var on = st.filter === f[0];
+      return { label: f[1], on: on ? 'true' : 'false', bg: on ? '#E8E6E1' : 'transparent', fg: on ? '#060708' : '#E8E6E1', border: on ? '#E8E6E1' : 'rgba(232,230,225,0.3)', pick: function () { self.setState({ filter: f[0] }); } };
+    });
+    var withFocus = function (m) { return Object.assign({}, m, { focus: function () { self.focusOn(m); }, dot: m.anom ? '#FF7A45' : '#E8E6E1' }); };
+    return {
+      grat: grat, dots: dots, marks: marks, hasPop: !!pop, pop: pop || {}, filters: filters,
+      gapList: this.marks.filter(function (m) { return m.kind === 'gap'; }).map(withFocus),
+      storyList: this.marks.filter(function (m) { return m.kind === 'story'; }).map(withFocus),
+      down: function (e) { self.drag = { x: e.clientX, y: e.clientY, lon: st.lon, lat: st.lat }; self.moved = false; },
+      move: function (e) {
+        if (!self.drag) return;
+        var dx = e.clientX - self.drag.x, dy = e.clientY - self.drag.y;
+        if (Math.abs(dx) + Math.abs(dy) > 4) self.moved = true;
+        if (self.moved) self.setState({ lon: self.drag.lon - dx * 0.35, lat: Math.max(-70, Math.min(70, self.drag.lat + dy * 0.35)), hover: null });
+      },
+      up: function () { self.drag = null; },
+      west: function () { self.setState({ lon: st.lon - 30 }); },
+      east: function () { self.setState({ lon: st.lon + 30 }); },
+      reset: function () { self.setState({ lon: 22, lat: 24, pinned: null, hover: null }); },
+      close: function () { self.setState({ pinned: null }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

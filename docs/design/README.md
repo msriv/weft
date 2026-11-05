@@ -17,8 +17,8 @@ All names, numbers, outlets and stories in them (Aldoria, Veymar, Kessar Strait,
 | `Proceeding.dc.html` | Proceeding / official document page | `/d/{id}` |
 | `Source.dc.html` | Source profile: weight, reasons, ownership, anomalies | `/sources/{id}` |
 | `Actor.dc.html` | Person page: statements and how they were reported | `/people/{id}` |
-| `World.dc.html` | World desk: coverage threads by country, gaps | `/world` |
-| `Globe.dc.html` | World desk, globe view: stories and coverage gaps as markers on a rotatable globe (design note below; source file lives in the design canvas) | `/world?view=globe` |
+| `World.dc.html` | World desk, threads view (now with a Threads / Globe toggle): coverage threads by country, gaps | `/world` |
+| `Globe.dc.html` | World desk, globe view: stories and coverage gaps as markers on a rotatable globe (design note below) | `/world?view=globe` |
 | `Ask.dc.html` | Ask Weft agent with evidence panel | `/ask` |
 | `Method.dc.html` | How we weigh: rules, weights, models, funding, corrections log | `/method` |
 | `Onboard.dc.html` | Onboarding: regions, topics, frequency, how to read a story | `/welcome` |
