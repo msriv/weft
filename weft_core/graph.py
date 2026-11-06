@@ -32,6 +32,25 @@ CREATE TABLE IF NOT EXISTS entity_links (name TEXT PRIMARY KEY, wikidata_id TEXT
 CREATE TABLE IF NOT EXISTS copies (
   report_id TEXT NOT NULL, copy_of TEXT NOT NULL, jaccard REAL NOT NULL,
   PRIMARY KEY (report_id, copy_of));
+CREATE TABLE IF NOT EXISTS claims (
+  id TEXT NOT NULL, report_id TEXT NOT NULL, event_id TEXT, group_id TEXT, text TEXT NOT NULL,
+  lang TEXT, start_char INTEGER NOT NULL, end_char INTEGER NOT NULL, embedding TEXT,
+  {V}, PRIMARY KEY (id, valid_from));
+CREATE TABLE IF NOT EXISTS claim_groups (
+  id TEXT NOT NULL, event_id TEXT NOT NULL, label TEXT NOT NULL, perspectives TEXT NOT NULL,
+  n_reports INTEGER NOT NULL, {V}, PRIMARY KEY (id, valid_from));
+CREATE TABLE IF NOT EXISTS conflicts (
+  group_a TEXT NOT NULL, group_b TEXT NOT NULL, event_id TEXT NOT NULL, nli_score REAL NOT NULL,
+  {V}, PRIMARY KEY (group_a, group_b, valid_from));
+CREATE TABLE IF NOT EXISTS figures (
+  id TEXT NOT NULL, report_id TEXT NOT NULL, event_id TEXT, kind TEXT NOT NULL,
+  quantity TEXT, value REAL, unit TEXT, speaker TEXT, text TEXT NOT NULL,
+  start_char INTEGER NOT NULL, end_char INTEGER NOT NULL, {V}, PRIMARY KEY (id, valid_from));
+CREATE TABLE IF NOT EXISTS short_versions (
+  id TEXT NOT NULL, payload TEXT NOT NULL, {V}, PRIMARY KEY (id, valid_from));
+CREATE TABLE IF NOT EXISTS batch_runs (
+  run_id TEXT NOT NULL, stage TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT,
+  rows_out INTEGER, status TEXT NOT NULL, error TEXT, PRIMARY KEY (run_id, stage));
 """
 
 
@@ -48,7 +67,15 @@ def now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-JSON_COLS = {"embedding", "centroid", "minhash", "entities", "perspectives", "evidence_ids"}
+JSON_COLS = {
+    "embedding",
+    "centroid",
+    "minhash",
+    "entities",
+    "perspectives",
+    "evidence_ids",
+    "payload",
+}
 
 
 def _dec(row: dict[str, Any]) -> dict[str, Any]:

@@ -48,3 +48,24 @@ variable "stream_worker_image" {
   description = "Stream worker image in Artifact Registry. Built in CI, not by hand."
   type        = string
 }
+
+variable "nightly_image" {
+  description = "Nightly pipeline image in Artifact Registry. Built in CI, not by hand."
+  type        = string
+}
+
+variable "model_base_url" {
+  description = "OpenAI-compatible endpoint for the hosted open-weight models. PLACEHOLDER until the provider is chosen (issue #3)."
+  type        = string
+}
+
+variable "model_name" {
+  description = "Pinned model name, e.g. Qwen/Qwen3-14B."
+  type        = string
+  default     = "Qwen/Qwen3-14B"
+}
+
+variable "model_revision" {
+  description = "Pinned model revision (Hugging Face commit hash). PLACEHOLDER until the provider is chosen."
+  type        = string
+}
