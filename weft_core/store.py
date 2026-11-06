@@ -24,11 +24,14 @@ CREATE TABLE IF NOT EXISTS sources (
   country TEXT, languages TEXT NOT NULL DEFAULT '["en"]', type TEXT NOT NULL DEFAULT 'news',
   state_run INTEGER, state_run_source TEXT,   -- NULL = unverified
   owner_id TEXT, ownership_source TEXT,
+  crawl TEXT,                                 -- JSON {start_urls, allow, max_depth} for portals
   feeds TEXT NOT NULL DEFAULT '[]', sitemaps TEXT NOT NULL DEFAULT '[]',
   healthy INTEGER NOT NULL DEFAULT 1,
   paywalled INTEGER NOT NULL DEFAULT 0, min_interval REAL NOT NULL DEFAULT 10,
   status TEXT NOT NULL DEFAULT 'active',      -- active | rejected (no live feed found)
   discovered_via TEXT NOT NULL, discovered_at TEXT NOT NULL, verified_at TEXT);
+CREATE TABLE IF NOT EXISTS portal_candidates (
+  domain TEXT PRIMARY KEY, hits INTEGER NOT NULL, example_url TEXT NOT NULL, last_seen TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS stories (
   id TEXT PRIMARY KEY, beat_id TEXT NOT NULL REFERENCES beats(id), title TEXT NOT NULL,
   public INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
@@ -148,11 +151,13 @@ def register_source(
     feeds: list[str],
     via: str,
     rejected: bool = False,
+    type: str = "news",
+    crawl: dict[str, Any] | None = None,
 ) -> None:
     """Insert a discovered source. Ownership and state_run stay NULL: nothing here cites them."""
     db.execute(
         "INSERT OR IGNORE INTO sources(id,name,homepage,domain,feeds,status,discovered_via,"
-        "discovered_at,verified_at) VALUES(?,?,?,?,?,?,?,?,?)",
+        "discovered_at,verified_at,type,crawl) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         (
             domain.replace(".", "-"),
             name,
@@ -163,6 +168,8 @@ def register_source(
             via,
             _now(),
             None if rejected else _now(),
+            type,
+            json.dumps(crawl) if crawl else None,
         ),
     )
 
@@ -189,6 +196,8 @@ def active_sources(db: Db) -> list[dict[str, Any]]:
             "paywalled": bool(r["paywalled"]),
             "rate_limit": {"requests": 1, "per_seconds": r["min_interval"]},
         }
+        if r["crawl"]:
+            e["crawl"] = json.loads(r["crawl"])
         for k in ("country", "state_run", "state_run_source", "owner_id", "ownership_source"):
             if r[k] is not None:
                 e[k] = bool(r[k]) if k == "state_run" else r[k]

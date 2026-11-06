@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import FastAPI, Request, Response
 from google.cloud import pubsub_v1  # type: ignore[attr-defined]
 
-from services.stream_worker.worker import Deps, process
+from services.stream_worker.worker import Deps, process, process_document
 from weft_core import config, graph, store
 from weft_core.nlp import default_nlp
 
@@ -26,6 +26,22 @@ def create_app(deps: Deps) -> FastAPI:
             return Response(status_code=204)  # malformed: drop, don't retry
         status = process(msg, deps)
         print(json.dumps({"event": "stream_item", "source_id": msg["source_id"], "status": status}))
+        return Response(status_code=204)
+
+    @app.post("/documents")
+    async def push_document(request: Request) -> Response:
+        envelope = await request.json()
+        try:
+            msg = json.loads(base64.b64decode(envelope["message"]["data"]))
+            msg["item_id"], msg["source_id"], msg["url"]
+        except (KeyError, ValueError):
+            return Response(status_code=204)
+        status = process_document(msg, deps)
+        print(
+            json.dumps(
+                {"event": "stream_document", "source_id": msg["source_id"], "status": status}
+            )
+        )
         return Response(status_code=204)
 
     return app

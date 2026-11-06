@@ -62,6 +62,15 @@ CREATE TABLE IF NOT EXISTS source_weights (
 CREATE TABLE IF NOT EXISTS report_versions (
   report_id TEXT NOT NULL, n INTEGER NOT NULL, fetched_at TEXT NOT NULL, text_hash TEXT NOT NULL,
   PRIMARY KEY (report_id, n));
+CREATE TABLE IF NOT EXISTS documents (
+  id TEXT NOT NULL, url TEXT NOT NULL, issuer_id TEXT NOT NULL, kind TEXT NOT NULL,
+  story_id TEXT, event_id TEXT, published_at TEXT, lang TEXT, title TEXT, summary TEXT,
+  text_hash TEXT, {V}, PRIMARY KEY (id, valid_from));
+CREATE TABLE IF NOT EXISTS actors (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, wikidata_id TEXT, role TEXT);
+CREATE TABLE IF NOT EXISTS statements (
+  id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, document_id TEXT NOT NULL, text TEXT NOT NULL,
+  start_char INTEGER NOT NULL, end_char INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS translations (
   key TEXT PRIMARY KEY, lang TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS review_items (

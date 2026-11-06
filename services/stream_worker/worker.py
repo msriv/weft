@@ -77,6 +77,71 @@ def _mean(centroid: list[float], n: int, vec: list[float]) -> list[float]:
     return [x / norm for x in m]
 
 
+def place(
+    d: Deps,
+    rid: str,
+    text: str,
+    ent_names: set[str],
+    vec: list[float],
+    published: str,
+    document: bool = False,
+) -> tuple[str | None, str | None, float | None, str]:
+    """Match a beat, then attach to the nearest open event of its story or open a new one."""
+    cfg = d.cfg["stream"]
+    story_id = event_id = None
+    confidence = None
+    matched = beats_mod.matching(store.beats(d.db), f"{text} {' '.join(ent_names)}")
+    status = "no_beat"
+    if matched:
+        story_id = beats_mod.ensure_story(d.db, matched[0])
+        window = (
+            datetime.fromisoformat(published) - timedelta(hours=cfg["candidate_window_hours"])
+        ).isoformat()
+        cands = graph.open_events(d.db, story_id, window)
+        scored = sorted(
+            ((attach_score(vec, ent_names, published, e, cfg), e) for e in cands),
+            key=lambda x: -x[0],
+        )[: cfg["candidate_limit"]]
+        if scored and scored[0][0] >= cfg["attach_threshold"]:
+            confidence, ev = scored[0]
+            event_id = ev["id"]
+            if document:  # a document records an event, it is not a report of it
+                return story_id, event_id, confidence, "attached"
+            graph.put(
+                d.db,
+                "events",
+                {
+                    **{k: ev[k] for k in ("id", "story_id", "first_seen")},
+                    "centroid": _mean(ev["centroid"], ev["n_reports"], vec),
+                    "entities": sorted(set(ev["entities"]) | ent_names)[:60],
+                    "n_reports": ev["n_reports"] + 1,
+                    "grouping_confidence": confidence,
+                },
+            )
+            status = "attached"
+        elif document:
+            status = "story_only"
+        else:
+            event_id = hashlib.sha256(f"event:{rid}".encode()).hexdigest()[:32]
+            confidence = scored[0][0] if scored else None
+            graph.put(
+                d.db,
+                "events",
+                {
+                    "id": event_id,
+                    "story_id": story_id,
+                    "first_seen": published,
+                    "centroid": vec,
+                    "entities": sorted(ent_names)[:60],
+                    "n_reports": 1,
+                    "grouping_confidence": confidence,
+                },
+            )
+            status = "new_event"
+
+    return story_id, event_id, confidence, status
+
+
 def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
     """Handle one `items-extracted` message. Returns what happened, for logs and tests."""
     cfg = d.cfg["stream"]
@@ -110,52 +175,7 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
         if j >= cfg["near_dup_jaccard"]:
             copies.append((r["id"], j))
 
-    story_id = event_id = None
-    confidence = None
-    matched = beats_mod.matching(store.beats(d.db), f"{text} {' '.join(ent_names)}")
-    status = "no_beat"
-    if matched:
-        story_id = beats_mod.ensure_story(d.db, matched[0])
-        window = (
-            datetime.fromisoformat(published) - timedelta(hours=cfg["candidate_window_hours"])
-        ).isoformat()
-        cands = graph.open_events(d.db, story_id, window)
-        scored = sorted(
-            ((attach_score(vec, ent_names, published, e, cfg), e) for e in cands),
-            key=lambda x: -x[0],
-        )[: cfg["candidate_limit"]]
-        if scored and scored[0][0] >= cfg["attach_threshold"]:
-            confidence, ev = scored[0]
-            event_id = ev["id"]
-            graph.put(
-                d.db,
-                "events",
-                {
-                    **{k: ev[k] for k in ("id", "story_id", "first_seen")},
-                    "centroid": _mean(ev["centroid"], ev["n_reports"], vec),
-                    "entities": sorted(set(ev["entities"]) | ent_names)[:60],
-                    "n_reports": ev["n_reports"] + 1,
-                    "grouping_confidence": confidence,
-                },
-            )
-            status = "attached"
-        else:
-            event_id = hashlib.sha256(f"event:{rid}".encode()).hexdigest()[:32]
-            confidence = scored[0][0] if scored else None
-            graph.put(
-                d.db,
-                "events",
-                {
-                    "id": event_id,
-                    "story_id": story_id,
-                    "first_seen": published,
-                    "centroid": vec,
-                    "entities": sorted(ent_names)[:60],
-                    "n_reports": 1,
-                    "grouping_confidence": confidence,
-                },
-            )
-            status = "new_event"
+    story_id, event_id, confidence, status = place(d, rid, text, ent_names, vec, published)
 
     graph.put(
         d.db,
@@ -189,4 +209,55 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
             "INSERT OR IGNORE INTO copies(report_id,copy_of,jaccard) VALUES(?,?,?)", (rid, other, j)
         )
     d.publish({"report_id": rid, "event_id": event_id, "story_id": story_id, "status": status})
+    return status
+
+
+KINDS = (
+    ("transcript", ("transcript", "debate", "proceedings", "hansard", "verbatim")),
+    ("gazette", ("gazette", "notification")),
+    ("order", ("order", "judgment", "judgement", "ruling")),
+)
+
+
+def document_kind(url: str, title: str) -> str:
+    """release | transcript | order | gazette, from the URL and title (rules, no model)."""
+    probe = f"{url} {title}".lower()
+    return next((k for k, words_ in KINDS if any(w in probe for w in words_)), "release")
+
+
+def process_document(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
+    """A crawled official document: place it in a story and event like a report, as a Document
+    node issued by its source. Whether the issuer is a party is decided per story at read time."""
+    now = now or datetime.now(UTC).isoformat()
+    did = msg["item_id"]
+    if graph.get(d.db, "documents", did):
+        return "duplicate"
+    src = {s["id"]: s for s in store.active_sources(d.db)}.get(msg["source_id"])
+    if src is None:
+        return "unknown_source"
+    title, lede = msg.get("title") or "", msg.get("summary") or ""
+    text = f"{title}. {lede}".strip()
+    published = msg.get("published_at") or now
+    ents = {n for n, _ in d.nlp.entities.extract(text)}
+    story_id, event_id, _, status = place(
+        d, did, text, ents, d.nlp.embedder.embed(text), published, document=True
+    )
+    graph.put(
+        d.db,
+        "documents",
+        {
+            "id": did,
+            "url": msg["url"],
+            "issuer_id": msg["source_id"],
+            "kind": document_kind(msg["url"], title),
+            "story_id": story_id,
+            "event_id": event_id,
+            "published_at": published,
+            "lang": d.nlp.langid.detect(text),
+            "title": title,
+            "summary": lede,
+            "text_hash": msg.get("text_hash"),
+        },
+    )
+    d.publish({"document_id": did, "event_id": event_id, "story_id": story_id, "status": status})
     return status

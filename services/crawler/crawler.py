@@ -7,6 +7,7 @@ one becomes a new version (same URL, new text hash).
 
 import hashlib
 import re
+from collections.abc import Callable
 from html.parser import HTMLParser
 from typing import Any, Protocol
 from urllib.parse import urldefrag, urljoin, urlsplit
@@ -33,7 +34,11 @@ class _Links(HTMLParser):
 
 
 def crawl_source(
-    source: dict[str, Any], http: PoliteClient, store: Store, state: HashState
+    source: dict[str, Any],
+    http: PoliteClient,
+    store: Store,
+    state: HashState,
+    publish: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, int]:
     cfg = source["crawl"]
     allow = [re.compile(p) for p in cfg.get("allow", [])]
@@ -64,6 +69,8 @@ def crawl_source(
                     versioned=True,
                 )
                 counts["stored" if res.status == "stored" else "other"] += 1
+                if res.message and publish:
+                    publish(res.message)  # `documents-new`: the stream worker places it
                 state.put(url, digest)
         if depth < max_depth and "html" in ctype:
             parser = _Links()

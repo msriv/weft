@@ -16,6 +16,7 @@ from pipeline import (
     review_sample,
     short_version,
     snapshot,
+    statements,
     weights,
 )
 from pipeline.ctx import Ctx
@@ -28,6 +29,7 @@ STAGES: dict[str, Callable[[Ctx], int]] = {
     "claim_groups": groups.run_groups,
     "conflicts": groups.run_conflicts,
     "short_version": short_version.run,
+    "statements": statements.run,
     "anomalies": anomalies.run,
     "weights": weights.run,
     "snapshot": lambda ctx: snapshot.run(ctx, _sink()),

@@ -38,10 +38,19 @@ variable "push_topic" {
   type        = string
   default     = ""
 }
+variable "extra_pushes" {
+  description = "More Pub/Sub topics pushed to a path on this service: name => {topic, path}."
+  type        = map(object({ topic = string, path = string }))
+  default     = {}
+}
 variable "public" {
   description = "Allow unauthenticated invocation (the reader-facing API and web app)."
   type        = bool
   default     = false
+}
+
+locals {
+  pushed = var.push_topic != "" || length(var.extra_pushes) > 0
 }
 
 resource "google_project_service" "run" {
@@ -112,14 +121,14 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
 }
 
 resource "google_service_account" "push" {
-  count        = var.push_topic == "" ? 0 : 1
+  count        = local.pushed ? 1 : 0
   project      = var.project_id
   account_id   = "${var.name}-push"
   display_name = "${var.name} Pub/Sub push"
 }
 
 resource "google_cloud_run_v2_service_iam_member" "push" {
-  count    = var.push_topic == "" ? 0 : 1
+  count    = local.pushed ? 1 : 0
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.svc.name
@@ -139,6 +148,24 @@ resource "google_pubsub_subscription" "push" {
   }
   push_config {
     push_endpoint = google_cloud_run_v2_service.svc.uri
+    oidc_token {
+      service_account_email = google_service_account.push[0].email
+    }
+  }
+}
+
+resource "google_pubsub_subscription" "extra" {
+  for_each             = var.extra_pushes
+  project              = var.project_id
+  name                 = "${var.name}-${each.key}"
+  topic                = each.value.topic
+  ack_deadline_seconds = 120
+  retry_policy {
+    minimum_backoff = "10s"
+    maximum_backoff = "600s"
+  }
+  push_config {
+    push_endpoint = "${google_cloud_run_v2_service.svc.uri}${each.value.path}"
     oidc_token {
       service_account_email = google_service_account.push[0].email
     }

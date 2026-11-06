@@ -14,7 +14,8 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from google.cloud import bigquery, pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.fetcher.fetcher import Store, fetch_item
-from weft_core import store
+from weft_core import portals, store
+from weft_core import store as store_mod
 from weft_core.polite import PoliteClient
 
 
@@ -52,6 +53,7 @@ def create_app(
     http: PoliteClient,
     sources: dict[str, dict[str, Any]],
     publish: Callable[[dict[str, Any]], None] | None = None,
+    db: "store_mod.Db | None" = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -73,6 +75,8 @@ def create_app(
                 {"event": "item_processed", "source_id": msg["source_id"], "status": result.status}
             )
         )
+        if result.message and db is not None and result.message["gov_domains"]:
+            portals.record_candidates(db, set(result.message["gov_domains"]), msg["url"])
         if result.message and publish:
             publish(result.message)  # stream worker picks it up
         if result.status == "skipped":
@@ -84,7 +88,8 @@ def create_app(
 
 def _default_app() -> FastAPI:
     project = os.environ["PROJECT_ID"]
-    sources = store.LiveSources(store.from_env())
+    db = store.from_env()
+    sources = store.LiveSources(db)
     http = PoliteClient(httpx.Client(timeout=30, follow_redirects=True))
     publisher = pubsub_v1.PublisherClient()
     topic = publisher.topic_path(project, "items-extracted")
@@ -92,7 +97,7 @@ def _default_app() -> FastAPI:
     def publish(m: dict[str, Any]) -> None:
         publisher.publish(topic, json.dumps(m).encode()).result()
 
-    return create_app(GcpStore(project, os.environ["RAW_BUCKET"]), http, sources, publish)
+    return create_app(GcpStore(project, os.environ["RAW_BUCKET"]), http, sources, publish, db)
 
 
 def __getattr__(name: str) -> FastAPI:  # `uvicorn services.fetcher.app:app` builds it lazily
