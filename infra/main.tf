@@ -105,3 +105,50 @@ resource "google_pubsub_topic_iam_member" "fetcher_publish" {
   role    = "roles/pubsub.publisher"
   member  = "serviceAccount:${module.platform.service_account_emails["fetcher"]}"
 }
+
+resource "google_secret_manager_secret" "model_api_key" {
+  project   = var.project_id
+  secret_id = "weft-model-api-key"
+  replication {
+    auto {}
+  }
+}
+
+module "nightly" {
+  source                = "./modules/nightly"
+  project_id            = var.project_id
+  region                = var.region
+  image                 = var.nightly_image
+  service_account_email = module.platform.service_account_emails["nightly"]
+  stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version"]
+  secret_env = merge(module.discovery.turso_secret_ids, {
+    MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
+  })
+  env = {
+    PROJECT_ID     = var.project_id
+    RAW_BUCKET     = module.storage.bucket_names["weft-raw"]
+    MODEL_BASE_URL = var.model_base_url
+    MODEL_NAME     = var.model_name
+    MODEL_REVISION = var.model_revision
+    WEFT_NLP       = "real"
+  }
+}
+
+resource "google_storage_bucket_iam_member" "nightly_raw_read" {
+  bucket = module.storage.bucket_names["weft-raw"]
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${module.platform.service_account_emails["nightly"]}"
+}
+
+resource "google_bigquery_dataset_iam_member" "nightly_bq" {
+  project    = var.project_id
+  dataset_id = module.bigquery.dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${module.platform.service_account_emails["nightly"]}"
+}
+
+resource "google_project_iam_member" "nightly_bq_jobs" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${module.platform.service_account_emails["nightly"]}"
+}

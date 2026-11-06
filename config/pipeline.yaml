@@ -15,6 +15,7 @@ nightly:
   merge_min_score: 0.45          # below this a pair is never a candidate
   merge_auto_score: 0.80         # at or above this, merge without asking the model
   claim_group_cosine: 0.82       # claims of one event closer than this say the same thing
+  conflict_min_cosine: 0.50      # only topically close claim groups go to NLI
   nli_contradiction: 0.80        # NLI probability to record a conflict
   token_budget_per_beat: 400000  # stages degrade (fewer merge checks) rather than overspend
   review_sample_rate: 0.01

@@ -28,14 +28,14 @@ Exit: one beat's feeds ingesting reliably for a week.
 
 Exit: editors rate merge and claim quality on a labelled sample, and it beats the agreed bar.
 
-- [ ] Neo4j AuraDB instance, schema constraints, vector indexes, `valid_from`/`valid_to` helpers
-- [ ] Stream worker stages: type classification, GlotLID, MinHash near-dup, entities, BGE-M3 embedding, attach-to-event, Neo4j write
-- [ ] Nightly pipeline skeleton on Dataflow + Cloud Workflows; each stage reads/writes its own table and can re-run alone
-- [ ] Re-group stage with LLM merge check on borderline pairs
-- [ ] Claim extraction with forced JSON schema and source offsets
-- [ ] Numbers/quotes extraction (regex + dependency parse)
-- [ ] Claim groups + NLI conflict detection
-- [ ] Short-version set logic (reported by all / conflict / no source has published)
+- [x] Story graph store with `valid_from`/`valid_to` helpers (Turso, D17; replaces Neo4j AuraDB)
+- [x] Stream worker stages: type, language ID, MinHash near-dup, entities, embedding, attach-to-event, graph write
+- [x] Nightly pipeline skeleton (plain Python, Cloud Run job + Cloud Workflows, D18); each stage re-runs alone
+- [x] Re-group stage with LLM merge check on borderline pairs
+- [x] Claim extraction with forced JSON schema and source offsets
+- [x] Numbers/quotes extraction (regex + dependency parse)
+- [x] Claim groups + NLI conflict detection
+- [x] Short-version set logic (reported by all / conflict / no source has published)
 - [ ] Snapshots to GCS + daily diff
 - [ ] `evals/`: labelled set format, scripts for merges, claims, NLI, translation; eval gate in CI
 - [ ] Editor review queue (1% sample) — simple internal page is fine

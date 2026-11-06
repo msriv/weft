@@ -61,8 +61,16 @@ class ModelClient:
             timeout=60,
         )
 
-    def complete(self, *, prompt_template: str, instructions: str, data: str) -> str:
-        """Run one call. `instructions` is our template text; `data` is untrusted and gets quoted."""
+    def complete(
+        self,
+        *,
+        prompt_template: str,
+        instructions: str,
+        data: str,
+        json_schema: dict[str, Any] | None = None,
+    ) -> str:
+        """Run one call. `instructions` is our template text; `data` is untrusted and gets quoted.
+        With `json_schema` the provider is asked for output that matches it (forced JSON)."""
         body: dict[str, Any] = {
             "model": self._model,
             "temperature": TEMPERATURE,
@@ -72,6 +80,15 @@ class ModelClient:
                 {"role": "user", "content": quote_untrusted(data)},
             ],
         }
+        if json_schema is not None:
+            body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": prompt_template.split("@")[0],
+                    "schema": json_schema,
+                    "strict": True,
+                },
+            }
         resp = self._http.post("/chat/completions", json=body)
         resp.raise_for_status()
         output: str = resp.json()["choices"][0]["message"]["content"]
