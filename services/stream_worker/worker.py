@@ -199,6 +199,11 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
             "grouping_confidence": confidence,
         },
     )
+    if msg.get("text_hash"):  # version 0 for the silent-edit rule; later versions come from refetch
+        d.db.execute(
+            "INSERT OR IGNORE INTO report_versions(report_id,n,fetched_at,text_hash) VALUES(?,0,?,?)",
+            (rid, now, msg["text_hash"]),
+        )
     for name, kind in ents:
         d.db.execute(
             "INSERT OR IGNORE INTO report_entities(report_id,name,kind) VALUES(?,?,?)",

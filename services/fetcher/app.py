@@ -13,7 +13,9 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from google.cloud import bigquery, pubsub_v1, storage  # type: ignore[attr-defined]
 
+from services.fetcher import refetch as refetch_mod
 from services.fetcher.fetcher import Store, fetch_item
+from services.fetcher.tasks import CloudTasksQueue
 from weft_core import portals, store
 from weft_core import store as store_mod
 from weft_core.polite import PoliteClient
@@ -37,6 +39,9 @@ class GcpStore:
         )
         return bool(job.result().total_rows)
 
+    def save_version(self, item_id: str, n: int, content: bytes, ext: str) -> None:
+        self._bucket.blob(f"{item_id}.v{n}.{ext}").upload_from_string(content)
+
     def save(
         self, raw_row: dict[str, Any], extracted_row: dict[str, Any], content: bytes, ext: str
     ) -> None:
@@ -54,6 +59,8 @@ def create_app(
     sources: dict[str, dict[str, Any]],
     publish: Callable[[dict[str, Any]], None] | None = None,
     db: "store_mod.Db | None" = None,
+    files: refetch_mod.VersionStore | None = None,
+    queue_for: Callable[[str], refetch_mod.Enqueue] | None = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -79,8 +86,29 @@ def create_app(
             portals.record_candidates(db, set(result.message["gov_domains"]), msg["url"])
         if result.message and publish:
             publish(result.message)  # stream worker picks it up
+        if result.message and queue_for:
+            refetch_mod.schedule(result.message, queue_for(str(request.base_url)))
         if result.status == "skipped":
             raise HTTPException(status_code=503, detail="deferred")  # Pub/Sub retries with backoff
+        return Response(status_code=204)
+
+    @app.post("/refetch")
+    async def refetch(request: Request) -> Response:
+        task = await request.json()
+        try:
+            source = sources[task["source_id"]]
+            task["item_id"], task["url"], task["n"]
+        except KeyError:
+            return Response(status_code=204)
+        if db is None or files is None:
+            return Response(status_code=204)
+        try:
+            outcome = refetch_mod.refetch(task, source, http, db, files)
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        print(json.dumps({"event": "refetch", "source_id": task["source_id"], "outcome": outcome}))
+        if outcome == "skipped":
+            raise HTTPException(status_code=503, detail="deferred")  # Cloud Tasks retries
         return Response(status_code=204)
 
     return app
@@ -97,7 +125,18 @@ def _default_app() -> FastAPI:
     def publish(m: dict[str, Any]) -> None:
         publisher.publish(topic, json.dumps(m).encode()).result()
 
-    return create_app(GcpStore(project, os.environ["RAW_BUCKET"]), http, sources, publish, db)
+    gcp = GcpStore(project, os.environ["RAW_BUCKET"])
+
+    def queue_for(base_url: str) -> refetch_mod.Enqueue:
+        return CloudTasksQueue(
+            project,
+            os.environ["REGION"],
+            os.environ["REFETCH_QUEUE"],
+            os.environ["TASKS_SERVICE_ACCOUNT"],
+            base_url,
+        )
+
+    return create_app(gcp, http, sources, publish, db, gcp, queue_for)
 
 
 def __getattr__(name: str) -> FastAPI:  # `uvicorn services.fetcher.app:app` builds it lazily

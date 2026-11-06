@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 import httpx
 
@@ -159,3 +159,53 @@ def test_scanned_pdf_falls_back_to_ocr(monkeypatch: Any) -> None:
     monkeypatch.setattr(fetcher, "ocr_page", lambda page: "")  # no tesseract: recorded as failure
     meta, _ = fetcher._extract(BLANK_PDF, "https://x.gov/order.pdf", "application/pdf")
     assert not meta["text"].strip()
+
+
+def test_refetch_schedule_and_version_collection() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from services.fetcher import refetch
+
+    queued: list[tuple[dict[str, Any], datetime]] = []
+    now = datetime(2026, 11, 6, tzinfo=UTC)
+    refetch.schedule(
+        {"item_id": "i", "source_id": "s", "url": "https://x/a"},
+        lambda b, t: queued.append((b, t)),
+        now,
+    )
+    assert [t - now for _, t in queued] == [
+        timedelta(hours=1),
+        timedelta(hours=24),
+        timedelta(days=7),
+    ]
+    assert [b["n"] for b, _ in queued] == [1, 2, 3]
+
+    page = (
+        "<html><body><article><p>"
+        + " ".join(f"Sentence {i} of the report." for i in range(60))
+        + "</p></article></body></html>"
+    )
+    pages = {"text": page}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/robots.txt":
+            return httpx.Response(404)
+        return httpx.Response(200, text=pages["text"], headers={"content-type": "text/html"})
+
+    http = PoliteClient(httpx.Client(transport=httpx.MockTransport(handler)))
+    db = SqliteDb()
+    graph.init(db)
+
+    class Files:
+        saved: ClassVar[list[tuple[str, int]]] = []
+
+        def save_version(self, item_id: str, n: int, content: bytes, ext: str) -> None:
+            self.saved.append((item_id, n))
+
+    src = {"rate_limit": {"requests": 1, "per_seconds": 0}}
+    task = {"item_id": "i", "url": "https://x/a", "n": 1}
+    first = refetch.refetch(task, src, http, db, Files())
+    assert first == "unchanged"  # no earlier version recorded in this fixture
+    pages["text"] = page.replace("Sentence 3 of", "Sentence three of")
+    assert refetch.refetch({**task, "n": 2}, src, http, db, Files()) == "changed"
+    assert [r["n"] for r in db.execute("SELECT n FROM report_versions ORDER BY n")] == [1, 2]
