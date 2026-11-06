@@ -71,6 +71,10 @@ CREATE TABLE IF NOT EXISTS actors (
 CREATE TABLE IF NOT EXISTS statements (
   id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, document_id TEXT NOT NULL, text TEXT NOT NULL,
   start_char INTEGER NOT NULL, end_char INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS reader_reports (
+  kind TEXT NOT NULL, ref_id TEXT, message TEXT NOT NULL, email TEXT, created_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open', resolution TEXT);
+CREATE TABLE IF NOT EXISTS corrections (day TEXT NOT NULL, kind TEXT NOT NULL, what TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS translations (
   key TEXT PRIMARY KEY, lang TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS review_items (
