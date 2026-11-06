@@ -10,7 +10,7 @@ resource "google_artifact_registry_repository" "images" {
 
 # One service account per service; IAM grants are added with the service that needs them.
 resource "google_service_account" "sa" {
-  for_each     = toset(["poller", "fetcher", "crawler", "stream-worker", "api", "discovery"])
+  for_each     = toset(["poller", "fetcher", "crawler", "stream-worker", "api", "discovery", "nightly", "ask", "notifier", "web"])
   project      = var.project_id
   account_id   = "weft-${each.key}"
   display_name = "Weft ${each.key}"

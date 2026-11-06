@@ -36,6 +36,7 @@ class Store(Protocol):
 class Result:
     status: str  # stored | duplicate | skipped | extract_failed
     item_id: str | None = None
+    message: dict[str, Any] | None = None  # `items-extracted` payload, set when stored
 
 
 def normalize_url(url: str) -> str:
@@ -120,7 +121,36 @@ def ingest(
         content,
         ext,
     )
-    return Result("stored", item_id)
+    return Result(
+        "stored",
+        item_id,
+        {
+            "item_id": item_id,
+            "source_id": msg["source_id"],
+            "url": msg["url"],
+            "title": d.get("title"),
+            "summary": lede,
+            "published_at": _iso(d.get("date")),
+            "section": ",".join(d.get("categories") or [])
+            if isinstance(d.get("categories"), list)
+            else (d.get("categories") or ""),
+            "text_hash": text_hash,
+        },
+    )
+
+
+def _iso(v: Any) -> str | None:
+    """trafilatura gives YYYY-MM-DD (or a datetime); the graph wants an ISO timestamp."""
+    if not v:
+        return None
+    try:
+        return (
+            datetime.fromisoformat(str(v)).replace(tzinfo=UTC).isoformat()
+            if "+" not in str(v)
+            else str(v)
+        )
+    except ValueError:
+        return None
 
 
 _META_KEYS = {"author", "date", "sitename", "categories", "tags", "description", "hostname"}

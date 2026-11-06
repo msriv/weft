@@ -6,11 +6,12 @@ Run with max instances 1 and concurrency 1 so there is one connection at a time.
 import base64
 import json
 import os
+from collections.abc import Callable
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
-from google.cloud import bigquery, storage  # type: ignore[attr-defined]
+from google.cloud import bigquery, pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.fetcher.fetcher import Store, fetch_item
 from weft_core import store
@@ -46,7 +47,12 @@ class GcpStore:
                 raise RuntimeError(f"insert into {table} failed: {errs}")
 
 
-def create_app(store: Store, http: PoliteClient, sources: dict[str, dict[str, Any]]) -> FastAPI:
+def create_app(
+    store: Store,
+    http: PoliteClient,
+    sources: dict[str, dict[str, Any]],
+    publish: Callable[[dict[str, Any]], None] | None = None,
+) -> FastAPI:
     app = FastAPI()
 
     @app.post("/")
@@ -67,6 +73,8 @@ def create_app(store: Store, http: PoliteClient, sources: dict[str, dict[str, An
                 {"event": "item_processed", "source_id": msg["source_id"], "status": result.status}
             )
         )
+        if result.message and publish:
+            publish(result.message)  # stream worker picks it up
         if result.status == "skipped":
             raise HTTPException(status_code=503, detail="deferred")  # Pub/Sub retries with backoff
         return Response(status_code=204)
@@ -78,7 +86,13 @@ def _default_app() -> FastAPI:
     project = os.environ["PROJECT_ID"]
     sources = store.LiveSources(store.from_env())
     http = PoliteClient(httpx.Client(timeout=30, follow_redirects=True))
-    return create_app(GcpStore(project, os.environ["RAW_BUCKET"]), http, sources)
+    publisher = pubsub_v1.PublisherClient()
+    topic = publisher.topic_path(project, "items-extracted")
+
+    def publish(m: dict[str, Any]) -> None:
+        publisher.publish(topic, json.dumps(m).encode()).result()
+
+    return create_app(GcpStore(project, os.environ["RAW_BUCKET"]), http, sources, publish)
 
 
 def __getattr__(name: str) -> FastAPI:  # `uvicorn services.fetcher.app:app` builds it lazily

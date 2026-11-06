@@ -1,0 +1,20 @@
+# Pipeline thresholds. Starting points, to tune against the labelled set in evals/.
+version: 1
+
+stream:
+  candidate_window_hours: 72     # open events considered for attach
+  candidate_limit: 20
+  attach_threshold: 0.55         # score = w_cos*cos + w_ent*entity_jaccard + w_time*time_proximity
+  weights: {cosine: 0.60, entities: 0.25, time: 0.15}
+  time_decay_hours: 24
+  near_dup_jaccard: 0.80
+  near_dup_window_hours: 72
+
+nightly:
+  regroup_days: 14
+  merge_min_score: 0.45          # below this a pair is never a candidate
+  merge_auto_score: 0.80         # at or above this, merge without asking the model
+  claim_group_cosine: 0.82       # claims of one event closer than this say the same thing
+  nli_contradiction: 0.80        # NLI probability to record a conflict
+  token_budget_per_beat: 400000  # stages degrade (fewer merge checks) rather than overspend
+  review_sample_rate: 0.01
