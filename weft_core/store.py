@@ -17,7 +17,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS beats (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,
   patterns TEXT NOT NULL,            -- JSON list of case-insensitive regexes over GDELT fields
-  languages TEXT NOT NULL DEFAULT '["en"]');
+  languages TEXT NOT NULL DEFAULT '["en"]',
+  parties TEXT NOT NULL DEFAULT '[]');   -- proposed parties (JSON list), unverified
 CREATE TABLE IF NOT EXISTS sources (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, homepage TEXT NOT NULL, domain TEXT NOT NULL UNIQUE,
   country TEXT, languages TEXT NOT NULL DEFAULT '["en"]', type TEXT NOT NULL DEFAULT 'news',
@@ -104,18 +105,32 @@ def _now() -> str:
 
 
 def add_beat(
-    db: Db, id: str, name: str, patterns: list[str], languages: list[str] | None = None
+    db: Db,
+    id: str,
+    name: str,
+    patterns: list[str],
+    languages: list[str] | None = None,
+    parties: list[str] | None = None,
 ) -> None:
     db.execute(
-        "INSERT INTO beats(id,name,patterns,languages) VALUES(?,?,?,?) "
+        "INSERT INTO beats(id,name,patterns,languages,parties) VALUES(?,?,?,?,?) "
         "ON CONFLICT(id) DO UPDATE SET name=excluded.name, patterns=excluded.patterns, "
-        "languages=excluded.languages",
-        (id, name, json.dumps(patterns), json.dumps(languages or ["en"])),
+        "languages=excluded.languages, parties=excluded.parties",
+        (
+            id,
+            name,
+            json.dumps(patterns),
+            json.dumps(languages or ["en"]),
+            json.dumps(parties or []),
+        ),
     )
 
 
 def beats(db: Db) -> list[dict[str, Any]]:
-    return [{**r, "patterns": json.loads(r["patterns"])} for r in db.execute("SELECT * FROM beats")]
+    return [
+        {**r, "patterns": json.loads(r["patterns"]), "parties": json.loads(r["parties"])}
+        for r in db.execute("SELECT * FROM beats")
+    ]
 
 
 def known_domains(db: Db) -> set[str]:

@@ -64,7 +64,18 @@ Short record of what was decided and why. Add an entry before changing any of th
 **What does not change:** The product rules. Ownership and `state_run` facts still carry a citation, or are stored as "unverified" and shown that way. Party status stays per story (rule 7), proposed by the pipeline and editable by an admin. Source weight changes ordering only (rule 6). Visibility is the only human gate.
 **Why:** The system is meant to scale to many stories and languages without staffing a review queue for every source.
 
-## D16. Operational database: Turso (proposed, pending comparison)
-**Status:** Proposed. Cloud SQL was never part of the plan and is too costly for now.
+## D16. Operational database: Turso
+**Status:** Accepted for operational data (sources, stories, parties, toggles); graph question settled in D17. Cloud SQL was never part of the plan and is too costly for now.
 **Idea:** Turso (libSQL) holds operational data: sources, stories, parties, feed health, admin toggles. Neo4j AuraDB keeps the story graph and vectors (D6) unless a comparison shows Turso can carry those too.
 **Open:** Neo4j AuraDB vs Turso for the graph (cost, graph queries, vector search, operations). Needs a decision entry before any Turso code, per CLAUDE.md.
+
+## D17. Story graph on Turso, not Neo4j (supersedes D6 for the MVP)
+**Decided (default, reversible):** The story graph lives in Turso (libSQL) as relational tables that mirror the node and relationship names in the spec (`reports`, `events`, `claims`, `claim_groups`, `anomalies`, ...). Every row carries `valid_from` and `valid_to`; nothing is deleted. Vectors are stored as JSON arrays and searched in Python over the open events of the last 72 hours.
+**Why:** Mihir asked for Turso over a paid graph database to keep cost down. At MVP volume (four beats, English) a stream attach looks at tens of events and the nightly job at a few thousand reports, so graph traversals are two-hop joins and brute-force cosine is fast enough. One datastore instead of two.
+**Cost of this choice:** No native graph queries and no ANN index. The Ask agent's "fixed Cypher templates" become fixed SQL templates with the same rule: the agent never writes its own query. If volume outgrows this, move the `graph.py` accessors to Neo4j AuraDB or use libSQL native vector columns; callers go through `weft_core.graph`, so only that module changes.
+**Does not change:** Rules 1 to 7, the node and relationship model, and `valid_from`/`valid_to` on everything.
+
+## D18. Nightly stages are plain Python run as a Cloud Run job
+**Decided (default, reversible):** Each nightly stage is a function in `pipeline/` that reads and writes its own tables and can re-run alone. One Cloud Run job runs them in order, orchestrated by Cloud Workflows, triggered by Cloud Scheduler. Stages are written as pure functions over rows so they can be wrapped in Apache Beam `DoFn`s later without changes.
+**Why:** The nightly input is a few thousand reports; Dataflow's per-job startup and cost buy nothing at that size. The 4-hour window is far from tight.
+**Revisit when:** a stage exceeds its time budget, or the beat count grows enough that one job instance cannot hold a night's reports in memory.

@@ -43,3 +43,8 @@ variable "discovery_image" {
   description = "Discovery image, e.g. <region>-docker.pkg.dev/<project>/weft/discovery:<tag>. Built in CI, not by hand."
   type        = string
 }
+
+variable "stream_worker_image" {
+  description = "Stream worker image in Artifact Registry. Built in CI, not by hand."
+  type        = string
+}

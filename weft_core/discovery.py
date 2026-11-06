@@ -159,26 +159,41 @@ def _previous(url: str) -> str:
 
 
 def seed_beats(db: store.Db) -> None:
-    """Initial beat inputs (Mihir, 2026-11-06). Patterns are GDELT-field regexes, editable in the DB."""
-    for id_, name, pats in BEATS:
-        store.add_beat(db, id_, name, pats)
+    """Initial beat inputs (Mihir, 2026-11-06). Patterns are regexes over GDELT fields in
+    discovery and over title + lede in the stream worker; both are editable in the DB.
+    Parties are proposals, stored without a citation until an admin confirms them (D15)."""
+    for id_, name, pats, parties in BEATS:
+        store.add_beat(db, id_, name, pats, parties=parties)
 
 
-BEATS: list[tuple[str, str, list[str]]] = [
-    ("iran-israel-war", "Iran-Israel war", [r"\biran\b.*\bisrael\b|\bisrael\b.*\biran\b"]),
+_CEC = r"chief[\s_-]*election[\s_-]*commissioner|election[\s_-]*commission"
+BEATS: list[tuple[str, str, list[str], list[str]]] = [
+    (
+        "iran-israel-war",
+        "Iran-Israel war",
+        [r"\biran\b.*\bisrael\b|\bisrael\b.*\biran\b"],
+        ["IR", "IL"],
+    ),
     (
         "ukraine-russia-war",
         "Ukraine-Russia war",
         [r"\bukrain\w*\b.*\brussia\w*\b|\brussia\w*\b.*\bukrain\w*\b"],
+        ["UA", "RU"],
     ),
     (
         "us-senate-democrats",
         "Democrats winning US Senate elections",
         [r"senate.*democrat|democrat.*senate"],
+        ["Democratic Party", "Republican Party"],
     ),
     (
         "india-cec-impeachment",
         "Opposition move to impeach CEC Gyanesh Kumar",
-        [r"gyanesh kumar|gyanesh-kumar"],
+        # the name alone, or impeach/removal talk next to the Election Commission
+        [
+            r"gyanesh[\s_-]*kumar",
+            rf"(impeach|removal|remove)\w*.*({_CEC})|({_CEC}).*(impeach|removal|remove)\w*",
+        ],
+        ["Election Commission of India", "Indian opposition parties"],
     ),
 ]

@@ -17,6 +17,12 @@ dependencies = [
 ]
 
 [dependency-groups]
+ml = [
+    "fasttext-wheel>=0.9.2",
+    "sentence-transformers>=3.0.0",
+    "spacy>=3.8.0",
+    "transformers>=4.50.0",
+]
 dev = [
     "ruff",
     "pytest",
@@ -44,5 +50,5 @@ files = ["weft_core", "services", "tests"]
 pythonpath = ["."]
 
 [[tool.mypy.overrides]]
-module = ["feedparser", "google.cloud.*"]
+module = ["feedparser", "google.cloud.*", "sentence_transformers", "spacy", "transformers", "fasttext"]
 ignore_missing_imports = true
