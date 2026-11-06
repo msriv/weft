@@ -8,3 +8,4 @@ __pycache__/
 *.tfstate*
 node_modules/
 .next/
+infra/images.auto.tfvars
