@@ -1,0 +1,6 @@
+{"id":"n1","premise":"Aldoria fired missiles at the port overnight.","hypothesis":"Aldoria did not fire missiles at the port overnight.","contradiction":true}
+{"id":"n2","premise":"Aldoria fired missiles at the port overnight.","hypothesis":"Missiles were fired at the port by Aldoria overnight.","contradiction":false}
+{"id":"n3","premise":"The Veymar minister resigned on Monday.","hypothesis":"The Veymar minister never resigned on Monday.","contradiction":true}
+{"id":"n4","premise":"Talks opened in Ostia on Monday.","hypothesis":"The harbour authority reported fires.","contradiction":false}
+{"id":"n5","premise":"Officials confirmed the ferry was suspended by weather.","hypothesis":"Officials denied the ferry was suspended by weather.","contradiction":true}
+{"id":"n6","premise":"The delegation arrived in Ostia on Tuesday.","hypothesis":"The delegation arrived in Ostia.","contradiction":false}

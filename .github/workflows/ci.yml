@@ -15,6 +15,7 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run python -m weft_core.sources
+      - run: uv run python -m evals.gate
       - run: uv run pytest
 
   terraform:

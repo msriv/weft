@@ -29,19 +29,25 @@ INSTRUCTIONS = (
 )
 
 
-def merge_check(model: ModelClient, a: str, b: str) -> bool:
-    out = model.complete(
-        prompt_template="merge-check@1",
-        instructions=INSTRUCTIONS,
-        data=json.dumps({"group_a": a, "group_b": b}),
-        json_schema=SCHEMA,
-    )
+def parse(out: str) -> bool:
+    """True only for a well-formed `same_event: true` answer."""
     try:
         obj = json.loads(out)
         validate(obj, SCHEMA)
     except (ValueError, ValidationError):
         return False  # unparseable answer: do not merge
     return bool(obj["same_event"])
+
+
+def merge_check(model: ModelClient, a: str, b: str) -> bool:
+    return parse(
+        model.complete(
+            prompt_template="merge-check@1",
+            instructions=INSTRUCTIONS,
+            data=json.dumps({"group_a": a, "group_b": b}),
+            json_schema=SCHEMA,
+        )
+    )
 
 
 def _digest(reports: list[dict[str, Any]]) -> str:

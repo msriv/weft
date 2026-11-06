@@ -32,7 +32,7 @@ class GcsState:
         self._blob(url).upload_from_string(json.dumps(state.__dict__))
 
 
-def record_and_report(project: str, results: dict[str, str | None]) -> None:
+def record_and_report(project: str, results: dict[str, str | None]) -> list[str]:
     """Append this run to `source_health`, then log one ERROR per unhealthy source."""
     bq = bigquery.Client(project=project)
     table = f"{project}.weft.source_health"
@@ -45,9 +45,11 @@ def record_and_report(project: str, results: dict[str, str | None]) -> None:
         raise RuntimeError(f"insert into source_health failed: {errs}")
     q = f"SELECT source_id, MAX(IF(ok, checked_at, NULL)) AS last_ok FROM `{table}` GROUP BY 1"
     last_ok = {r.source_id: r.last_ok for r in bq.query(q).result()}
-    for sid in unhealthy(last_ok, now):
+    bad = unhealthy(last_ok, now)
+    for sid in bad:
         # structured line; the Terraform log-based metric alerts on event=source_unhealthy
         print(json.dumps({"severity": "ERROR", "event": "source_unhealthy", "source_id": sid}))
+    return bad
 
 
 def main() -> int:
@@ -58,14 +60,16 @@ def main() -> int:
     def publish(msg: dict[str, object]) -> None:
         publisher.publish(topic, json.dumps(msg).encode()).result()
 
+    db = store.from_env()
     with httpx.Client(timeout=30, follow_redirects=True) as http:
         results = Poller(PoliteClient(http), GcsState(os.environ["STATE_BUCKET"]), publish).run(
-            store.active_sources(store.from_env())
+            store.active_sources(db)
         )
     for sid, err in results.items():
         if err:
             print(f"poll failed: {sid}: {err}", file=sys.stderr)
-    record_and_report(project, results)
+    # the rules engine reads this flag to suppress silence anomalies for unhealthy feeds
+    store.set_health(db, record_and_report(project, results))
     return 0
 
 

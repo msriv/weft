@@ -7,11 +7,13 @@ claim cannot point at text that is not there. The claim text is the source sente
 
 import hashlib
 import json
+from collections.abc import Callable
 
 from jsonschema import ValidationError, validate
 
 from pipeline.ctx import Ctx
 from weft_core import graph
+from weft_core.models import ModelClient
 from weft_core.textutil import sentences
 
 SCHEMA = {
@@ -39,6 +41,23 @@ def pick(model_out: str, n: int) -> list[int]:
     return sorted({i for i in obj["claims"] if i < n})
 
 
+def extract(
+    model: ModelClient, text: str, allow: Callable[[str], bool] = lambda _: True
+) -> list[tuple[int, int]]:
+    """Claim spans (start, end) in `text`. `allow` lets the caller veto the call (token budget)."""
+    spans = sentences(text)[:MAX_SENTENCES]
+    numbered = "\n".join(f"[{i}] {text[s:e]}" for i, (s, e) in enumerate(spans))
+    if not spans or not allow(numbered):
+        return []
+    out = model.complete(
+        prompt_template="claim-extract@1",
+        instructions=INSTRUCTIONS,
+        data=numbered,
+        json_schema=SCHEMA,
+    )
+    return [spans[i] for i in pick(out, len(spans))]
+
+
 def run(ctx: Ctx) -> int:
     assert ctx.model is not None, "claim extraction needs the model client"
     made = 0
@@ -48,20 +67,7 @@ def run(ctx: Ctx) -> int:
         ):
             continue  # already extracted; unchanged reports are never re-sent
         text = ctx.text_of(r)
-        spans = sentences(text)[:MAX_SENTENCES]
-        if not spans:
-            continue
-        numbered = "\n".join(f"[{i}] {text[s:e]}" for i, (s, e) in enumerate(spans))
-        if not ctx.budget(r["story_id"]).take(numbered):
-            continue
-        out = ctx.model.complete(
-            prompt_template="claim-extract@1",
-            instructions=INSTRUCTIONS,
-            data=numbered,
-            json_schema=SCHEMA,
-        )
-        for i in pick(out, len(spans)):
-            s, e = spans[i]
+        for s, e in extract(ctx.model, text, ctx.budget(r["story_id"]).take):
             graph.put(
                 ctx.db,
                 "claims",

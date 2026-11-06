@@ -40,3 +40,14 @@ rules:
   unattributed:          # v2
     enabled: false
     min_attributed_versions: 2
+
+# Source weight (nightly stage 9). Changes ordering only; no report is ever hidden (rule 6).
+# Never scored on whether an outlet was "right". Each factor is a share between 0 and 1;
+# factors that raise the weight count as is, factors that lower it count as (1 - share).
+weights:
+  window_days: 30
+  min_reports: 10                    # fewer reports than this: neutral weight, marked insufficient data
+  neutral: 0.5
+  type_multiplier: {news: 1.0, wire: 1.0, gov: 1.0, parliament: 1.0, court: 1.0, intl_body: 1.0, blog: 0.8}
+  raises: [names_sources, links_documents, corrects_openly]
+  lowers: [silent_edits, copied_wording, opinion_share]

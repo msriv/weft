@@ -1,0 +1,6 @@
+{"m1":"{\"same_event\": true, \"reason\": \"Same shelling of the same port.\"}",
+ "m2":"{\"same_event\": false, \"reason\": \"Different subjects.\"}",
+ "m3":"{\"same_event\": false, \"reason\": \"Opening and end are different developments.\"}",
+ "m4":"{\"same_event\": true, \"reason\": \"Same resignation.\"}",
+ "m5":"{\"same_event\": false, \"reason\": \"Different dates.\"}",
+ "m6":"{\"same_event\": true, \"reason\": \"Same suspension.\"}"}

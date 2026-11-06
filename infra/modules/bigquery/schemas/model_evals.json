@@ -1,0 +1,9 @@
+[
+  {"name": "evaluated_at", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "task", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "model", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "revision", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "prompt_versions", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "metric", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "score", "type": "FLOAT", "mode": "REQUIRED"}
+]
