@@ -66,3 +66,11 @@ module "gdelt" {
   project_id  = var.project_id
   theme_regex = var.gdelt_theme_regex
 }
+
+module "discovery" {
+  source                = "./modules/discovery"
+  project_id            = var.project_id
+  region                = var.region
+  image                 = var.discovery_image
+  service_account_email = module.platform.service_account_emails["discovery"]
+}
