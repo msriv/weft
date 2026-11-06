@@ -176,3 +176,37 @@ def test_live_changes_and_stream_is_hidden_until_public() -> None:
     got = readmodel.changes(ctx.db, "iran-israel-war", "2000-01-01")
     assert {m["type"] for m in got} >= {"node.added"}
     assert readmodel.changes(ctx.db, "iran-israel-war", "2999-01-01") == []
+
+
+def test_digest_only_for_followed_stories_never_provisional_and_unsubscribes() -> None:
+    from datetime import UTC, datetime
+
+    from weft_core import digest
+
+    c, ctx = build()
+    c.put("/admin/stories/iran-israel-war/public", json={"public": True}, headers=H)
+    assert c.put("/v1/subscription", json={"email": "bad", "frequency": "daily"}).status_code == 422
+    for who, follows in (("a@x.org", ["iran-israel-war"]), ("b@x.org", [])):
+        assert (
+            c.put(
+                "/v1/subscription", json={"email": who, "frequency": "daily", "follows": follows}
+            ).status_code
+            == 200
+        )
+    ctx.db.execute(
+        "INSERT OR REPLACE INTO daily_diffs(day,payload) VALUES('2026-11-06','{\"new_events\":[\"e\"]}')"
+    )
+    sent: list[tuple[str, str, str]] = []
+    n = digest.send_due(
+        ctx.db, lambda *a: sent.append(a), "https://w.test", datetime(2026, 11, 6, tzinfo=UTC)
+    )
+    assert n == 1 and [to for to, _, _ in sent] == ["a@x.org"]
+    assert (
+        digest.send_due(
+            ctx.db, lambda *a: sent.append(a), "https://w.test", datetime(2026, 11, 6, tzinfo=UTC)
+        )
+        == 0
+    )
+    token = ctx.db.execute("SELECT token FROM subscriptions WHERE email='a@x.org'")[0]["token"]
+    assert c.get(f"/v1/unsubscribe?token={token}").json() == {"unsubscribed": True}
+    assert c.get(f"/v1/unsubscribe?token={token}").status_code == 404

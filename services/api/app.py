@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from weft_core import graph, readmodel, review, store
+from weft_core import digest, graph, readmodel, review, store
 
 STREAM_POLL_SECONDS = 5
 
@@ -38,6 +38,12 @@ class SourcePatch(BaseModel):
     state_run_source: str | None = None
     owner_id: str | None = None
     ownership_source: str | None = None
+
+
+class Subscription(BaseModel):
+    email: str
+    frequency: str
+    follows: list[str] = []
 
 
 class Question(BaseModel):
@@ -151,6 +157,18 @@ def create_app(
                 await asyncio.sleep(STREAM_POLL_SECONDS)
 
         return StreamingResponse(events(), media_type="text/event-stream")
+
+    @v1.put("/subscription")
+    def subscribe(body: Subscription) -> dict[str, bool]:
+        try:
+            digest.subscribe(db, body.email, body.frequency, body.follows)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return {"subscribed": True}
+
+    @v1.get("/unsubscribe")
+    def unsubscribe(token: str) -> dict[str, bool]:
+        return {"unsubscribed": bool(found(digest.unsubscribe(db, token) or None))}
 
     @v1.post("/ask")
     def ask(body: Question) -> dict[str, Any]:

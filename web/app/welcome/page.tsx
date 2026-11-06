@@ -9,6 +9,7 @@ export default function Welcome() {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
   const [stories, setStories] = useState<Card[]>([]);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(false);
   useEffect(() => {
     setPrefs(loadPrefs());
     fetch("/api/v1/stories").then((r) => (r.ok ? r.json() : [])).then(setStories).catch(() => setStories([]));
@@ -18,7 +19,14 @@ export default function Welcome() {
   const toggle = (k: "regions" | "follows", v: string) =>
     setPrefs((p) => ({ ...p, [k]: p[k].includes(v) ? p[k].filter((x) => x !== v) : [...p[k], v] }));
   return (
-    <form onSubmit={(e) => { e.preventDefault(); savePrefs(prefs); setSaved(true); }}>
+    <form onSubmit={async (e) => {
+      e.preventDefault(); savePrefs(prefs); setSaved(false);
+      if (prefs.frequency !== "never" && prefs.email) {
+        const r = await fetch("/api/v1/subscription", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: prefs.email, frequency: prefs.frequency, follows: prefs.follows }) });
+        if (!r.ok) return setError(true);
+      }
+      setError(false); setSaved(true);
+    }}>
       <Kicker>Welcome</Kicker>
       <h1>What do you want to follow?</h1>
       <p className="muted">Stays in this browser. Nothing is tracked. Changes ordering and what the digest covers, never what is hidden.</p>
@@ -44,7 +52,7 @@ export default function Welcome() {
         <p><label className="kicker" htmlFor="email">Email</label><br />
           <input id="email" type="email" value={prefs.email ?? ""} onChange={(e) => setPrefs({ ...prefs, email: e.target.value })} /></p>
       )}
-      <p><button type="submit">Save</button> {saved && <span role="status">Saved.</span>}</p>
+      <p><button type="submit">Save</button> {saved && <span role="status">Saved.</span>}{error && <span role="alert">Could not subscribe. Check the email.</span>}</p>
     </form>
   );
 }

@@ -117,17 +117,25 @@ resource "google_secret_manager_secret" "model_api_key" {
   }
 }
 
+resource "google_secret_manager_secret" "smtp_password" {
+  project   = var.project_id
+  secret_id = "weft-smtp-password"
+  replication {
+    auto {}
+  }
+}
+
 module "nightly" {
   source                = "./modules/nightly"
   project_id            = var.project_id
   region                = var.region
   image                 = var.nightly_image
   service_account_email = module.platform.service_account_emails["nightly"]
-  stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "statements", "anomalies", "weights", "snapshot", "review_sample"]
+  stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "statements", "anomalies", "weights", "snapshot", "review_sample", "notify"]
   secret_env = merge(module.discovery.turso_secret_ids, {
     MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
-  })
-  env = {
+    }, var.smtp_host == "" ? {} : { SMTP_PASSWORD = google_secret_manager_secret.smtp_password.secret_id })
+  env = merge({
     PROJECT_ID      = var.project_id
     RAW_BUCKET      = module.storage.bucket_names["weft-raw"]
     SNAPSHOT_BUCKET = module.storage.bucket_names["weft-snapshots"]
@@ -135,7 +143,12 @@ module "nightly" {
     MODEL_NAME      = var.model_name
     MODEL_REVISION  = var.model_revision
     WEFT_NLP        = "real"
-  }
+    }, var.smtp_host == "" ? {} : {
+    SMTP_HOST = var.smtp_host
+    SMTP_USER = var.smtp_user
+    MAIL_FROM = var.mail_from
+    SITE_URL  = module.web.uri
+  })
 }
 
 resource "google_storage_bucket_iam_member" "nightly_raw_read" {
