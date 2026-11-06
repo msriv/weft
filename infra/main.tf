@@ -134,7 +134,7 @@ module "nightly" {
   stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "statements", "anomalies", "weights", "snapshot", "review_sample", "notify"]
   secret_env = merge(module.discovery.turso_secret_ids, {
     MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
-    }, var.smtp_host == "" ? {} : { SMTP_PASSWORD = google_secret_manager_secret.smtp_password.secret_id })
+  }, var.smtp_host == "" ? {} : { SMTP_PASSWORD = google_secret_manager_secret.smtp_password.secret_id })
   env = merge({
     PROJECT_ID      = var.project_id
     RAW_BUCKET      = module.storage.bucket_names["weft-raw"]
