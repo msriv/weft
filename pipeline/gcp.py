@@ -1,11 +1,13 @@
 """GCP bindings for the nightly job: raw copy -> text, and the `model_calls` sink."""
 
+from datetime import datetime
 from typing import Any
 
 from google.cloud import bigquery, storage  # type: ignore[attr-defined]
 
 from services.fetcher.fetcher import _extract
 from weft_core.models import ModelCall, as_row
+from weft_core.store import Db
 
 
 class GcsText:
@@ -28,6 +30,32 @@ class GcsText:
             else:
                 self._cache[rid] = ""
         return self._cache[rid]
+
+
+def versions_of(raw_bucket: str, db: Db):  # type: ignore[no-untyped-def]
+    """Texts of a report's saved versions, oldest first, consecutive duplicates collapsed."""
+    bucket = storage.Client().bucket(raw_bucket)
+
+    def get(report_id: str) -> list[tuple[datetime, str]]:
+        out: list[tuple[datetime, str]] = []
+        last = None
+        for v in db.execute(
+            "SELECT n, fetched_at, text_hash FROM report_versions WHERE report_id=? ORDER BY n",
+            (report_id,),
+        ):
+            if v["text_hash"] == last:
+                continue
+            last = v["text_hash"]
+            stem = report_id if v["n"] == 0 else f"{report_id}.v{v['n']}"
+            for ext, ctype in (("html", "text/html"), ("pdf", "application/pdf")):
+                blob = bucket.blob(f"{stem}.{ext}")
+                if blob.exists():
+                    meta, _ = _extract(blob.download_as_bytes(), report_id, ctype)
+                    out.append((datetime.fromisoformat(v["fetched_at"]), meta.get("text") or ""))
+                    break
+        return out
+
+    return get
 
 
 def bq_sink(project: str, dataset: str = "weft"):  # type: ignore[no-untyped-def]

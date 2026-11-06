@@ -61,6 +61,8 @@ module "crawler" {
   raw_bucket            = module.storage.bucket_names["weft-raw"]
   state_bucket          = module.storage.bucket_names["weft-snapshots"]
   dataset_id            = module.bigquery.dataset_id
+  documents_topic       = module.messaging.topic_names["documents-new"]
+  turso_secret_ids      = module.discovery.turso_secret_ids
 }
 
 module "gdelt" {
@@ -90,6 +92,7 @@ module "stream_worker" {
   cpu                   = "2"
   concurrency           = 4
   push_topic            = module.messaging.topic_names["items-extracted"]
+  extra_pushes          = { documents = { topic = module.messaging.topic_names["documents-new"], path = "/documents" } }
 }
 
 resource "google_pubsub_topic_iam_member" "stream_publish" {
@@ -120,7 +123,7 @@ module "nightly" {
   region                = var.region
   image                 = var.nightly_image
   service_account_email = module.platform.service_account_emails["nightly"]
-  stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "anomalies", "weights", "snapshot", "review_sample"]
+  stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "statements", "anomalies", "weights", "snapshot", "review_sample"]
   secret_env = merge(module.discovery.turso_secret_ids, {
     MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
   })

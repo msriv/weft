@@ -8,6 +8,11 @@ variable "service_account_email" { type = string }
 variable "raw_bucket" { type = string }
 variable "state_bucket" { type = string }
 variable "dataset_id" { type = string }
+variable "documents_topic" { type = string }
+variable "turso_secret_ids" {
+  description = "Env var name to Secret Manager secret id for the Turso source store."
+  type        = map(string)
+}
 variable "schedule" {
   description = "Cron for the crawl run. Spec cadence for portals and transcripts is daily."
   type        = string
@@ -46,6 +51,21 @@ resource "google_project_iam_member" "bq_jobs" {
   member  = "serviceAccount:${var.service_account_email}"
 }
 
+resource "google_pubsub_topic_iam_member" "publish" {
+  project = var.project_id
+  topic   = var.documents_topic
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${var.service_account_email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "turso" {
+  for_each  = var.turso_secret_ids
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.service_account_email}"
+}
+
 resource "google_cloud_run_v2_job" "crawler" {
   project             = var.project_id
   location            = var.region
@@ -71,11 +91,23 @@ resource "google_cloud_run_v2_job" "crawler" {
           name  = "STATE_BUCKET"
           value = var.state_bucket
         }
+        dynamic "env" {
+          for_each = var.turso_secret_ids
+          content {
+            name = env.key
+            value_source {
+              secret_key_ref {
+                secret  = env.value
+                version = "latest"
+              }
+            }
+          }
+        }
       }
     }
   }
 
-  depends_on = [google_project_service.apis]
+  depends_on = [google_project_service.apis, google_secret_manager_secret_iam_member.turso]
 }
 
 resource "google_service_account" "scheduler" {

@@ -871,6 +871,23 @@ wheels = [
 ]
 
 [[package]]
+name = "google-cloud-tasks"
+version = "2.26.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "grpc-google-iam-v1" },
+    { name = "grpcio" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/cc/3ff6a7bfd00ba892a32713dd1d28c0d8287040017e4eadb23338b95c7cda/google_cloud_tasks-2.26.0.tar.gz", hash = "sha256:df33be57411c57bd791461d0bbcd6d04b4e0e55f9c65b68682706cad247c5b06", size = 390489, upload-time = "2026-10-01T18:18:28.118Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0f/a6/8dda4fbb4f6a2312a4f1e3d3b6f049c55e446993d29e1c80d2caeb9b53f5/google_cloud_tasks-2.26.0-py3-none-any.whl", hash = "sha256:b020be5ca494907accd9ea7372d9963f747cd09e6370458511fc126d3f18525e", size = 325078, upload-time = "2026-10-01T18:12:41.099Z" },
+]
+
+[[package]]
 name = "google-crc32c"
 version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2468,6 +2485,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytesseract"
+version = "0.3.13"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9f/a6/7d679b83c285974a7cb94d739b461fa7e7a9b17a3abfd7bf6cbc5c2394b0/pytesseract-0.3.13.tar.gz", hash = "sha256:4bf5f880c99406f52a3cfc2633e42d9dc67615e69d8a509d74867d3baddb5db9", size = 17689, upload-time = "2024-08-16T02:33:56.762Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7a/33/8312d7ce74670c9d39a532b2c246a853861120486be9443eebf048043637/pytesseract-0.3.13-py3-none-any.whl", hash = "sha256:7a99c6c2ac598360693d83a416e36e0b33a67638bb9d77fdcac094a3589d4b34", size = 14705, upload-time = "2024-08-16T02:36:10.09Z" },
+]
+
+[[package]]
 name = "pytest"
 version = "9.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3571,10 +3601,12 @@ dependencies = [
     { name = "google-cloud-bigquery" },
     { name = "google-cloud-pubsub" },
     { name = "google-cloud-storage" },
+    { name = "google-cloud-tasks" },
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "pdfplumber" },
     { name = "pyarrow" },
+    { name = "pytesseract" },
     { name = "pyyaml" },
     { name = "trafilatura" },
     { name = "uvicorn" },
@@ -3602,10 +3634,12 @@ requires-dist = [
     { name = "google-cloud-bigquery", specifier = ">=3.47.0" },
     { name = "google-cloud-pubsub", specifier = ">=2.43.0" },
     { name = "google-cloud-storage", specifier = ">=3.17.1" },
+    { name = "google-cloud-tasks", specifier = ">=2.26.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "pdfplumber", specifier = ">=0.11.10" },
     { name = "pyarrow", specifier = ">=26.0.1" },
+    { name = "pytesseract", specifier = ">=0.3.13" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "trafilatura", specifier = ">=2.3.1" },
     { name = "uvicorn", specifier = ">=0.54.0" },

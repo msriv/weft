@@ -16,9 +16,22 @@ from urllib.parse import urlsplit, urlunsplit
 import pdfplumber
 import trafilatura
 
+from weft_core import portals
 from weft_core.polite import PoliteClient
 
 LEDE_CHARS = 500
+MAX_OCR_PAGES = 30  # shortcut: scans longer than this are cut, raise when a portal needs it
+
+
+def ocr_page(page: Any) -> str:
+    """Tesseract on one rendered page. Empty when pytesseract or the binary is not installed,
+    which the caller records as an extraction failure."""
+    try:
+        import pytesseract
+
+        return str(pytesseract.image_to_string(page.to_image(resolution=200).original))
+    except (ImportError, OSError):
+        return ""
 
 
 class Store(Protocol):
@@ -63,6 +76,8 @@ def _extract(content: bytes, url: str, content_type: str) -> tuple[dict[str, Any
     if "pdf" in content_type or url.lower().endswith(".pdf"):
         with pdfplumber.open(io.BytesIO(content)) as pdf:
             text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+            if not text.strip():  # scanned PDF: no text layer, so OCR the page images
+                text = "\n".join(ocr_page(page) for page in pdf.pages[:MAX_OCR_PAGES])
         return {"text": text, "title": (pdf.metadata or {}).get("Title")}, "pdf"
     doc = trafilatura.bare_extraction(
         content.decode("utf-8", errors="replace"), url=url, with_metadata=True
@@ -121,6 +136,7 @@ def ingest(
         content,
         ext,
     )
+    html = content.decode("utf-8", errors="replace") if ext == "html" else ""
     return Result(
         "stored",
         item_id,
@@ -135,6 +151,9 @@ def ingest(
             if isinstance(d.get("categories"), list)
             else (d.get("categories") or ""),
             "text_hash": text_hash,
+            "gov_domains": sorted(portals.outbound_gov_domains(html, canonical))
+            if ext == "html"
+            else [],
         },
     )
 

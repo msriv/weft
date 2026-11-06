@@ -16,6 +16,7 @@ from pipeline import (
     review_sample,
     short_version,
     snapshot,
+    statements,
     weights,
 )
 from pipeline.ctx import Ctx
@@ -28,6 +29,7 @@ STAGES: dict[str, Callable[[Ctx], int]] = {
     "claim_groups": groups.run_groups,
     "conflicts": groups.run_conflicts,
     "short_version": short_version.run,
+    "statements": statements.run,
     "anomalies": anomalies.run,
     "weights": weights.run,
     "snapshot": lambda ctx: snapshot.run(ctx, _sink()),
@@ -86,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
 def production_ctx() -> Ctx:
     import os
 
-    from pipeline.gcp import GcsText, bq_sink
+    from pipeline.gcp import GcsText, bq_sink, versions_of
     from weft_core import config, store
     from weft_core.models import ModelClient
     from weft_core.nlp import default_nlp
@@ -101,7 +103,15 @@ def production_ctx() -> Ctx:
         revision=os.environ["MODEL_REVISION"],
         log=bq_sink(project),
     )
-    return Ctx(db, config.pipeline(), default_nlp(), GcsText(os.environ["RAW_BUCKET"]).text, model)
+    raw = os.environ["RAW_BUCKET"]
+    return Ctx(
+        db,
+        config.pipeline(),
+        default_nlp(),
+        GcsText(raw).text,
+        model,
+        versions_of=versions_of(raw, db),
+    )
 
 
 if __name__ == "__main__":
