@@ -66,3 +66,15 @@ def test_failed_call_is_not_logged_as_success() -> None:
 def test_revision_required() -> None:
     with pytest.raises(ValueError):
         ModelClient(base_url="https://x", api_key="k", model="m", revision="", log=lambda c: None)
+
+
+def test_provider_pinned_in_request() -> None:
+    log: list[ModelCall] = []
+    c, sent = _client(log)
+    c._provider = "Together"
+    c.complete(prompt_template="t@1", instructions="i", data="d")
+    assert sent[-1]["provider"] == {
+        "order": ["Together"],
+        "allow_fallbacks": False,
+        "require_parameters": True,
+    }

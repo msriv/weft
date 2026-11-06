@@ -142,6 +142,7 @@ module "nightly" {
     MODEL_BASE_URL  = var.model_base_url
     MODEL_NAME      = var.model_name
     MODEL_REVISION  = var.model_revision
+    MODEL_PROVIDER  = var.model_provider
     WEFT_NLP        = "real"
     }, var.smtp_host == "" ? {} : {
     SMTP_HOST = var.smtp_host
@@ -195,6 +196,7 @@ module "api" {
     MODEL_BASE_URL = var.model_base_url
     MODEL_NAME     = var.model_name
     MODEL_REVISION = var.model_revision
+    MODEL_PROVIDER = var.model_provider
     WEFT_NLP       = "real"
   }
   memory        = "4Gi"

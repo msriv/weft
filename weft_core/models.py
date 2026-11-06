@@ -6,6 +6,7 @@ to a log sink (the `model_calls` table in production) before returning.
 
 import hashlib
 import json
+import os
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -50,9 +51,12 @@ class ModelClient:
         revision: str,
         log: LogSink,  # required: no unlogged calls
         transport: httpx.BaseTransport | None = None,
+        provider: str
+        | None = None,  # OpenRouter only: pin one upstream host, else it may switch hosts
     ) -> None:
         if not revision:
             raise ValueError("revision must be pinned")
+        self._provider = provider or os.environ.get("MODEL_PROVIDER")
         self._model, self._revision, self._log = model, revision, log
         self._http = httpx.Client(
             base_url=base_url,
@@ -80,6 +84,12 @@ class ModelClient:
                 {"role": "user", "content": quote_untrusted(data)},
             ],
         }
+        if self._provider:
+            body["provider"] = {
+                "order": [self._provider],
+                "allow_fallbacks": False,
+                "require_parameters": True,
+            }
         if json_schema is not None:
             body["response_format"] = {
                 "type": "json_schema",

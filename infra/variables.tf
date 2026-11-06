@@ -70,6 +70,12 @@ variable "model_revision" {
   type        = string
 }
 
+variable "model_provider" {
+  description = "OpenRouter only: upstream host to pin (e.g. Together). Empty for other providers."
+  type        = string
+  default     = ""
+}
+
 variable "api_image" {
   description = "API image in Artifact Registry. Built in CI, not by hand."
   type        = string
