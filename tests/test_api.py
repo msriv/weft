@@ -132,3 +132,47 @@ def test_admin_cannot_assert_state_run_without_citation_and_problems_flow() -> N
     assert c.get("/v1/method").json()["corrections"][0]["what"] == "Moved a report"
     q = c.get("/admin/review", headers=H).json()
     assert "open" in q and TEXTS
+
+
+def test_ask_cites_retrieved_passages_and_drops_verdicts() -> None:
+    import json
+
+    import httpx
+
+    from weft_core import ask
+    from weft_core.models import ModelClient
+
+    _, ctx = build()
+    store.set_public(ctx.db, "iran-israel-war", True)
+    reply = json.dumps(
+        {
+            "statements": [
+                {"text": "Outlet A reported the strike.", "passages": [1]},
+                {"text": "The strike is confirmed.", "passages": [1]},
+                {"text": "Nobody cited this.", "passages": [99]},
+            ]
+        }
+    )
+    model = ModelClient(
+        base_url="https://llm.test/v1", api_key="k", model="m", revision="r", log=lambda c: None,
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(200, json={"choices": [{"message": {"content": reply}}]})
+        ),
+    )  # fmt: skip
+    out = ask.answer(ctx.db, ctx.nlp.embedder, model, "what did outlets report about the strike?")
+    assert [s["text"] for s in out["sentences"]] == ["Outlet A reported the strike."]
+    assert out["cites"] and out["cites"][0]["id"] == out["sentences"][0]["cites"][0]
+    _, hidden = build()  # nothing public: nothing retrievable
+    assert ask.retrieve(hidden.db, hidden.nlp.embedder, "strike") == []
+    c = TestClient(create_app(ctx.db, "t0k"))
+    assert c.post("/v1/ask", json={"question": "strike?"}).status_code == 503
+
+
+def test_live_changes_and_stream_is_hidden_until_public() -> None:
+    from weft_core import readmodel
+
+    c, ctx = build()
+    assert c.get("/v1/stories/iran-israel-war/stream").status_code == 404
+    got = readmodel.changes(ctx.db, "iran-israel-war", "2000-01-01")
+    assert {m["type"] for m in got} >= {"node.added"}
+    assert readmodel.changes(ctx.db, "iran-israel-war", "2999-01-01") == []

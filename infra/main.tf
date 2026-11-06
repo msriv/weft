@@ -144,17 +144,20 @@ resource "google_storage_bucket_iam_member" "nightly_raw_read" {
   member = "serviceAccount:${module.platform.service_account_emails["nightly"]}"
 }
 
-resource "google_bigquery_dataset_iam_member" "nightly_bq" {
+# model_calls are written by every service that calls a model (rule 4)
+resource "google_bigquery_dataset_iam_member" "model_logging_bq" {
+  for_each   = toset(["nightly", "api"])
   project    = var.project_id
   dataset_id = module.bigquery.dataset_id
   role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${module.platform.service_account_emails["nightly"]}"
+  member     = "serviceAccount:${module.platform.service_account_emails[each.key]}"
 }
 
-resource "google_project_iam_member" "nightly_bq_jobs" {
-  project = var.project_id
-  role    = "roles/bigquery.jobUser"
-  member  = "serviceAccount:${module.platform.service_account_emails["nightly"]}"
+resource "google_project_iam_member" "model_logging_bq_jobs" {
+  for_each = toset(["nightly", "api"])
+  project  = var.project_id
+  role     = "roles/bigquery.jobUser"
+  member   = "serviceAccount:${module.platform.service_account_emails[each.key]}"
 }
 
 resource "google_storage_bucket_iam_member" "nightly_snapshots_write" {
@@ -170,9 +173,20 @@ module "api" {
   name                  = "weft-api"
   image                 = var.api_image
   service_account_email = module.platform.service_account_emails["api"]
-  secret_env            = merge(module.discovery.turso_secret_ids, { ADMIN_TOKEN = module.discovery.admin_token_secret_id })
-  public                = true
-  max_instances         = 5
+  secret_env = merge(module.discovery.turso_secret_ids, {
+    ADMIN_TOKEN   = module.discovery.admin_token_secret_id
+    MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
+  })
+  env = {
+    PROJECT_ID     = var.project_id
+    MODEL_BASE_URL = var.model_base_url
+    MODEL_NAME     = var.model_name
+    MODEL_REVISION = var.model_revision
+    WEFT_NLP       = "real"
+  }
+  memory        = "4Gi"
+  public        = true
+  max_instances = 5
 }
 
 module "web" {

@@ -5,7 +5,9 @@ def test_differing_codes_map_correctly() -> None:
     # codes where FIPS 10-4 and ISO 3166 differ, including the beats' countries
     assert iso_from_fips("IS") == "IL" and iso_from_fips("IR") == "IR"
     assert iso_from_fips("UP") == "UA" and iso_from_fips("RS") == "RU"
-    assert iso_from_fips("IN") == "IN" and iso_from_fips("UK") == "GB" and iso_from_fips("GM") == "DE"
+    assert (
+        iso_from_fips("IN") == "IN" and iso_from_fips("UK") == "GB" and iso_from_fips("GM") == "DE"
+    )
     assert iso_from_fips("us") == "US" and iso_from_fips("ZZ") is None
 
 

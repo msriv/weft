@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 
 from pipeline import claims, regroup
-from weft_core import graph, translate
+from weft_core import ask, graph, translate
 from weft_core.models import ModelClient
 from weft_core.nlp import default_nlp
 from weft_core.store import SqliteDb
@@ -134,12 +134,30 @@ def eval_translation(live: bool) -> dict[str, float]:
     return {"chrf": sum(chrf(got, c["reference"]) for c, got in res) / len(res)}
 
 
+def eval_ask(live: bool) -> dict[str, float]:
+    """Which recorded answer statements survive the citation and no-verdict checks, vs gold."""
+
+    def call(m: ModelClient, c: dict[str, Any]) -> list[str]:
+        ps = [{"id": f"p{i}", "outlet": "O", "perspective": "xx", "text": t, "url": "u",
+               "title": "t", "report_id": "r", "start_char": 0, "end_char": 1}
+              for i, t in enumerate(c["passages"], 1)]  # fmt: skip
+        return [s["text"] for s in ask.answer_from(m, c["question"], ps)["sentences"]]
+
+    res, _ = _model_task("ask", live, call)
+    tp = fp = fn = 0
+    for c, kept in res:
+        got, gold = set(kept), set(c["gold_kept"])
+        tp, fp, fn = tp + len(got & gold), fp + len(got - gold), fn + len(gold - got)
+    return prf(tp, fp, fn)
+
+
 def run_all(live: bool = False) -> dict[str, dict[str, float]]:
     return {
         "merges": eval_merges(live),
         "claims": eval_claims(live),
         "nli": eval_nli(),
         "translation": eval_translation(live),
+        "ask": eval_ask(live),
     }
 
 

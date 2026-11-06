@@ -4,14 +4,21 @@ The admin toggle is the only human gate (D15): a story is invisible here until i
 is set. `GET /stories` and the /admin/stories routes predate /v1 and are kept.
 """
 
+import asyncio
 import hmac
+import json
 import os
+from collections.abc import AsyncIterator, Callable
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from weft_core import graph, readmodel, review, store
+
+STREAM_POLL_SECONDS = 5
 
 
 class Visibility(BaseModel):
@@ -31,6 +38,10 @@ class SourcePatch(BaseModel):
     state_run_source: str | None = None
     owner_id: str | None = None
     ownership_source: str | None = None
+
+
+class Question(BaseModel):
+    question: str = Field(min_length=3, max_length=500)
 
 
 class Rating(BaseModel):
@@ -53,7 +64,11 @@ def found(x: Any) -> Any:
     return x
 
 
-def create_app(db: store.Db, admin_token: str) -> FastAPI:
+def create_app(
+    db: store.Db,
+    admin_token: str,
+    asker: Callable[[str], dict[str, Any]] | None = None,
+) -> FastAPI:
     app = FastAPI(title="Weft API")
 
     def admin(authorization: Annotated[str, Header()] = "") -> None:
@@ -121,6 +136,27 @@ def create_app(db: store.Db, admin_token: str) -> FastAPI:
             }
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
+
+    @v1.get("/stories/{story_id}/stream")
+    async def stream(story_id: str, request: Request) -> StreamingResponse:
+        found(readmodel.public_story(db, story_id))
+
+        async def events() -> AsyncIterator[str]:
+            cursor = datetime.now(UTC).isoformat()
+            while not await request.is_disconnected():
+                for m in await asyncio.to_thread(readmodel.changes, db, story_id, cursor):
+                    cursor = max(cursor, m["at"])
+                    yield f"event: {m['type']}\ndata: {json.dumps(m['data'])}\n\n"
+                yield ": keepalive\n\n"
+                await asyncio.sleep(STREAM_POLL_SECONDS)
+
+        return StreamingResponse(events(), media_type="text/event-stream")
+
+    @v1.post("/ask")
+    def ask(body: Question) -> dict[str, Any]:
+        if asker is None:
+            raise HTTPException(503, "ask is not configured")
+        return asker(body.question)
 
     app.include_router(v1)
 
@@ -214,4 +250,23 @@ def create_app(db: store.Db, admin_token: str) -> FastAPI:
 def app_from_env() -> FastAPI:
     db = store.from_env()
     graph.init(db)
-    return create_app(db, os.environ["ADMIN_TOKEN"])
+    return create_app(db, os.environ["ADMIN_TOKEN"], _asker(db))
+
+
+def _asker(db: store.Db) -> Callable[[str], dict[str, Any]] | None:
+    if "MODEL_BASE_URL" not in os.environ:
+        return None
+    from pipeline.gcp import bq_sink
+    from weft_core import ask
+    from weft_core.models import ModelClient
+    from weft_core.nlp import default_nlp
+
+    model = ModelClient(
+        base_url=os.environ["MODEL_BASE_URL"],
+        api_key=os.environ["MODEL_API_KEY"],
+        model=os.environ["MODEL_NAME"],
+        revision=os.environ["MODEL_REVISION"],
+        log=bq_sink(os.environ["PROJECT_ID"]),
+    )
+    embedder = default_nlp().embedder
+    return lambda q: ask.answer(db, embedder, model, q)

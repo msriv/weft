@@ -834,3 +834,27 @@ def add_correction(db: Db, kind: str, what: str, day: str | None = None) -> None
         "INSERT INTO corrections(day,kind,what) VALUES(?,?,?)",
         (day or datetime.now(UTC).date().isoformat(), kind, what),
     )
+
+
+def changes(db: Db, story_id: str, since: str) -> list[dict[str, Any]]:
+    """Graph changes of one story after `since` (ISO time), oldest first, for live mode (D10).
+    shortcut: read straight from the graph tables; replace with Pub/Sub -> Redis when many
+    readers hold streams open."""
+    out: list[dict[str, Any]] = []
+    for r in graph.select(db, "reports", "story_id=? AND valid_from > ?", (story_id, since)):
+        out.append(
+            {
+                "type": "node.added",
+                "at": r["valid_from"],
+                "data": {"id": r["id"], "perspective": r["perspective"]},
+            }
+        )
+    for a in graph.select(db, "anomalies", "story_id=? AND valid_from > ?", (story_id, since)):
+        out.append(
+            {
+                "type": "anomaly.updated",
+                "at": a["valid_from"],
+                "data": {"id": a["id"], "status": a["status"]},
+            }
+        )
+    return sorted(out, key=lambda m: m["at"])
