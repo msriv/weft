@@ -1,0 +1,22 @@
+{
+  "prompts": [
+    "claim-extract@1",
+    "merge-check@1",
+    "translate@1",
+    "type-classify@1"
+  ],
+  "scores": {
+    "merges": {
+      "f1": 1.0
+    },
+    "claims": {
+      "f1": 1.0
+    },
+    "nli": {
+      "f1": 1.0
+    },
+    "translation": {
+      "chrf": 1.0
+    }
+  }
+}

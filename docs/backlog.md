@@ -36,9 +36,9 @@ Exit: editors rate merge and claim quality on a labelled sample, and it beats th
 - [x] Numbers/quotes extraction (regex + dependency parse)
 - [x] Claim groups + NLI conflict detection
 - [x] Short-version set logic (reported by all / conflict / no source has published)
-- [ ] Snapshots to GCS + daily diff
-- [ ] `evals/`: labelled set format, scripts for merges, claims, NLI, translation; eval gate in CI
-- [ ] Editor review queue (1% sample) — simple internal page is fine
+- [x] Snapshots to GCS + daily diff
+- [x] `evals/`: labelled set format, scripts for merges, claims, NLI, translation; eval gate in CI
+- [x] Editor review queue (1% sample), API and page in the web app
 
 ## Phase 3: Anomalies and core screens
 Rules engine with unit tests per rule and suppression case; source weights; API endpoints for story, event, source, document, method; Next.js story view (network + list), event page, source and proceeding pages, How we weigh.

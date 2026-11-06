@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from pipeline import claims, figures, groups, regroup, short_version
+from pipeline import claims, figures, groups, regroup, review_sample, short_version, snapshot
 from pipeline.ctx import Ctx
 from weft_core import graph
 
@@ -18,7 +18,16 @@ STAGES: dict[str, Callable[[Ctx], int]] = {
     "claim_groups": groups.run_groups,
     "conflicts": groups.run_conflicts,
     "short_version": short_version.run,
+    "snapshot": lambda ctx: snapshot.run(ctx, _sink()),
+    "review_sample": review_sample.run,
 }
+
+
+def _sink() -> snapshot.Sink | None:
+    import os
+
+    bucket = os.environ.get("SNAPSHOT_BUCKET")
+    return snapshot.GcsSink(bucket) if bucket else None
 
 
 def run_stages(ctx: Ctx, only: str | None = None, start: str | None = None) -> dict[str, int]:

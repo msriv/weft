@@ -11,6 +11,7 @@ dependencies = [
     "httpx>=0.28.1",
     "jsonschema>=4.26.0",
     "pdfplumber>=0.11.10",
+    "pyarrow>=26.0.1",
     "pyyaml>=6.0.3",
     "trafilatura>=2.3.1",
     "uvicorn>=0.54.0",
@@ -44,11 +45,11 @@ target-version = "py312"
 
 [tool.mypy]
 strict = true
-files = ["weft_core", "services", "pipeline", "tests"]
+files = ["weft_core", "services", "pipeline", "evals", "tests"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 
 [[tool.mypy.overrides]]
-module = ["feedparser", "google.cloud.*", "sentence_transformers", "spacy", "transformers", "fasttext"]
+module = ["feedparser", "pyarrow", "pyarrow.*", "google.cloud.*", "sentence_transformers", "spacy", "transformers", "fasttext"]
 ignore_missing_imports = true

@@ -26,7 +26,7 @@ class ModelCall:
     revision: str
     temperature: float
     seed: int
-    prompt_template: str  # name@version, e.g. "merge-check@3"
+    prompt_template: str  # name@version, e.g. "merge-check@1"
     input_hash: str
     input: str
     output: str

@@ -9,6 +9,7 @@ locals {
     model_calls     = "called_at"
     batch_runs      = "started_at"
     source_health   = "checked_at"
+    model_evals     = "evaluated_at"
   }
 }
 

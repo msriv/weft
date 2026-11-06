@@ -1,0 +1,6 @@
+{"id":"m1","a":"- Aldoria shells port of Ostia. Harbour authority reports fires.","b":"- Port of Ostia hit by Aldorian shelling. Fires reported at the harbour.","same":true}
+{"id":"m2","a":"- Aldoria shells port of Ostia. Harbour authority reports fires.","b":"- Veymar parliament votes on budget. Opposition walks out.","same":false}
+{"id":"m3","a":"- Kessar Strait talks open in Ostia. Delegations arrive.","b":"- Kessar Strait talks end without statement. Delegations leave.","same":false}
+{"id":"m4","a":"- Veymar minister resigns over audit. Statement issued Monday.","b":"- Minister in Veymar quits after audit findings. Statement on Monday.","same":true}
+{"id":"m5","a":"- Aldoria ministry publishes casualty figures. Report on Tuesday.","b":"- Aldoria ministry publishes casualty figures. Report on Friday.","same":false}
+{"id":"m6","a":"- Kessar ferry service suspended. Operator cites weather.","b":"- Ferry service across Kessar halted. Weather blamed by operator.","same":true}
