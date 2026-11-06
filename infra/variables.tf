@@ -38,3 +38,8 @@ variable "gdelt_theme_regex" {
   description = "Regex over GDELT themes for the first beat. PLACEHOLDER until the beat is chosen (issue #1)."
   type        = string
 }
+
+variable "discovery_image" {
+  description = "Discovery image, e.g. <region>-docker.pkg.dev/<project>/weft/discovery:<tag>. Built in CI, not by hand."
+  type        = string
+}
