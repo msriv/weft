@@ -16,7 +16,16 @@ import pyarrow.parquet as pq
 from pipeline.ctx import Ctx
 from weft_core import graph
 
-TABLES = ["reports", "events", "claims", "claim_groups", "conflicts", "figures", "short_versions"]
+TABLES = [
+    "reports",
+    "events",
+    "claims",
+    "claim_groups",
+    "conflicts",
+    "figures",
+    "short_versions",
+    "anomalies",
+]
 
 
 class Sink(Protocol):

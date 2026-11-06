@@ -120,18 +120,18 @@ module "nightly" {
   region                = var.region
   image                 = var.nightly_image
   service_account_email = module.platform.service_account_emails["nightly"]
-  stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "snapshot", "review_sample"]
+  stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "anomalies", "weights", "snapshot", "review_sample"]
   secret_env = merge(module.discovery.turso_secret_ids, {
     MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
   })
   env = {
-    PROJECT_ID     = var.project_id
+    PROJECT_ID      = var.project_id
     RAW_BUCKET      = module.storage.bucket_names["weft-raw"]
     SNAPSHOT_BUCKET = module.storage.bucket_names["weft-snapshots"]
-    MODEL_BASE_URL = var.model_base_url
-    MODEL_NAME     = var.model_name
-    MODEL_REVISION = var.model_revision
-    WEFT_NLP       = "real"
+    MODEL_BASE_URL  = var.model_base_url
+    MODEL_NAME      = var.model_name
+    MODEL_REVISION  = var.model_revision
+    WEFT_NLP        = "real"
   }
 }
 

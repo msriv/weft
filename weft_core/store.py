@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS sources (
   state_run INTEGER, state_run_source TEXT,   -- NULL = unverified
   owner_id TEXT, ownership_source TEXT,
   feeds TEXT NOT NULL DEFAULT '[]', sitemaps TEXT NOT NULL DEFAULT '[]',
+  healthy INTEGER NOT NULL DEFAULT 1,
   paywalled INTEGER NOT NULL DEFAULT 0, min_interval REAL NOT NULL DEFAULT 10,
   status TEXT NOT NULL DEFAULT 'active',      -- active | rejected (no live feed found)
   discovered_via TEXT NOT NULL, discovered_at TEXT NOT NULL, verified_at TEXT);
@@ -164,6 +165,13 @@ def register_source(
             None if rejected else _now(),
         ),
     )
+
+
+def set_health(db: Db, unhealthy_ids: list[str]) -> None:
+    """Mark feeds unhealthy (no success within the health window) or healthy again."""
+    db.execute("UPDATE sources SET healthy=1")
+    for sid in unhealthy_ids:
+        db.execute("UPDATE sources SET healthy=0 WHERE id=?", (sid,))
 
 
 def active_sources(db: Db) -> list[dict[str, Any]]:

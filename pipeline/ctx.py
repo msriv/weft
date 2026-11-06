@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from weft_core import graph, store
+from weft_core import config, graph, store
 from weft_core.models import ModelClient
 from weft_core.nlp import Nlp
 
@@ -34,6 +34,8 @@ class Ctx:
     text_of: Callable[[dict[str, Any]], str]  # report -> extracted text (from the raw copy)
     model: ModelClient | None = None
     now: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    versions_of: Callable[[str], list[tuple[datetime, str]]] = lambda report_id: []
+    rules: dict[str, Any] = field(default_factory=config.rules)  # config/rules.yaml
     budgets: dict[str, Budget] = field(default_factory=dict)
 
     def budget(self, story_id: str) -> Budget:

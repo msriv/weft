@@ -7,7 +7,17 @@ import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from pipeline import claims, figures, groups, regroup, review_sample, short_version, snapshot
+from pipeline import (
+    anomalies,
+    claims,
+    figures,
+    groups,
+    regroup,
+    review_sample,
+    short_version,
+    snapshot,
+    weights,
+)
 from pipeline.ctx import Ctx
 from weft_core import graph
 
@@ -18,6 +28,8 @@ STAGES: dict[str, Callable[[Ctx], int]] = {
     "claim_groups": groups.run_groups,
     "conflicts": groups.run_conflicts,
     "short_version": short_version.run,
+    "anomalies": anomalies.run,
+    "weights": weights.run,
     "snapshot": lambda ctx: snapshot.run(ctx, _sink()),
     "review_sample": review_sample.run,
 }

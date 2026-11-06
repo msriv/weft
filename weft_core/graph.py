@@ -48,6 +48,20 @@ CREATE TABLE IF NOT EXISTS figures (
   start_char INTEGER NOT NULL, end_char INTEGER NOT NULL, {V}, PRIMARY KEY (id, valid_from));
 CREATE TABLE IF NOT EXISTS short_versions (
   id TEXT NOT NULL, payload TEXT NOT NULL, {V}, PRIMARY KEY (id, valid_from));
+CREATE TABLE IF NOT EXISTS anomalies (
+  id TEXT NOT NULL, rule TEXT NOT NULL, rule_version INTEGER NOT NULL, status TEXT NOT NULL,
+  subject_kind TEXT NOT NULL, subject_id TEXT NOT NULL, story_id TEXT, event_id TEXT,
+  summary TEXT NOT NULL, inputs TEXT NOT NULL, evidence_ids TEXT NOT NULL, detail TEXT NOT NULL,
+  {V}, PRIMARY KEY (id, valid_from));
+CREATE TABLE IF NOT EXISTS anomalies_log (
+  at TEXT NOT NULL, anomaly_id TEXT NOT NULL, change TEXT NOT NULL, rule TEXT NOT NULL,
+  rule_version INTEGER NOT NULL, status TEXT);
+CREATE TABLE IF NOT EXISTS source_weights (
+  source_id TEXT NOT NULL, day TEXT NOT NULL, weight REAL NOT NULL, factors TEXT NOT NULL,
+  n_reports INTEGER NOT NULL, insufficient INTEGER NOT NULL, PRIMARY KEY (source_id, day));
+CREATE TABLE IF NOT EXISTS report_versions (
+  report_id TEXT NOT NULL, n INTEGER NOT NULL, fetched_at TEXT NOT NULL, text_hash TEXT NOT NULL,
+  PRIMARY KEY (report_id, n));
 CREATE TABLE IF NOT EXISTS translations (
   key TEXT PRIMARY KEY, lang TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS review_items (
@@ -81,6 +95,9 @@ JSON_COLS = {
     "perspectives",
     "evidence_ids",
     "payload",
+    "inputs",
+    "detail",
+    "factors",
 }
 
 
