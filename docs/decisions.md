@@ -57,3 +57,14 @@ Short record of what was decided and why. Add an entry before changing any of th
 
 ## D14. Name: Weft
 **Decided:** "Weft". In weaving, the warp is the fixed threads and the weft is woven across them: the record is the warp, narratives are the weft. Alternatives considered: Parallax, Sightline, Undercurrent. Trademark and domain not yet checked.
+
+## D15. Automation first: sources and stories are created by the pipeline, an admin toggle publishes
+**Decided (Mihir, 2026-11-06):** Weft runs without manual steps. Sources, stories and their parties are created by the pipeline and stored in the operational database, not hand-written in git. Nothing is public until an admin turns on a per-story visibility toggle.
+**What changes:** The git-reviewed `config/sources/*.yaml` registry (spec, Source registry) becomes a seed and export format, not the source of truth. Source discovery (GDELT candidates grouped by domain per story, feeds found automatically) writes records directly. The 1% review sample stays optional, not a gate.
+**What does not change:** The product rules. Ownership and `state_run` facts still carry a citation, or are stored as "unverified" and shown that way. Party status stays per story (rule 7), proposed by the pipeline and editable by an admin. Source weight changes ordering only (rule 6). Visibility is the only human gate.
+**Why:** The system is meant to scale to many stories and languages without staffing a review queue for every source.
+
+## D16. Operational database: Turso (proposed, pending comparison)
+**Status:** Proposed. Cloud SQL was never part of the plan and is too costly for now.
+**Idea:** Turso (libSQL) holds operational data: sources, stories, parties, feed health, admin toggles. Neo4j AuraDB keeps the story graph and vectors (D6) unless a comparison shows Turso can carry those too.
+**Open:** Neo4j AuraDB vs Turso for the graph (cost, graph queries, vector search, operations). Needs a decision entry before any Turso code, per CLAUDE.md.
