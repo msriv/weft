@@ -4,7 +4,6 @@ poller_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed t
 fetcher_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
 alert_email = "REPLACE-ME" # PLACEHOLDER: who gets feed-health alerts
 crawler_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
-gdelt_theme_regex = "REPLACE-ME" # PLACEHOLDER: GDELT themes for the first beat
 discovery_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed to Artifact Registry
 stream_worker_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
 nightly_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed

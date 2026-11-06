@@ -65,12 +65,6 @@ module "crawler" {
   turso_secret_ids      = module.discovery.turso_secret_ids
 }
 
-module "gdelt" {
-  source      = "./modules/gdelt"
-  project_id  = var.project_id
-  theme_regex = var.gdelt_theme_regex
-}
-
 module "discovery" {
   source                = "./modules/discovery"
   project_id            = var.project_id
