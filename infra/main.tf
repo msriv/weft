@@ -162,3 +162,15 @@ resource "google_storage_bucket_iam_member" "nightly_snapshots_write" {
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${module.platform.service_account_emails["nightly"]}"
 }
+
+module "api" {
+  source                = "./modules/run_service"
+  project_id            = var.project_id
+  region                = var.region
+  name                  = "weft-api"
+  image                 = var.api_image
+  service_account_email = module.platform.service_account_emails["api"]
+  secret_env            = merge(module.discovery.turso_secret_ids, { ADMIN_TOKEN = module.discovery.admin_token_secret_id })
+  public                = true
+  max_instances         = 5
+}

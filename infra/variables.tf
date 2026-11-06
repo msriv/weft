@@ -69,3 +69,8 @@ variable "model_revision" {
   description = "Pinned model revision (Hugging Face commit hash). PLACEHOLDER until the provider is chosen."
   type        = string
 }
+
+variable "api_image" {
+  description = "API image in Artifact Registry. Built in CI, not by hand."
+  type        = string
+}

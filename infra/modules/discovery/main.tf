@@ -106,3 +106,7 @@ output "turso_secret_ids" {
   description = "Secret ids for TURSO_URL and TURSO_TOKEN, for services that read the source store."
   value       = { TURSO_URL = google_secret_manager_secret.turso["turso-url"].secret_id, TURSO_TOKEN = google_secret_manager_secret.turso["turso-token"].secret_id }
 }
+
+output "admin_token_secret_id" {
+  value = google_secret_manager_secret.turso["admin-token"].secret_id
+}
