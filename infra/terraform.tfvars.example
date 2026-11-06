@@ -10,3 +10,4 @@ stream_worker_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is p
 nightly_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
 model_base_url = "REPLACE-ME" # PLACEHOLDER: hosted model provider, issue #3
 model_revision = "REPLACE-ME" # PLACEHOLDER: pinned model revision
+api_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed

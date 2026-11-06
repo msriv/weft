@@ -71,11 +71,18 @@ CREATE TABLE IF NOT EXISTS actors (
 CREATE TABLE IF NOT EXISTS statements (
   id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, document_id TEXT NOT NULL, text TEXT NOT NULL,
   start_char INTEGER NOT NULL, end_char INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS reader_reports (
+  kind TEXT NOT NULL, ref_id TEXT, message TEXT NOT NULL, email TEXT, created_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open', resolution TEXT);
+CREATE TABLE IF NOT EXISTS corrections (day TEXT NOT NULL, kind TEXT NOT NULL, what TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS translations (
   key TEXT PRIMARY KEY, lang TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS review_items (
   id TEXT PRIMARY KEY, kind TEXT NOT NULL, ref_id TEXT NOT NULL, payload TEXT NOT NULL,
   sampled_at TEXT NOT NULL, rating TEXT, reviewer TEXT, rated_at TEXT);
+CREATE TABLE IF NOT EXISTS subscriptions (
+  email TEXT PRIMARY KEY, frequency TEXT NOT NULL, follows TEXT NOT NULL, token TEXT NOT NULL,
+  created_at TEXT NOT NULL, last_sent TEXT);
 CREATE TABLE IF NOT EXISTS daily_diffs (day TEXT PRIMARY KEY, payload TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS batch_runs (
   run_id TEXT NOT NULL, stage TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT,

@@ -1,5 +1,6 @@
 {
   "prompts": [
+    "ask@1",
     "claim-extract@1",
     "merge-check@1",
     "translate@1",
@@ -17,6 +18,9 @@
     },
     "translation": {
       "chrf": 1.0
+    },
+    "ask": {
+      "f1": 1.0
     }
   }
 }

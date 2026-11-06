@@ -69,3 +69,29 @@ variable "model_revision" {
   description = "Pinned model revision (Hugging Face commit hash). PLACEHOLDER until the provider is chosen."
   type        = string
 }
+
+variable "api_image" {
+  description = "API image in Artifact Registry. Built in CI, not by hand."
+  type        = string
+}
+
+variable "web_image" {
+  description = "Web app image in Artifact Registry. Built in CI, not by hand."
+  type        = string
+}
+
+# Email digest. Provider and sender are still open (alert email); empty smtp_host turns the digest off.
+variable "smtp_host" {
+  type    = string
+  default = ""
+}
+
+variable "smtp_user" {
+  type    = string
+  default = ""
+}
+
+variable "mail_from" {
+  type    = string
+  default = ""
+}

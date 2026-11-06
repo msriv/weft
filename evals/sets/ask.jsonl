@@ -1,0 +1,2 @@
+{"id": "a1", "question": "What did outlets report about the port?", "passages": ["The authority said 12 ships were waiting.", "Traders were relieved."], "gold_kept": ["Outlet O reported 12 ships were waiting."]}
+{"id": "a2", "question": "Was the figure right?", "passages": ["Officials in Veymar denied the figure."], "gold_kept": ["Officials in Veymar denied the figure, according to outlet O."]}

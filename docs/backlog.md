@@ -41,13 +41,19 @@ Exit: editors rate merge and claim quality on a labelled sample, and it beats th
 - [x] Editor review queue (1% sample), API and page in the web app
 
 ## Phase 3: Anomalies and core screens
-Rules engine with unit tests per rule and suppression case; source weights; API endpoints for story, event, source, document, method; Next.js story view (network + list), event page, source and proceeding pages, How we weigh.
+- [x] Rules engine with unit tests per rule and suppression case; source weights
+- [x] API endpoints for story, event, source, document, method (`/v1`, public stories only)
+- [x] Next.js story view (graph + list), event page, source and proceeding pages, How we weigh
 
 ## Phase 4: Private beta
-Today, onboarding, follows, email digest, report-a-problem, Weft's corrections log, Firebase auth.
+- [x] Today, onboarding, follows (browser-local), email digest (`subscriptions`, nightly `notify` stage), report-a-problem, corrections log
+- [ ] Firebase auth and Firestore prefs (readers are guests; prefs stay in the browser, digest by email only)
 
 ## Phase 5: Live and Ask (v2)
-SSE stream to the UI, live view, Ask agent with read-only tools and citation post-check, World desk, person page.
+- [x] SSE stream (`/v1/stories/{id}/stream`, polls the graph; Pub/Sub + Redis is the upgrade) and live view
+- [x] Ask: fixed retrieval, one model call, citation and no-verdict post-check, evidence panel
+- [x] World desk with Globe, person page
+- [ ] Ask is a single retrieval step, not a multi-tool agent; add tools if answers need more
 
 ## Phase 6: Scale out
 More beats and languages, subscriptions, web push, PWA polish; revisit self-hosted vLLM (decision D7).
