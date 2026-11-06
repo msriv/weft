@@ -13,8 +13,8 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from google.cloud import bigquery, storage  # type: ignore[attr-defined]
 
 from services.fetcher.fetcher import Store, fetch_item
+from weft_core import store
 from weft_core.polite import PoliteClient
-from weft_core.sources import load_sources
 
 
 class GcpStore:
@@ -76,7 +76,7 @@ def create_app(store: Store, http: PoliteClient, sources: dict[str, dict[str, An
 
 def _default_app() -> FastAPI:
     project = os.environ["PROJECT_ID"]
-    sources = {s["id"]: s for s in load_sources()}
+    sources = store.LiveSources(store.from_env())
     http = PoliteClient(httpx.Client(timeout=30, follow_redirects=True))
     return create_app(GcpStore(project, os.environ["RAW_BUCKET"]), http, sources)
 

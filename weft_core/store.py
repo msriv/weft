@@ -194,3 +194,25 @@ def stories(db: Db, *, public_only: bool) -> list[dict[str, Any]]:
         {**r, "public": bool(r["public"])}
         for r in db.execute(f"SELECT id,beat_id,title,public,created_at FROM stories{where}")
     ]
+
+
+def from_env() -> TursoDb:
+    import os
+
+    db = TursoDb(os.environ["TURSO_URL"], os.environ["TURSO_TOKEN"])
+    init(db)
+    return db
+
+
+class LiveSources(dict[str, dict[str, Any]]):
+    """Source lookup that re-reads the store on a miss, so a long-lived service sees sources
+    that discovery registered after it started."""
+
+    def __init__(self, db: Db) -> None:
+        super().__init__()
+        self._db = db
+
+    def __missing__(self, key: str) -> dict[str, Any]:
+        self.clear()
+        self.update({s["id"]: s for s in active_sources(self._db)})
+        return self[key] if key in self else super().__getitem__(key)

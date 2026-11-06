@@ -9,9 +9,9 @@ import httpx
 from google.cloud import bigquery, pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.poller.poller import FeedState, Poller
+from weft_core import store
 from weft_core.health import unhealthy
 from weft_core.polite import PoliteClient
-from weft_core.sources import load_sources
 
 
 class GcsState:
@@ -60,7 +60,7 @@ def main() -> int:
 
     with httpx.Client(timeout=30, follow_redirects=True) as http:
         results = Poller(PoliteClient(http), GcsState(os.environ["STATE_BUCKET"]), publish).run(
-            load_sources()
+            store.active_sources(store.from_env())
         )
     for sid, err in results.items():
         if err:
