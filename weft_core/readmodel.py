@@ -13,7 +13,9 @@ from typing import Any
 
 from weft_core import config, graph
 from weft_core.perspectives import perspective_of
+from weft_core.rules import log_odds
 from weft_core.store import Db
+from weft_core.textutil import words
 from weft_core.weights import FACTORS
 
 QUIET_AFTER = timedelta(hours=48)
@@ -243,11 +245,48 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
 
 
 def _event_short_versions(db: Db, story_id: str, at: str | None) -> dict[str, Any]:
-    out = {}
+    """Story-level short version: the event-level set logic with claim-group labels resolved,
+    so the page can say what is reported by all, what conflicts, and what no source has published."""
+    label = {
+        g["id"]: g["label"]
+        for g in graph.select(
+            db,
+            "claim_groups",
+            "event_id IN (SELECT id FROM events WHERE story_id=?)",
+            (story_id,),
+            at,
+        )
+    }
+    out: dict[str, Any] = {
+        "reported_by_all": [],
+        "reports_conflict_on": [],
+        "one_perspective_only": [],
+        "no_source_published": [],
+    }
     for e in graph.select(db, "events", "story_id=?", (story_id,), at):
         sv = graph.get(db, "short_versions", e["id"], at)
-        if sv:
-            out[e["id"]] = sv["payload"]
+        if not sv:
+            continue
+        p = sv["payload"]
+        out["reported_by_all"] += [
+            {"event_id": e["id"], "group": g, "label": label.get(g, "")}
+            for g in p["reported_by_all"]
+        ]
+        out["reports_conflict_on"] += [
+            {"event_id": e["id"], "labels": [label.get(g, "") for g in pair]}
+            for pair in p["reports_conflict_on"]
+        ]
+        out["one_perspective_only"] += [
+            {
+                "event_id": e["id"],
+                "label": label.get(x["group"], ""),
+                "perspective": x["perspective"],
+            }
+            for x in p["one_perspective_only"]
+        ]
+        out["no_source_published"] = sorted(
+            set(out["no_source_published"]) | set(p["no_source_published"])
+        )
     return out
 
 
@@ -344,6 +383,7 @@ def event_page(db: Db, event_id: str, at: str | None = None) -> dict[str, Any] |
     sv = graph.get(db, "short_versions", event_id, at)
     return {
         "event": event_row(db, e, at),
+        "voices": _voices(by_p),
         "perspectives": {p: rs for p, rs in sorted(by_p.items())},
         "claim_groups": [
             {
@@ -365,6 +405,25 @@ def event_page(db: Db, event_id: str, at: str | None = None) -> dict[str, Any] |
         "short_version": sv["payload"] if sv else None,
         "parties": plist,
     }
+
+
+def _voices(by_p: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
+    """Per perspective: the heaviest source's headline and the words used far more than by the
+    other perspectives (weighted log-odds). A reading aid, not a flag: no anomaly comes from it."""
+    counts = {
+        p: Counter(w for r in rs for w in words(f"{r['title']} {r['summary']}") if len(w) > 3)
+        for p, rs in by_p.items()
+    }
+    out = {}
+    for p, rs in by_p.items():
+        rest: Counter[str] = Counter()
+        for q, c in counts.items():
+            if q != p:
+                rest.update(c)
+        z = log_odds(counts[p], rest) if rest else {}
+        top = [w for w, v in sorted(z.items(), key=lambda x: -x[1]) if v > 1.0][:5]
+        out[p] = {"headline": rs[0]["title"] if rs else None, "words": top, "reports": len(rs)}
+    return out
 
 
 # --- nodes ------------------------------------------------------------------------------------

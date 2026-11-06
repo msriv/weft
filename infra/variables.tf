@@ -74,3 +74,8 @@ variable "api_image" {
   description = "API image in Artifact Registry. Built in CI, not by hand."
   type        = string
 }
+
+variable "web_image" {
+  description = "Web app image in Artifact Registry. Built in CI, not by hand."
+  type        = string
+}

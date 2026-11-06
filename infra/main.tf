@@ -174,3 +174,17 @@ module "api" {
   public                = true
   max_instances         = 5
 }
+
+module "web" {
+  source                = "./modules/run_service"
+  project_id            = var.project_id
+  region                = var.region
+  name                  = "weft-web"
+  image                 = var.web_image
+  service_account_email = module.platform.service_account_emails["web"]
+  env                   = { API_URL = module.api.uri }
+  public                = true
+  max_instances         = 5
+}
+
+output "web_url" { value = module.web.uri }
