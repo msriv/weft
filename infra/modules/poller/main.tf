@@ -55,6 +55,18 @@ resource "google_cloud_run_v2_job" "poller" {
           name  = "STATE_BUCKET"
           value = var.state_bucket
         }
+        dynamic "env" {
+          for_each = var.turso_secret_ids
+          content {
+            name = env.key
+            value_source {
+              secret_key_ref {
+                secret  = env.value
+                version = "latest"
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -106,4 +118,17 @@ resource "google_project_iam_member" "bq_jobs" {
   project = var.project_id
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${var.service_account_email}"
+}
+
+variable "turso_secret_ids" {
+  description = "Env var name to Secret Manager secret id for the Turso source store."
+  type        = map(string)
+}
+
+resource "google_secret_manager_secret_iam_member" "turso" {
+  for_each  = var.turso_secret_ids
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.service_account_email}"
 }

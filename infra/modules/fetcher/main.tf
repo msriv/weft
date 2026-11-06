@@ -59,6 +59,18 @@ resource "google_cloud_run_v2_service" "fetcher" {
         name  = "RAW_BUCKET"
         value = var.raw_bucket
       }
+      dynamic "env" {
+        for_each = var.turso_secret_ids
+        content {
+          name = env.key
+          value_source {
+            secret_key_ref {
+              secret  = env.value
+              version = "latest"
+            }
+          }
+        }
+      }
     }
   }
 
@@ -96,4 +108,17 @@ resource "google_pubsub_subscription" "fetcher" {
       service_account_email = google_service_account.push.email
     }
   }
+}
+
+variable "turso_secret_ids" {
+  description = "Env var name to Secret Manager secret id for the Turso source store."
+  type        = map(string)
+}
+
+resource "google_secret_manager_secret_iam_member" "turso" {
+  for_each  = var.turso_secret_ids
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.service_account_email}"
 }

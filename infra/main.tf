@@ -24,6 +24,7 @@ module "platform" {
 
 module "poller" {
   source                = "./modules/poller"
+  turso_secret_ids      = module.discovery.turso_secret_ids
   project_id            = var.project_id
   region                = var.region
   image                 = var.poller_image
@@ -35,6 +36,7 @@ module "poller" {
 
 module "fetcher" {
   source                = "./modules/fetcher"
+  turso_secret_ids      = module.discovery.turso_secret_ids
   project_id            = var.project_id
   region                = var.region
   image                 = var.fetcher_image

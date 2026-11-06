@@ -108,3 +108,19 @@ def test_story_toggle_gates_public_list() -> None:
     assert (
         c.put("/admin/stories/nope/public", json={"public": True}, headers=off).status_code == 404
     )
+
+
+def test_live_sources_see_late_registration() -> None:
+    db = store.SqliteDb()
+    store.init(db)
+    live = store.LiveSources(db)
+    assert "a-example" not in live
+    store.register_source(
+        db,
+        domain="a.example",
+        name="A",
+        homepage="https://a.example/",
+        feeds=["https://a.example/f"],
+        via="t",
+    )
+    assert live["a-example"]["feeds"] == ["https://a.example/f"]

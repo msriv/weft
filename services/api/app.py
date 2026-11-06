@@ -40,6 +40,4 @@ def create_app(db: store.Db, admin_token: str) -> FastAPI:
 
 
 def app_from_env() -> FastAPI:
-    db = store.TursoDb(os.environ["TURSO_URL"], os.environ["TURSO_TOKEN"])
-    store.init(db)
-    return create_app(db, os.environ["ADMIN_TOKEN"])
+    return create_app(store.from_env(), os.environ["ADMIN_TOKEN"])
