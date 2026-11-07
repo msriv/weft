@@ -1,8 +1,0 @@
-[
-  {"name": "url", "type": "STRING", "mode": "REQUIRED"},
-  {"name": "domain", "type": "STRING", "mode": "NULLABLE"},
-  {"name": "published_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
-  {"name": "themes", "type": "STRING", "mode": "NULLABLE"},
-  {"name": "locations", "type": "STRING", "mode": "NULLABLE"},
-  {"name": "discovered_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
-]

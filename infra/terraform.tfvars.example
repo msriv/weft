@@ -1,13 +1,10 @@
-project_id = "weft-dev"
-region     = "REPLACE-ME" # PLACEHOLDER: pick in issue #2
-poller_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed to Artifact Registry
-fetcher_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
-alert_email = "REPLACE-ME" # PLACEHOLDER: who gets feed-health alerts
-crawler_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
-gdelt_theme_regex = "REPLACE-ME" # PLACEHOLDER: GDELT themes for the first beat
-discovery_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed to Artifact Registry
-stream_worker_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
-nightly_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
-model_base_url = "REPLACE-ME" # PLACEHOLDER: hosted model provider, issue #3
-model_revision = "REPLACE-ME" # PLACEHOLDER: pinned model revision
-api_image = "REPLACE-ME" # PLACEHOLDER: set after the first image is pushed
+project_id  = "weft-news-prod"
+alert_email = "you@example.com"
+
+# Email digest through Resend. Leave smtp_host empty to turn the digest off.
+smtp_host = "smtp.resend.com"
+smtp_user = "resend"
+mail_from = "digest@your-verified-domain.example"
+
+# The *_image variables come from infra/images.auto.tfvars, written by infra/build_images.sh.
+# region and the model_* variables default in variables.tf; override them here if needed.
