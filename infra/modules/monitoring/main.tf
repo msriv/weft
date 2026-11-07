@@ -1,6 +1,6 @@
 variable "project_id" { type = string }
 variable "alert_email" {
-  description = "Where feed-health alerts go. PLACEHOLDER until the owner names who is on call."
+  description = "Where feed-health alerts go."
   type        = string
 }
 

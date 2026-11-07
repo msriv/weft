@@ -4,8 +4,9 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "GCP region for every resource. PLACEHOLDER until the owner picks one (issue #2); changing it is a variable change."
+  description = "GCP region for every resource. Changing it is a variable change."
   type        = string
+  default     = "asia-south1"
 }
 
 variable "raw_retention_days" {
@@ -25,7 +26,7 @@ variable "fetcher_image" {
 }
 
 variable "alert_email" {
-  description = "Recipient for alert policies. PLACEHOLDER until the owner decides who is on call."
+  description = "Recipient for alert policies."
   type        = string
 }
 
@@ -50,25 +51,27 @@ variable "nightly_image" {
 }
 
 variable "model_base_url" {
-  description = "OpenAI-compatible endpoint for the hosted open-weight models. PLACEHOLDER until the provider is chosen (issue #3)."
+  description = "OpenAI-compatible endpoint for the hosted open-weight models (OpenRouter)."
   type        = string
+  default     = "https://openrouter.ai/api/v1"
 }
 
 variable "model_name" {
-  description = "Pinned model name, e.g. Qwen/Qwen3-14B."
+  description = "Model slug at the provider. Open-weight; revision pins the weights."
   type        = string
-  default     = "Qwen/Qwen3-14B"
+  default     = "qwen/qwen3.6-35b-a3b"
 }
 
 variable "model_revision" {
-  description = "Pinned model revision (Hugging Face commit hash). PLACEHOLDER until the provider is chosen."
+  description = "Pinned model revision (Hugging Face commit hash of model_name)."
   type        = string
+  default     = "995ad96eacd98c81ed38be0c5b274b04031597b0"
 }
 
 variable "model_provider" {
-  description = "OpenRouter only: upstream host to pin (e.g. Together). Empty for other providers."
+  description = "OpenRouter only: upstream host to pin. Empty for other providers."
   type        = string
-  default     = ""
+  default     = "DeepInfra"
 }
 
 variable "api_image" {
@@ -81,7 +84,7 @@ variable "web_image" {
   type        = string
 }
 
-# Email digest. Provider and sender are still open (alert email); empty smtp_host turns the digest off.
+# Email digest (Resend over SMTP). Empty smtp_host turns the digest off.
 variable "smtp_host" {
   type    = string
   default = ""
