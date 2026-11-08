@@ -1,6 +1,7 @@
 variable "project_id" {
-  description = "GCP project for this environment, e.g. weft-dev."
+  description = "GCP project for this environment."
   type        = string
+  default     = "weft-news-prod"
 }
 
 variable "region" {
