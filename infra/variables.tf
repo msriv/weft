@@ -17,38 +17,45 @@ variable "raw_retention_days" {
 }
 
 variable "poller_image" {
-  description = "Poller image, e.g. <region>-docker.pkg.dev/<project>/weft/poller:<tag>. Built in CI, not by hand."
+  description = "Override the poller image. Empty uses :latest from Artifact Registry; build_images.sh pins a tag in images.auto.tfvars."
   type        = string
+  default     = ""
 }
 
 variable "fetcher_image" {
-  description = "Fetcher image in Artifact Registry. Built in CI, not by hand."
+  description = "Override the fetcher image. Empty uses :latest from Artifact Registry; build_images.sh pins a tag in images.auto.tfvars."
   type        = string
+  default     = ""
 }
 
 variable "alert_email" {
   description = "Recipient for alert policies."
   type        = string
+  default     = "msriv574@gmail.com"
 }
 
 variable "crawler_image" {
-  description = "Crawler image in Artifact Registry. Built in CI, not by hand."
+  description = "Override the crawler image. Empty uses :latest from Artifact Registry; build_images.sh pins a tag in images.auto.tfvars."
   type        = string
+  default     = ""
 }
 
 variable "discovery_image" {
-  description = "Discovery image, e.g. <region>-docker.pkg.dev/<project>/weft/discovery:<tag>. Built in CI, not by hand."
+  description = "Override the discovery image. Empty uses :latest from Artifact Registry; build_images.sh pins a tag in images.auto.tfvars."
   type        = string
+  default     = ""
 }
 
 variable "stream_worker_image" {
-  description = "Stream worker image in Artifact Registry. Built in CI, not by hand."
+  description = "Override the stream_worker image. Empty uses :latest from Artifact Registry; build_images.sh pins a tag in images.auto.tfvars."
   type        = string
+  default     = ""
 }
 
 variable "nightly_image" {
-  description = "Nightly pipeline image in Artifact Registry. Built in CI, not by hand."
+  description = "Override the nightly image. Empty uses :latest from Artifact Registry; build_images.sh pins a tag in images.auto.tfvars."
   type        = string
+  default     = ""
 }
 
 variable "model_base_url" {
@@ -76,13 +83,15 @@ variable "model_provider" {
 }
 
 variable "api_image" {
-  description = "API image in Artifact Registry. Built in CI, not by hand."
+  description = "Override the api image. Empty uses :latest from Artifact Registry; build_images.sh pins a tag in images.auto.tfvars."
   type        = string
+  default     = ""
 }
 
 variable "web_image" {
-  description = "Web app image in Artifact Registry. Built in CI, not by hand."
+  description = "Override the web image. Empty uses :latest from Artifact Registry; build_images.sh pins a tag in images.auto.tfvars."
   type        = string
+  default     = ""
 }
 
 # Email digest (Resend over SMTP). Empty smtp_host turns the digest off.
