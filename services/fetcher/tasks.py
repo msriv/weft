@@ -12,7 +12,7 @@ def _client() -> tasks_v2.CloudTasksClient:
     host = os.environ.get("TASKS_EMULATOR_HOST")  # set only by docker-compose.yml
     if not host:
         return tasks_v2.CloudTasksClient()
-    import grpc
+    import grpc  # type: ignore[import-untyped]
     from google.api_core.client_options import ClientOptions
     from google.cloud.tasks_v2.services.cloud_tasks.transports import CloudTasksGrpcTransport
 

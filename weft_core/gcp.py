@@ -3,7 +3,7 @@ BigQuery client at a local emulator; the other GCP clients read their own emulat
 
 import os
 
-from google.cloud import bigquery  # type: ignore[attr-defined]
+from google.cloud import bigquery
 
 
 def bigquery_client(project: str) -> bigquery.Client:
@@ -16,5 +16,5 @@ def bigquery_client(project: str) -> bigquery.Client:
     return bigquery.Client(
         project=project,
         client_options=ClientOptions(api_endpoint=host),
-        credentials=AnonymousCredentials(),
+        credentials=AnonymousCredentials(),  # type: ignore[no-untyped-call]
     )
