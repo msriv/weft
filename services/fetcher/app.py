@@ -17,8 +17,8 @@ from services.fetcher import refetch as refetch_mod
 from services.fetcher.fetcher import Store, fetch_item
 from services.fetcher.tasks import CloudTasksQueue
 from weft_core import portals, store
-from weft_core.gcp import bigquery_client
 from weft_core import store as store_mod
+from weft_core.gcp import bigquery_client
 from weft_core.polite import PoliteClient
 
 

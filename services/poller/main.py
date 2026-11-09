@@ -6,7 +6,7 @@ import sys
 from datetime import UTC, datetime
 
 import httpx
-from google.cloud import bigquery, pubsub_v1, storage  # type: ignore[attr-defined]
+from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.poller.poller import FeedState, Poller
 from weft_core import store
