@@ -17,13 +17,14 @@ from services.fetcher import refetch as refetch_mod
 from services.fetcher.fetcher import Store, fetch_item
 from services.fetcher.tasks import CloudTasksQueue
 from weft_core import portals, store
+from weft_core.gcp import bigquery_client
 from weft_core import store as store_mod
 from weft_core.polite import PoliteClient
 
 
 class GcpStore:
     def __init__(self, project: str, raw_bucket: str, dataset: str = "weft") -> None:
-        self._bq = bigquery.Client(project=project)
+        self._bq = bigquery_client(project)
         self._bucket = storage.Client(project=project).bucket(raw_bucket)
         self._ds = f"{project}.{dataset}"
 
