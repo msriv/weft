@@ -1,4 +1,5 @@
 "use client";
+import { pushPrefs } from "./account";
 // Reader preferences. Guests keep them in this browser; signed-in readers also sync to Firestore
 // through the API (see lib/account.ts). Nothing here is tracked.
 export type Prefs = { regions: string[]; topics: string[]; follows: string[]; frequency: "daily" | "weekly" | "never"; email?: string };
@@ -9,4 +10,7 @@ export function loadPrefs(): Prefs {
   try { return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Prefs>) }; }
   catch { return DEFAULTS; }
 }
-export function savePrefs(p: Prefs): void { localStorage.setItem(KEY, JSON.stringify(p)); }
+export function savePrefs(p: Prefs): void {
+  localStorage.setItem(KEY, JSON.stringify(p));
+  void pushPrefs(p).catch(() => {}); // signed-in readers only; the local copy is what the UI reads
+}

@@ -1,5 +1,5 @@
 # Local stack. Stand-ins: sqld for Turso, fake-gcs-server for GCS, bigquery-emulator for BigQuery,
-# Pub/Sub emulator, Cloud Tasks emulator. Firestore and Neo4j are not used by the current code.
+# Pub/Sub emulator, Cloud Tasks emulator, Firebase Auth + Firestore emulators.
 # `docker compose up` starts everything, including the scheduled jobs.
 
 x-env: &env
@@ -28,6 +28,8 @@ x-env: &env
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   MAIL_FROM: ${MAIL_FROM:-}
   SITE_URL: http://localhost:3000
+  FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
+  FIRESTORE_EMULATOR_HOST: firebase:8080
 
 x-deps: &deps
   sqld: { condition: service_started }
@@ -51,6 +53,8 @@ services:
   pubsub:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085"]
+  firebase:  # Firebase Auth + Firestore emulators (reader accounts and preferences)
+    build: ./local/firebase
   tasks:
     image: ghcr.io/aertje/cloud-tasks-emulator:latest
     command: ["-host", "0.0.0.0", "-port", "8123", "-queue", "projects/weft-local/locations/local/queues/refetch"]
@@ -66,7 +70,7 @@ services:
   api:
     build: { context: ., dockerfile: services/api/Dockerfile }
     environment: { <<: *env, WEFT_NLP: light }
-    depends_on: *deps
+    depends_on: { <<: *deps, firebase: { condition: service_started } }
     ports: ["8080:8080"]
   fetcher:
     build: { context: ., dockerfile: services/fetcher/Dockerfile }
@@ -78,7 +82,9 @@ services:
     depends_on: *deps
   web:
     build: ./web
-    environment: { API_URL: "http://api:8080" }
+    environment:
+      API_URL: http://api:8080
+      FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
     depends_on: [api]
     ports: ["3000:8080"]
 

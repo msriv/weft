@@ -100,3 +100,9 @@ variable "mail_from" {
   type    = string
   default = ""
 }
+
+variable "firebase_api_key" {
+  description = "Firebase web API key (public by design). Create it in the Firebase console once Identity Platform is enabled; leave empty to keep reader sign-in off."
+  type        = string
+  default     = ""
+}

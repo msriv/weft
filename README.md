@@ -13,7 +13,7 @@ Start here:
 
 ## Run locally (docker compose)
 
-Runs the whole platform on your machine with local stand-ins for GCP: sqld (Turso), fake-gcs-server (GCS), bigquery-emulator, Pub/Sub emulator and Cloud Tasks emulator. No GCP account needed. Needs Docker and an OpenRouter key.
+Runs the whole platform on your machine with local stand-ins for GCP: sqld (Turso), fake-gcs-server (GCS), bigquery-emulator, Pub/Sub emulator, Cloud Tasks emulator, and the Firebase emulators (Auth + Firestore, for reader accounts). No GCP account needed. Needs Docker and an OpenRouter key.
 
 ```bash
 cp .env.example .env          # set MODEL_API_KEY
@@ -21,7 +21,7 @@ docker compose up --build -d  # first build is slow: it downloads the real small
 docker compose logs -f        # watch it work
 ```
 
-Web: http://localhost:3000. API: http://localhost:8080.
+Web: http://localhost:3000. Create a reader account on `/welcome` to try sign-in and synced preferences (Firebase Auth emulator; accounts vanish on `down -v`). API: http://localhost:8080.
 
 ### Seeding and schedules
 
