@@ -13,30 +13,22 @@ Start here:
 
 ## Run locally (docker compose)
 
-Runs the whole platform on your machine with local stand-ins for GCP: sqld (Turso), fake-gcs-server (GCS), bigquery-emulator, Pub/Sub emulator and Cloud Tasks emulator. No GCP account needed. Needs Docker and an OpenRouter key.
+Runs the whole platform on your machine with local stand-ins for GCP: sqld (Turso), fake-gcs-server (GCS), bigquery-emulator, Pub/Sub emulator, Cloud Tasks emulator, and the Firebase emulators (Auth + Firestore, for reader accounts). No GCP account needed. Needs Docker and an OpenRouter key.
 
 ```bash
-cp .env.example .env        # set MODEL_API_KEY
-docker compose up --build -d
+cp .env.example .env          # set MODEL_API_KEY
+docker compose up --build -d  # first build is slow: it downloads the real small models
+docker compose logs -f        # watch it work
 ```
 
-First build is slow: the stream worker and nightly images download the real small models (BGE-M3, GlotLID, spaCy). Web is at http://localhost:3000, API at http://localhost:8080.
+Web: http://localhost:3000. Create a reader account on `/welcome` to try sign-in and synced preferences (Firebase Auth emulator; accounts vanish on `down -v`). API: http://localhost:8080.
 
-### Seed it with the real pipeline
+### Seeding and schedules
 
-No hand-seeded sources. `local/seed.sh` runs the same jobs production runs:
+Seeding is part of startup, through the real pipeline and no hand-seeded sources. `seed` runs the first discovery (reads GDELT, registers real feeds and portals per beat). Then the same jobs production runs, on production's cadence, loop in their own containers: `poller` every 10 min, `discovery` hourly, `crawler` daily, `pipeline` (nightly stages) daily, first run 30 min after start. `fetcher` and `stream-worker` process what the poller publishes.
 
-1. `discovery` reads the newest GDELT file, finds real feeds and portals for each beat, and registers them.
-2. `poller` polls those feeds and publishes new items; `fetcher` and `stream-worker` extract, group and attach them to events.
-3. `crawler` crawls official portals.
-4. `pipeline` runs the nightly stages (claims, conflicts, anomalies, snapshot).
+Stories start private. Flip one public with the admin toggle (`Authorization: Bearer $ADMIN_TOKEN` against the API) to see it on the site.
 
-```bash
-./local/seed.sh
-```
+Run a job now: `docker compose run --rm --no-deps --entrypoint "uv run --no-sync python -m pipeline.run" pipeline --stage anomalies`. Reset everything: `docker compose down -v`.
 
-Run one job on its own with `docker compose --profile jobs run --rm poller` (or `discovery`, `crawler`, `pipeline`; `pipeline --stage anomalies` re-runs one stage). Stories start private: flip one public with the admin toggle (`Authorization: Bearer $ADMIN_TOKEN` against the API) to see it on the site.
-
-Reset everything: `docker compose down -v`.
-
-Limits: the emulators are not the real services, so BigQuery and Cloud Tasks behaviour can differ in edge cases. Firestore (accounts) and Neo4j are not used by the current code, so they are not in the stack. Discovery and polling hit the live internet and obey robots.txt.
+Limits: the emulators are not the real services, so BigQuery and Cloud Tasks behaviour can differ in edge cases. Discovery and polling hit the live internet and obey robots.txt. Neo4j is not used: the story graph lives in Turso (D17 in `docs/decisions.md`).

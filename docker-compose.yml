@@ -1,6 +1,6 @@
 # Local stack. Stand-ins: sqld for Turso, fake-gcs-server for GCS, bigquery-emulator for BigQuery,
-# Pub/Sub emulator, Cloud Tasks emulator. Firestore and Neo4j are not used by the current code.
-# Long-running services start with `docker compose up`; jobs are run by hand (see README).
+# Pub/Sub emulator, Cloud Tasks emulator, Firebase Auth + Firestore emulators.
+# `docker compose up` starts everything, including the scheduled jobs.
 
 x-env: &env
   PROJECT_ID: weft-local
@@ -28,10 +28,17 @@ x-env: &env
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   MAIL_FROM: ${MAIL_FROM:-}
   SITE_URL: http://localhost:3000
+  FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
+  FIRESTORE_EMULATOR_HOST: firebase:8080
 
 x-deps: &deps
   sqld: { condition: service_started }
   init: { condition: service_completed_successfully }
+
+x-job: &job
+  entrypoint: ["sh", "-c", "sleep $$DELAY; while true; do uv run --no-sync $$JOB || echo job failed; sleep $$EVERY; done"]
+  depends_on: { seed: { condition: service_completed_successfully } }
+  restart: unless-stopped
 
 services:
   sqld:
@@ -46,6 +53,8 @@ services:
   pubsub:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085"]
+  firebase:  # Firebase Auth + Firestore emulators (reader accounts and preferences)
+    build: ./local/firebase
   tasks:
     image: ghcr.io/aertje/cloud-tasks-emulator:latest
     command: ["-host", "0.0.0.0", "-port", "8123", "-queue", "projects/weft-local/locations/local/queues/refetch"]
@@ -61,7 +70,7 @@ services:
   api:
     build: { context: ., dockerfile: services/api/Dockerfile }
     environment: { <<: *env, WEFT_NLP: light }
-    depends_on: *deps
+    depends_on: { <<: *deps, firebase: { condition: service_started } }
     ports: ["8080:8080"]
   fetcher:
     build: { context: ., dockerfile: services/fetcher/Dockerfile }
@@ -73,31 +82,37 @@ services:
     depends_on: *deps
   web:
     build: ./web
-    environment: { API_URL: "http://api:8080" }
+    environment:
+      API_URL: http://api:8080
+      FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
     depends_on: [api]
     ports: ["3000:8080"]
 
-  # Jobs: `docker compose run --rm <name>`. Not started by `up`.
-  discovery:
-    profiles: [jobs]
+  # Cloud Scheduler stand-ins: the same jobs on the same cadence as infra/ (poller */10, discovery
+  # hourly, crawler and nightly daily). `seed` is the first discovery run, so a fresh `up` fills
+  # itself through the real pipeline; nothing is hand-seeded.
+  seed:
     build: { context: ., dockerfile: services/discovery/Dockerfile }
     environment: *env
     depends_on: *deps
+    restart: "no"
+  discovery:
+    <<: *job
+    build: { context: ., dockerfile: services/discovery/Dockerfile }
+    environment: { <<: *env, DELAY: "3600", EVERY: "3600", JOB: "python -m services.discovery.main" }
   poller:
-    profiles: [jobs]
+    <<: *job
     build: { context: ., dockerfile: services/poller/Dockerfile }
-    environment: *env
-    depends_on: *deps
+    environment: { <<: *env, DELAY: "0", EVERY: "600", JOB: "python -m services.poller.main" }
   crawler:
-    profiles: [jobs]
+    <<: *job
     build: { context: ., dockerfile: services/crawler/Dockerfile }
-    environment: *env
-    depends_on: *deps
+    environment: { <<: *env, DELAY: "0", EVERY: "86400", JOB: "python -m services.crawler.main" }
   pipeline:
-    profiles: [jobs]
+    <<: *job
     build: { context: ., dockerfile: pipeline/Dockerfile }
-    environment: *env
-    depends_on: *deps
+    # first nightly run waits 30 min so the first poll has been extracted and grouped
+    environment: { <<: *env, DELAY: "1800", EVERY: "86400", JOB: "python -m pipeline.run" }
 
 volumes:
   sqld:

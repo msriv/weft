@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from weft_core import digest, graph, readmodel, review, store
+from weft_core import accounts, digest, graph, readmodel, review, store
 
 STREAM_POLL_SECONDS = 5
 
@@ -44,6 +44,14 @@ class Subscription(BaseModel):
     email: str
     frequency: str
     follows: list[str] = []
+
+
+class ReaderPrefs(BaseModel):
+    regions: list[str] = []
+    topics: list[str] = []
+    follows: list[str] = []
+    frequency: str = "daily"
+    email: str | None = None
 
 
 class Question(BaseModel):
@@ -74,6 +82,8 @@ def create_app(
     db: store.Db,
     admin_token: str,
     asker: Callable[[str], dict[str, Any]] | None = None,
+    prefs: accounts.Prefs | None = None,
+    project: str = "",
 ) -> FastAPI:
     app = FastAPI(title="Weft API")
 
@@ -82,7 +92,24 @@ def create_app(
         if not admin_token or not hmac.compare_digest(authorization, f"Bearer {admin_token}"):
             raise HTTPException(401, "admin token required")
 
+    def reader(authorization: Annotated[str, Header()] = "") -> str:
+        uid = accounts.verify_token(authorization.removeprefix("Bearer "), project)
+        if prefs is None or uid is None:
+            raise HTTPException(401, "sign in required")
+        return uid
+
     v1 = APIRouter(prefix="/v1")
+
+    @v1.get("/me/prefs")
+    def my_prefs(uid: Annotated[str, Depends(reader)]) -> dict[str, Any]:
+        assert prefs is not None
+        return prefs.get(uid)
+
+    @v1.put("/me/prefs")
+    def put_my_prefs(body: ReaderPrefs, uid: Annotated[str, Depends(reader)]) -> dict[str, Any]:
+        assert prefs is not None
+        prefs.put(uid, body.model_dump())
+        return body.model_dump()
 
     @v1.get("/stories")
     def stories(
@@ -268,7 +295,10 @@ def create_app(
 def app_from_env() -> FastAPI:
     db = store.from_env()
     graph.init(db)
-    return create_app(db, os.environ["ADMIN_TOKEN"], _asker(db))
+    project = os.environ["PROJECT_ID"]
+    return create_app(
+        db, os.environ["ADMIN_TOKEN"], _asker(db), accounts.FirestorePrefs(project), project
+    )
 
 
 def _asker(db: store.Db) -> Callable[[str], dict[str, Any]] | None:

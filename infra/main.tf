@@ -174,6 +174,38 @@ resource "google_storage_bucket_iam_member" "nightly_snapshots_write" {
   member = "serviceAccount:${module.platform.service_account_emails["nightly"]}"
 }
 
+# Reader accounts: Firebase Authentication (Identity Platform) and Firestore preferences.
+resource "google_project_service" "accounts" {
+  for_each = toset(["firestore.googleapis.com", "identitytoolkit.googleapis.com"])
+  project  = var.project_id
+  service  = each.key
+}
+
+resource "google_firestore_database" "default" {
+  project     = var.project_id
+  name        = "(default)"
+  location_id = var.region
+  type        = "FIRESTORE_NATIVE"
+  depends_on  = [google_project_service.accounts]
+}
+
+resource "google_identity_platform_config" "auth" {
+  project = var.project_id
+  sign_in {
+    email {
+      enabled           = true
+      password_required = true
+    }
+  }
+  depends_on = [google_project_service.accounts]
+}
+
+resource "google_project_iam_member" "api_firestore" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${module.platform.service_account_emails["api"]}"
+}
+
 module "api" {
   source                = "./modules/run_service"
   project_id            = var.project_id
@@ -205,7 +237,7 @@ module "web" {
   name                  = "weft-web"
   image                 = var.web_image
   service_account_email = module.platform.service_account_emails["web"]
-  env                   = { API_URL = module.api.uri }
+  env                   = { API_URL = module.api.uri, FIREBASE_API_KEY = var.firebase_api_key }
   public                = true
   max_instances         = 5
 }

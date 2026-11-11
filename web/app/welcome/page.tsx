@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { DEFAULTS, loadPrefs, savePrefs, type Prefs } from "@/lib/prefs";
 import { Kicker } from "@/components/bits";
+import { pullPrefs, signIn, signOut, signedInAs } from "@/lib/account";
 
 type Card = { id: string; title: string; beat: string; perspectives: string[] };
 
@@ -10,7 +11,19 @@ export default function Welcome() {
   const [stories, setStories] = useState<Card[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(false);
+  const [who, setWho] = useState<string | null>(null);
+  const [cred, setCred] = useState({ email: "", password: "" });
+  const [authError, setAuthError] = useState("");
+  const enter = async (create: boolean) => {
+    try {
+      await signIn(cred.email, cred.password, create);
+      const remote = await pullPrefs();
+      if (remote && Object.keys(remote).length) { const merged = { ...DEFAULTS, ...remote }; savePrefs(merged); setPrefs(merged); }
+      setWho(signedInAs()); setAuthError("");
+    } catch (e) { setAuthError((e as Error).message); }
+  };
   useEffect(() => {
+    setWho(signedInAs());
     setPrefs(loadPrefs());
     fetch("/api/v1/stories").then((r) => (r.ok ? r.json() : [])).then(setStories).catch(() => setStories([]));
   }, []);
@@ -29,7 +42,18 @@ export default function Welcome() {
     }}>
       <Kicker>Welcome</Kicker>
       <h1>What do you want to follow?</h1>
-      <p className="muted">Stays in this browser. Nothing is tracked. Changes ordering and what the digest covers, never what is hidden.</p>
+      <p className="muted">Stays in this browser unless you sign in. Nothing is tracked. Changes ordering and what the digest covers, never what is hidden.</p>
+      <Kicker>Account</Kicker>
+      {who ? (
+        <p>Signed in as {who}. Your choices sync across devices. <button type="button" onClick={() => { signOut(); setWho(null); }}>Sign out</button></p>
+      ) : (
+        <p>
+          <input aria-label="Account email" type="email" value={cred.email} onChange={(e) => setCred({ ...cred, email: e.target.value })} />{" "}
+          <input aria-label="Password" type="password" value={cred.password} onChange={(e) => setCred({ ...cred, password: e.target.value })} />{" "}
+          <button type="button" onClick={() => enter(false)}>Sign in</button> <button type="button" onClick={() => enter(true)}>Create account</button>
+          {authError && <span role="alert"> {authError}</span>} <span className="muted">Optional. Guests keep everything in this browser.</span>
+        </p>
+      )}
       <Kicker>Stories</Kicker>
       <div className="row">
         {beats.map(([b, t]) => (

@@ -47,7 +47,7 @@ Exit: editors rate merge and claim quality on a labelled sample, and it beats th
 
 ## Phase 4: Private beta
 - [x] Today, onboarding, follows (browser-local), email digest (`subscriptions`, nightly `notify` stage), report-a-problem, corrections log
-- [ ] Firebase auth and Firestore prefs (readers are guests; prefs stay in the browser, digest by email only)
+- [x] Firebase auth and Firestore prefs (optional sign-in; guests keep prefs in the browser; email/password via Identity Platform, prefs in `users/{uid}`)
 
 ## Phase 5: Live and Ask (v2)
 - [x] SSE stream (`/v1/stories/{id}/stream`, polls the graph; Pub/Sub + Redis is the upgrade) and live view
