@@ -1,0 +1,103 @@
+# Local stack. Stand-ins: sqld for Turso, fake-gcs-server for GCS, bigquery-emulator for BigQuery,
+# Pub/Sub emulator, Cloud Tasks emulator. Firestore and Neo4j are not used by the current code.
+# Long-running services start with `docker compose up`; jobs are run by hand (see README).
+
+x-env: &env
+  PROJECT_ID: weft-local
+  REGION: local
+  RAW_BUCKET: weft-raw
+  STATE_BUCKET: weft-state
+  SNAPSHOT_BUCKET: weft-snapshots
+  TURSO_URL: http://sqld:8080
+  TURSO_TOKEN: local
+  STORAGE_EMULATOR_HOST: http://gcs:4443
+  PUBSUB_EMULATOR_HOST: pubsub:8085
+  BIGQUERY_EMULATOR_HOST: http://bigquery:9050
+  TASKS_EMULATOR_HOST: tasks:8123
+  REFETCH_QUEUE: refetch
+  TASKS_SERVICE_ACCOUNT: local@weft-local.iam.gserviceaccount.com
+  MODEL_API_KEY: ${MODEL_API_KEY:-}
+  MODEL_BASE_URL: ${MODEL_BASE_URL:-https://openrouter.ai/api/v1}
+  MODEL_NAME: ${MODEL_NAME:-}
+  MODEL_REVISION: ${MODEL_REVISION:-}
+  MODEL_PROVIDER: ${MODEL_PROVIDER:-}
+  ADMIN_TOKEN: ${ADMIN_TOKEN:-local-admin-token}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  MAIL_FROM: ${MAIL_FROM:-}
+  SITE_URL: http://localhost:3000
+
+x-deps: &deps
+  sqld: { condition: service_started }
+  init: { condition: service_completed_successfully }
+
+services:
+  sqld:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    volumes: ["sqld:/var/lib/sqld"]
+  gcs:
+    image: fsouza/fake-gcs-server
+    command: ["-scheme", "http", "-port", "4443", "-backend", "memory"]
+  bigquery:
+    image: ghcr.io/goccy/bigquery-emulator:latest
+    command: ["--project=weft-local", "--dataset=weft"]
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085"]
+  tasks:
+    image: ghcr.io/aertje/cloud-tasks-emulator:latest
+    command: ["-host", "0.0.0.0", "-port", "8123", "-queue", "projects/weft-local/locations/local/queues/refetch"]
+
+  init:
+    build: { context: ., dockerfile: services/api/Dockerfile }
+    command: ["uv", "run", "--no-sync", "python", "/local/init.py"]
+    environment: *env
+    volumes: ["./local:/local:ro"]
+    depends_on: [gcs, bigquery, pubsub, tasks]
+    restart: "no"
+
+  api:
+    build: { context: ., dockerfile: services/api/Dockerfile }
+    environment: { <<: *env, WEFT_NLP: light }
+    depends_on: *deps
+    ports: ["8080:8080"]
+  fetcher:
+    build: { context: ., dockerfile: services/fetcher/Dockerfile }
+    environment: *env
+    depends_on: *deps
+  stream-worker:
+    build: { context: ., dockerfile: services/stream_worker/Dockerfile }
+    environment: *env
+    depends_on: *deps
+  web:
+    build: ./web
+    environment: { API_URL: "http://api:8080" }
+    depends_on: [api]
+    ports: ["3000:8080"]
+
+  # Jobs: `docker compose run --rm <name>`. Not started by `up`.
+  discovery:
+    profiles: [jobs]
+    build: { context: ., dockerfile: services/discovery/Dockerfile }
+    environment: *env
+    depends_on: *deps
+  poller:
+    profiles: [jobs]
+    build: { context: ., dockerfile: services/poller/Dockerfile }
+    environment: *env
+    depends_on: *deps
+  crawler:
+    profiles: [jobs]
+    build: { context: ., dockerfile: services/crawler/Dockerfile }
+    environment: *env
+    depends_on: *deps
+  pipeline:
+    profiles: [jobs]
+    build: { context: ., dockerfile: pipeline/Dockerfile }
+    environment: *env
+    depends_on: *deps
+
+volumes:
+  sqld:

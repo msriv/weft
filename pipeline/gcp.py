@@ -3,9 +3,10 @@
 from datetime import datetime
 from typing import Any
 
-from google.cloud import bigquery, storage  # type: ignore[attr-defined]
+from google.cloud import storage  # type: ignore[attr-defined]
 
 from services.fetcher.fetcher import _extract
+from weft_core.gcp import bigquery_client
 from weft_core.models import ModelCall, as_row
 from weft_core.store import Db
 
@@ -59,7 +60,7 @@ def versions_of(raw_bucket: str, db: Db):  # type: ignore[no-untyped-def]
 
 
 def bq_sink(project: str, dataset: str = "weft"):  # type: ignore[no-untyped-def]
-    client = bigquery.Client(project=project)
+    client = bigquery_client(project)
 
     def sink(call: ModelCall) -> None:
         if errs := client.insert_rows_json(f"{project}.{dataset}.model_calls", [as_row(call)]):

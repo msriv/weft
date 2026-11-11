@@ -1,17 +1,32 @@
 """Cloud Tasks binding for delayed re-fetches."""
 
 import json
+import os
 from datetime import datetime
 
 from google.cloud import tasks_v2
 from google.protobuf import timestamp_pb2
 
 
+def _client() -> tasks_v2.CloudTasksClient:
+    host = os.environ.get("TASKS_EMULATOR_HOST")  # set only by docker-compose.yml
+    if not host:
+        return tasks_v2.CloudTasksClient()
+    import grpc  # type: ignore[import-untyped]
+    from google.api_core.client_options import ClientOptions
+    from google.cloud.tasks_v2.services.cloud_tasks.transports import CloudTasksGrpcTransport
+
+    return tasks_v2.CloudTasksClient(
+        transport=CloudTasksGrpcTransport(channel=grpc.insecure_channel(host)),
+        client_options=ClientOptions(api_endpoint=host),
+    )
+
+
 class CloudTasksQueue:
     def __init__(
         self, project: str, region: str, queue: str, service_account: str, base_url: str
     ) -> None:
-        self._c = tasks_v2.CloudTasksClient()
+        self._c = _client()
         self._parent = self._c.queue_path(project, region, queue)
         self._sa, self._url = service_account, base_url.rstrip("/") + "/refetch"
 

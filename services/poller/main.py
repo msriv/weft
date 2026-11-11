@@ -6,10 +6,11 @@ import sys
 from datetime import UTC, datetime
 
 import httpx
-from google.cloud import bigquery, pubsub_v1, storage  # type: ignore[attr-defined]
+from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.poller.poller import FeedState, Poller
 from weft_core import store
+from weft_core.gcp import bigquery_client
 from weft_core.health import unhealthy
 from weft_core.polite import PoliteClient
 
@@ -34,7 +35,7 @@ class GcsState:
 
 def record_and_report(project: str, results: dict[str, str | None]) -> list[str]:
     """Append this run to `source_health`, then log one ERROR per unhealthy source."""
-    bq = bigquery.Client(project=project)
+    bq = bigquery_client(project)
     table = f"{project}.weft.source_health"
     now = datetime.now(UTC)
     rows = [
