@@ -65,7 +65,7 @@ services:
     build: ./local/firebase
   tasks:
     image: ghcr.io/aertje/cloud-tasks-emulator:latest
-    command: ["-host", "0.0.0.0", "-port", "8123", "-queue", "projects/weft-local/locations/local/queues/refetch"]
+    command: ["-host", "0.0.0.0", "-port", "8123", "-initial-queue", "projects/weft-local/locations/local/queues/refetch"]
 
   init:
     build: { context: ., dockerfile: services/api/Dockerfile }
