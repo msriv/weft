@@ -18,4 +18,5 @@ nightly:
   conflict_min_cosine: 0.50      # only topically close claim groups go to NLI
   nli_contradiction: 0.80        # NLI probability to record a conflict
   token_budget_per_beat: 400000  # stages degrade (fewer merge checks) rather than overspend
+  token_shares: {regroup: 0.2, claims: 0.6, detective: 0.2}  # of the beat budget, per stage
   review_sample_rate: 0.01

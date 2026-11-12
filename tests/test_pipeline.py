@@ -170,3 +170,50 @@ def test_runner_logs_batch_runs() -> None:
     row: dict[str, Any] = ctx.db.execute("MATCH (n:BatchRun) RETURN n")[0]["n"]
     assert row["stage"] == "figures" and row["status"] == "ok"
     assert next(iter(STAGES)) == "regroup"
+
+
+def test_regroup_weighs_how_far_apart_events_started_and_moves_claims() -> None:
+    ctx, _ = setup([])
+    [e] = graph.select(ctx.db, "events")
+    story = e["story_id"]
+    far = "2026-11-02T00:00:00+00:00"  # 4 days before: same words, different development
+    graph.put(
+        ctx.db,
+        "events",
+        {
+            **{k: e[k] for k in ("centroid", "entities", "n_reports")},
+            "id": "old",
+            "story_id": story,
+            "first_seen": far,
+            "grouping_confidence": 1.0,
+        },
+    )
+    ctx.cfg["nightly"]["merge_min_score"] = 0.0
+    ctx.cfg["nightly"]["merge_auto_score"] = 0.95  # identical text alone no longer clears it
+    ctx.model = None  # no model: borderline pairs stay apart
+    regroup.run(ctx)
+    assert {x["id"] for x in graph.select(ctx.db, "events")} == {e["id"], "old"}
+    # a merge carries the dropped event's claims along with its reports
+    graph.put(
+        ctx.db,
+        "claims",
+        {
+            "id": "c-old",
+            "report_id": "1",
+            "event_id": "old",
+            "text": "t",
+            "start_char": 0,
+            "end_char": 1,
+        },
+    )
+    ctx.cfg["nightly"]["merge_auto_score"] = 0.0
+    regroup.run(ctx)
+    [kept] = graph.select(ctx.db, "events")  # the earlier event is kept, the later one closed
+    assert kept["id"] == "old"
+    assert graph.get(ctx.db, "claims", "c-old")["event_id"] == "old"  # type: ignore[index]
+
+
+def test_stages_have_separate_budgets() -> None:
+    ctx, _ = setup([])
+    ctx.budget("s", "regroup").take("x" * 10_000_000)
+    assert ctx.budget("s", "claims").take("hello")

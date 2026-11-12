@@ -10,7 +10,7 @@ def run(ctx: Ctx) -> int:
         return 0
     n = 0
     for s in store.stories(ctx.db, public_only=False):
-        allow = ctx.budget(s["id"]).take
+        allow = ctx.budget(s["id"], "detective").take
         n += detective.check(ctx.db, ctx.model, s["id"], ctx.now, allow)
         n += detective.predict(ctx.db, ctx.model, s["id"], ctx.now, allow)
     return n

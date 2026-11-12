@@ -118,11 +118,13 @@ def reconcile(
             log(a.id, "changed", a.rule, a.rule_version, a.status)
             changes += 1
 
+    live = {e["id"] for e in graph.select(ctx.db, "events")} if events is not None else set()
+
     def in_scope(a: dict[str, Any]) -> bool:
         if events is None:
             return True
-        if a["event_id"]:
-            return a["event_id"] in events
+        if a["event_id"]:  # merged-away (closed) events are in scope, so theirs are withdrawn
+            return a["event_id"] in events or a["event_id"] not in live
         return (a["story_id"] or "") in (stories or set())
 
     for a_id, old in current.items():
