@@ -79,19 +79,23 @@ services:
 
   api:
     build: { context: ., dockerfile: services/api/Dockerfile }
+    restart: unless-stopped  # like Cloud Run: a crashed service comes back
     environment: { <<: *env, WEFT_NLP: light }
     depends_on: { <<: *deps, firebase: { condition: service_started } }
     ports: ["8080:8080"]
   fetcher:
     build: { context: ., dockerfile: services/fetcher/Dockerfile }
+    restart: unless-stopped  # like Cloud Run: a crashed service comes back
     environment: *env
     depends_on: *deps
   stream-worker:
     build: { context: ., dockerfile: services/stream_worker/Dockerfile }
+    restart: unless-stopped  # like Cloud Run: a crashed service comes back
     environment: *env
     depends_on: *deps
   web:
     build: ./web
+    restart: unless-stopped  # like Cloud Run: a crashed service comes back
     environment:
       API_URL: http://api:8080
       FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
