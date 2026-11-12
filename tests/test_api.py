@@ -270,3 +270,12 @@ def test_untracked_party_is_not_called_silent() -> None:
     _, ctx = build()
     have = perspective_of(store.all_sources(ctx.db, "n.status='active'")[0])
     assert readmodel.untracked(ctx.db, [have, "ZZ"]) == ([have], ["ZZ"])
+
+
+def test_globe_places_stories_where_they_happen() -> None:
+    c, _ = build()
+    c.put("/admin/stories/iran-israel-war/public", json={"public": True}, headers=H)
+    w = c.get("/v1/world").json()
+    places = {p["country"] for p in w["places"] if p["story_id"] == "iran-israel-war"}
+    assert places == {"IR", "IL"}  # where it happens, not where the outlets are
+    assert sum(w["places"][0]["from"].values()) == w["places"][0]["reports"]

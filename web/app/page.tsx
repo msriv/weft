@@ -1,39 +1,17 @@
 import Link from "next/link";
-import { AnomalyCard, Empty, Kicker, StoryRow } from "@/components/bits";
-import FollowedBranches from "@/components/FollowedBranches";
+import Globe from "@/components/Globe";
+import { Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
-import type { StoryCard, Today } from "@/lib/types";
+import type { World } from "@/lib/types";
 
-export default async function TodayPage() {
-  const [t, all] = await Promise.all([api<Today>("/v1/today"), api<StoryCard[]>("/v1/stories")]);
+export default async function Home() {
+  const w = (await api<World>("/v1/world")) ?? { stories: [], gaps: [] };
   return (
     <>
-      <Kicker>Overnight batch{t?.day ? ` · ${t.day}` : ""}</Kicker>
-      <h1>Today</h1>
-      <p>Who reported what, when, and from where. Weft shows coverage; it never says what is true.</p>
-      <hr />
-      <Kicker>What changed overnight</Kicker>
-      {t && t.changes.length > 0 ? (
-        <div className="row">{t.changes.map((c) => (
-          <div key={c.kind}><div className="stat">{c.count}</div><div className="kicker">{c.label}</div></div>
-        ))}</div>
-      ) : <Empty>No changes recorded yet. The first nightly run has not finished.</Empty>}
-      {t && t.new_anomalies.map((a) => <AnomalyCard key={a.id} a={a} />)}
-      <hr />
-      <Kicker>Breaking now</Kicker>
-      {t?.breaking.length ? t.breaking.map((s) => <StoryRow key={s.id} s={s} />) : <Empty>No developing stories are public yet.</Empty>}
-      <hr />
-      <Kicker>No source has published</Kicker>
-      {t?.blind_spots.length ? t.blind_spots.map((b) => (
-        <div className="card" key={b.event_id}>
-          <Link href={`/s/${b.story_id}/e/${b.event_id}`}>{b.title}</Link>
-          {b.no_source_published.length > 0 && <p className="muted">No source from {b.no_source_published.join(", ")} has published on this event.</p>}
-          {b.untracked.length > 0 && <p className="muted">Weft tracks no source from {b.untracked.join(", ")}.</p>}
-        </div>
-      )) : <Empty>Nothing to show.</Empty>}
-      <hr />
-      <Kicker>Branches you follow</Kicker>
-      <FollowedBranches stories={all ?? []} />
+      <Kicker>World desk</Kicker>
+      <h1>Where the news is</h1>
+      <p className="muted">Each story sits on the countries it is about; open one to see where its reports come from. Weft shows coverage; it never says what is true. <Link href="/today">See today&apos;s changes</Link>.</p>
+      <Globe world={w} />
     </>
   );
 }
