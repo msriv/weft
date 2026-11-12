@@ -105,7 +105,7 @@ export default function StoryGraph(props: {
 function Legend() {
   return (
     <div className="row muted" style={{ fontSize: 12 }}>
-      <span>● Grey: document from a party to the story</span><span>● Bright: independent document</span>
+      <span>● Grey: document from a party to the story</span><span>● Bright: document from an issuer not listed as a party</span>
       <span>◌ Dashed: group of reports, number = how many</span>
       <span style={{ color: "var(--anomaly)" }}>◯ Orange ring: anomaly (dashed: provisional)</span>
       <span style={{ color: "var(--anomaly)" }}>┄ Dashed orange line: conflicting reports</span>

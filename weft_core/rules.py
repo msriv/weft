@@ -75,6 +75,7 @@ class Figure:
     quantity: str
     value: float
     text: str
+    group: str | None = None  # claim group of the sentence the figure sits in
 
 
 @dataclass
@@ -164,12 +165,15 @@ def omission(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
 
 
 def numbers_differ(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
+    """Figures for the same quantity inside one claim group, so "12 people killed" is never
+    compared with "300 people evacuated". Figures outside any group, and years, are skipped."""
     c = cfg["rules"]["numbers_differ"]
-    by_q: dict[str, list[Figure]] = defaultdict(list)
+    by_q: dict[tuple[str, str], list[Figure]] = defaultdict(list)
     for f in ev.figures:
-        by_q[f.quantity].append(f)
+        if f.group and not (1900 <= f.value <= 2100 and f.value.is_integer()):
+            by_q[(f.group, f.quantity)].append(f)
     out = []
-    for q, fs in sorted(by_q.items()):
+    for (g, q), fs in sorted(by_q.items()):
         lo, hi = min(fs, key=lambda f: f.value), max(fs, key=lambda f: f.value)
         if lo.report_id == hi.report_id or hi.value <= 0:
             continue
@@ -180,12 +184,16 @@ def numbers_differ(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
                     "numbers_differ",
                     cfg,
                     subject_kind="quantity",
-                    subject_id=q,
+                    subject_id=f"{g}:{q}",
                     story_id=ev.story_id,
                     event_id=ev.id,
                     summary=f"Reports of this event give different figures for '{q}': "
                     f"{lo.value:g} and {hi.value:g} ({diff:.0%} apart).",
-                    inputs={"threshold": c["min_relative_difference"], "difference": diff},
+                    inputs={
+                        "threshold": c["min_relative_difference"],
+                        "difference": diff,
+                        "claim_group": g,
+                    },
                     evidence_ids=[lo.id, hi.id],
                     detail={
                         "figures": [
@@ -268,8 +276,8 @@ def silence(story_id: str, reports: list[Rep], now: datetime, cfg: dict[str, Any
     quiet = timedelta(hours=c["outlet_quiet_hours"])
     recent = [r for r in reports if now - quiet < r.published_at <= now]
     prior = [r for r in reports if now - 2 * quiet < r.published_at <= now - quiet]
-    if not prior:
-        return []
+    if len(prior) < c.get("min_prior_reports", 0):
+        return []  # too little coverage to call any outlet's absence notable
     change = abs(len(recent) - len(prior)) / len(prior)
     if change > c["story_coverage_within"]:
         return []  # the story itself went quiet or surged: a quiet outlet is not notable
@@ -281,8 +289,9 @@ def silence(story_id: str, reports: list[Rep], now: datetime, cfg: dict[str, Any
     for sid, rs in sorted(by_source.items()):
         if sid in active or (c["skip_unhealthy_feeds"] and not rs[0].healthy):
             continue
-        if not any(now - 2 * quiet < r.published_at <= now - quiet for r in rs):
-            continue  # not covering the story before the quiet window
+        before = [r for r in rs if now - 2 * quiet < r.published_at <= now - quiet]
+        if len(before) < max(1, c.get("min_outlet_reports", 1)):
+            continue  # not covering the story steadily before the quiet window
         out.append(
             _a(
                 "silence",
@@ -291,9 +300,9 @@ def silence(story_id: str, reports: list[Rep], now: datetime, cfg: dict[str, Any
                 subject_id=sid,
                 story_id=story_id,
                 event_id=None,
-                summary=f"{rs[0].source_name} published nothing on this story in the last "
-                f"{c['outlet_quiet_hours']} hours, while the story's coverage held "
-                f"({len(recent)} reports now, {len(prior)} before).",
+                summary=f"Weft holds no report from {rs[0].source_name} on this story in the "
+                f"last {c['outlet_quiet_hours']} hours ({len(before)} before), while the "
+                f"story's coverage held ({len(recent)} reports now, {len(prior)} before).",
                 inputs={
                     "quiet_hours": c["outlet_quiet_hours"],
                     "recent": len(recent),
@@ -306,6 +315,15 @@ def silence(story_id: str, reports: list[Rep], now: datetime, cfg: dict[str, Any
     return out
 
 
+LIVE = re.compile(
+    r"\blive( updates| blog)?\b|\bupdated?\b:?\s*\d|\bdeveloping story\b", re.IGNORECASE
+)
+# a sentence with a number or an attributed statement: what a silent edit would matter for
+SUBSTANTIVE = re.compile(
+    r"\d|[\"“”]|\b(said|says|told|according to|announced|denied|claimed|confirmed)\b", re.IGNORECASE
+)
+
+
 def silent_edit(edits: list[Edit], cfg: dict[str, Any]) -> list[Anomaly]:
     c = cfg["rules"]["silent_edit"]
     out = []
@@ -313,6 +331,8 @@ def silent_edit(edits: list[Edit], cfg: dict[str, Any]) -> list[Anomaly]:
         for (t0, a), (t1, b) in zip(e.versions, e.versions[1:], strict=False):
             if " ".join(a.split()) == " ".join(b.split()) or CORRECTION.search(b):
                 continue
+            if LIVE.search(a[:400]) or LIVE.search(b[:400]):
+                continue  # live blogs and "updated" stories change by design
             sa = [a[s:x] for s, x in sentences(a)]
             sb = [b[s:x] for s, x in sentences(b)]
             d = [
@@ -320,6 +340,9 @@ def silent_edit(edits: list[Edit], cfg: dict[str, Any]) -> list[Anomaly]:
                 for ln in difflib.unified_diff(sa, sb, lineterm="", n=0)
                 if ln[:1] in "+-" and ln[:3] not in ("+++", "---")
             ]
+            removed = [ln[1:] for ln in d if ln[:1] == "-"]
+            if not any(SUBSTANTIVE.search(ln) for ln in removed):
+                continue  # only sentences carrying a figure or an attributed claim count
             out.append(
                 _a(
                     "silent_edit",

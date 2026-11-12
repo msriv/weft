@@ -1,7 +1,7 @@
 # Anomaly rule thresholds. Published on How we weigh.
 # Bump `version` on any change; every anomaly records the version that fired it.
 # These are starting points, to tune against an editor-labelled set before launch.
-version: 1
+version: 2  # 2026-11-12: numbers within claim group, silence floor, narrower silent edit
 
 provisional:
   min_sources: 5
@@ -21,6 +21,8 @@ rules:
     enabled: true
     outlet_quiet_hours: 48
     story_coverage_within: 0.50       # story's coverage stays within 50% of prior window
+    min_prior_reports: 10             # story needs this many reports in the prior window
+    min_outlet_reports: 3             # the outlet needs this many reports in the prior window
     skip_unhealthy_feeds: true
   copied_text:
     enabled: true

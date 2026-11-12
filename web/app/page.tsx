@@ -27,7 +27,8 @@ export default async function TodayPage() {
       {t?.blind_spots.length ? t.blind_spots.map((b) => (
         <div className="card" key={b.event_id}>
           <Link href={`/s/${b.story_id}/e/${b.event_id}`}>{b.title}</Link>
-          <p className="muted">No source from {b.no_source_published.join(", ")} has published on this event.</p>
+          {b.no_source_published.length > 0 && <p className="muted">No source from {b.no_source_published.join(", ")} has published on this event.</p>}
+          {b.untracked.length > 0 && <p className="muted">Weft tracks no source from {b.untracked.join(", ")}.</p>}
         </div>
       )) : <Empty>Nothing to show.</Empty>}
       <hr />

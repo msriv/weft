@@ -38,7 +38,11 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
         <div className="card">
           <Kicker>Reported by all perspectives</Kicker>
           {sv.reported_by_all.length ? sv.reported_by_all.slice(0, 6).map((x) => <p key={x.label}>{x.label}</p>) : <p className="muted">No claim is carried by every perspective yet.</p>}
-          <p className="muted" style={{ fontSize: 13 }}>{g.summary.join(" ")}</p>
+        </div>
+        <div className="card">
+          <Kicker>Opening lines from early reports</Kicker>
+          {g.summary.length ? g.summary.map((x, i) => <p key={i} className="muted" style={{ fontSize: 13 }}>{x}</p>) : <p className="muted">None yet.</p>}
+          <p className="muted" style={{ fontSize: 12 }}>Taken from single outlets. Not carried by every perspective.</p>
         </div>
         <div className="card">
           <Kicker anomaly>Reports conflict on</Kicker>
@@ -46,7 +50,9 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
         </div>
         <div className="card">
           <Kicker>No source has published</Kicker>
-          {sv.no_source_published.length ? <p>No source from {sv.no_source_published.map(perspectiveName).join(", ")} has published on some events of this story.</p> : <p className="muted">Every party to the story has at least one published report.</p>}
+          {sv.no_source_published.length ? <p>No source from {sv.no_source_published.map(perspectiveName).join(", ")} has published on some events of this story.</p> : null}
+          {sv.untracked?.length ? <p className="muted">Weft tracks no source from {sv.untracked.map(perspectiveName).join(", ")}, so their coverage cannot show here.</p> : null}
+          {!sv.no_source_published.length && !sv.untracked?.length && <p className="muted">Every party to the story has at least one published report.</p>}
         </div>
         <div className="card">
           <Kicker>One perspective only</Kicker>
@@ -62,6 +68,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
             <div className="card" id={`event-${e.id}`} key={e.id}>
               <Kicker>{day(e.first_seen)} · {e.perspectives.map(perspectiveName).join(", ")}</Kicker>
               <h3><Link href={`/s/${id}/e/${e.id}`}>{e.label ?? "Event"}</Link></h3>
+              {e.label_source && <p className="muted" style={{ fontSize: 12 }}>Headline from {e.label_source}</p>}
               <p className="muted">{e.reports} reports</p>
             </div>
           ))}

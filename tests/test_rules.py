@@ -57,14 +57,22 @@ def test_omission_skips_paywalled_sources() -> None:
 
 def test_numbers_differ() -> None:
     f = [
-        Figure("f1", "1", "missile", 40, "40 missiles"),
-        Figure("f2", "2", "missile", 25, "25 missiles"),
+        Figure("f1", "1", "missile", 40, "40 missiles", "g"),
+        Figure("f2", "2", "missile", 25, "25 missiles", "g"),
     ]
     (a,) = rules.numbers_differ(event([rep("1"), rep("2")], figures=f), CFG)
     assert a.evidence_ids == ["f2", "f1"] and a.inputs["difference"] > 0.2
-    close = [Figure("f1", "1", "missile", 40, ""), Figure("f2", "2", "missile", 36, "")]
+    close = [Figure("f1", "1", "missile", 40, "", "g"), Figure("f2", "2", "missile", 36, "", "g")]
     assert rules.numbers_differ(event([rep("1"), rep("2")], figures=close), CFG) == []  # 10%
-    same = [Figure("f1", "1", "missile", 40, ""), Figure("f2", "1", "missile", 10, "")]
+    # different claims ("12 people killed" vs "300 people evacuated") are never compared
+    apart = [Figure("f1", "1", "people", 12, "", "g1"), Figure("f2", "2", "people", 300, "", "g2")]
+    assert rules.numbers_differ(event([rep("1"), rep("2")], figures=apart), CFG) == []
+    years = [
+        Figure("f1", "1", "election", 2024, "", "g"),
+        Figure("f2", "2", "election", 1990, "", "g"),
+    ]
+    assert rules.numbers_differ(event([rep("1"), rep("2")], figures=years), CFG) == []
+    same = [Figure("f1", "1", "missile", 40, "", "g"), Figure("f2", "1", "missile", 10, "", "g")]
     assert rules.numbers_differ(event([rep("1")], figures=same), CFG) == []  # one report only
 
 
@@ -93,19 +101,26 @@ def test_copied_text_and_its_suppressions() -> None:
     assert rules.copied_text(event(other), CFG) == []
 
 
-def silence_reps(quiet_healthy: bool = True) -> list[Rep]:
+def silence_reps(quiet_healthy: bool = True, quiet_n: int = 3) -> list[Rep]:
     now = T0
-    out = [rep(f"p{i}", src="quiet", hours=-60 + i, healthy=quiet_healthy) for i in range(2)]
-    out += [rep(f"o{i}", src="other", hours=-90 + 5 * i) for i in range(6)]  # prior window
-    out += [rep(f"n{i}", src="other", hours=-40 + 5 * i) for i in range(6)]  # recent window
+    out = [rep(f"p{i}", src="quiet", hours=-60 + i, healthy=quiet_healthy) for i in range(quiet_n)]
+    out += [rep(f"o{i}", src="other", hours=-90 + 3 * i) for i in range(8)]  # prior window
+    out += [rep(f"n{i}", src="other", hours=-40 + 3 * i) for i in range(11)]  # recent window
     assert now
     return out
 
 
 def test_silence_fires_and_is_suppressed_for_unhealthy_feeds() -> None:
     (a,) = rules.silence("st", silence_reps(), T0, CFG)
-    assert a.subject_id == "quiet" and a.inputs["recent"] == 6
+    assert a.subject_id == "quiet" and a.inputs["recent"] == 11
+    assert a.summary.startswith("Weft holds no report from")
     assert rules.silence("st", silence_reps(quiet_healthy=False), T0, CFG) == []
+
+
+def test_silence_needs_enough_coverage_and_a_steady_outlet() -> None:
+    assert rules.silence("st", silence_reps(quiet_n=2), T0, CFG) == []  # outlet below 3
+    thin = [r for r in silence_reps() if not r.id.startswith(("o5", "o6", "o7"))]
+    assert rules.silence("st", thin, T0, CFG) == []  # prior window below 10
 
 
 def test_silence_does_not_fire_when_the_story_itself_went_quiet() -> None:
@@ -137,6 +152,16 @@ def test_silent_edit_and_correction_note() -> None:
     assert rules.silent_edit([noted], CFG) == []
     same = Edit(r, [(v0, "Same text."), (v1, "Same   text.")])
     assert rules.silent_edit([same], CFG) == []
+    wording = Edit(r, [(v0, "Talks continue in the city."), (v1, "Talks go on in the city.")])
+    assert rules.silent_edit([wording], CFG) == []  # no figure or attributed claim changed
+    live = Edit(
+        r,
+        [
+            (v0, "Live updates: the toll was 12 people."),
+            (v1, "Live updates: the toll was 20 people."),
+        ],
+    )
+    assert rules.silent_edit([live], CFG) == []
 
 
 def test_loaded_wording_and_unattributed_are_off_by_default_but_work() -> None:
@@ -176,7 +201,7 @@ def test_loaded_wording_and_unattributed_are_off_by_default_but_work() -> None:
 
 def test_provisional_until_enough_sources_perspectives_and_time() -> None:
     reps = [rep("1"), rep("2"), rep("3", "IR")]
-    f = [Figure("f1", "1", "m", 40, ""), Figure("f2", "2", "m", 10, "")]
+    f = [Figure("f1", "1", "m", 40, "", "g"), Figure("f2", "2", "m", 10, "", "g")]
     (a,) = rules.evaluate_event(event(reps, figures=f), CFG, NOW)
     assert a.status == "provisional"  # 3 sources < 5
     many = [rep(str(i), "IL" if i % 2 else "IR") for i in range(1, 7)]
@@ -187,7 +212,7 @@ def test_provisional_until_enough_sources_perspectives_and_time() -> None:
 
 
 def test_same_input_same_anomaly_id() -> None:
-    f = [Figure("f1", "1", "m", 40, ""), Figure("f2", "2", "m", 10, "")]
+    f = [Figure("f1", "1", "m", 40, "", "g"), Figure("f2", "2", "m", 10, "", "g")]
     e = event([rep("1"), rep("2")], figures=f)
     assert rules.numbers_differ(e, CFG)[0].id == rules.numbers_differ(e, CFG)[0].id
 

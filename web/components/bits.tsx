@@ -20,7 +20,7 @@ export function SourceTag({ s }: { s: SourceLabel }) {
 export function IssuerTag({ i }: { i: Issuer }) {
   return (
     <span className="pill on">
-      {i.name} · {i.is_party ? "Party to this story" : "Independent of this story"}
+      {i.name} · {i.is_party ? "Party to this story" : "Not listed as a party to this story"}
     </span>
   );
 }

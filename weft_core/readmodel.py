@@ -78,6 +78,20 @@ def source_label(s: dict[str, Any], w: dict[str, Any] | None = None) -> dict[str
     }
 
 
+def untracked(db: Db, codes: list[str]) -> tuple[list[str], list[str]]:
+    """Split "no source has published" perspectives into (sources exist but published nothing,
+    Weft tracks no active source there). The second is a gap in Weft's list, not silence."""
+    have = {perspective_of(s) for s in store.all_sources(db, "n.status='active'")}
+    return [c for c in codes if c in have], [c for c in codes if c not in have]
+
+
+def _split_sv(db: Db, sv: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not sv:
+        return sv
+    published, missing = untracked(db, sv.get("no_source_published") or [])
+    return {**sv, "no_source_published": published, "untracked": missing}
+
+
 def issuer_label(s: dict[str, Any], story_parties: list[dict[str, Any]]) -> dict[str, Any]:
     """Rule 7: a document is its issuer's account; whether that issuer is a party is per story."""
     names = {p["party"].lower() for p in story_parties}
@@ -246,7 +260,7 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
             event_row(db, e, at)
             for e in graph.select(db, "events", "n.story_id=?", (story_id,), at)
         ],
-        "short_version": _event_short_versions(db, story_id, at),
+        "short_version": _split_sv(db, _event_short_versions(db, story_id, at)),
         "weights_note": "Source weight changes ordering only. No report is hidden.",
     }
 
@@ -304,11 +318,17 @@ def event_row(db: Db, e: dict[str, Any], at: str | None = None) -> dict[str, Any
         "id": e["id"],
         "story_id": e["story_id"],
         "label": first["title"] if first else None,
+        "label_source": _source_name(db, first["source_id"]) if first else None,
         "first_seen": e["first_seen"],
         "reports": len(reps),
         "perspectives": sorted({r["perspective"] for r in reps}),
         "grouping_confidence": e["grouping_confidence"],
     }
+
+
+def _source_name(db: Db, source_id: str) -> str | None:
+    rows = store.all_sources(db, "n.id=?", (source_id,))
+    return rows[0]["name"] if rows else None
 
 
 # --- events -----------------------------------------------------------------------------------
@@ -411,7 +431,7 @@ def event_page(db: Db, event_id: str, at: str | None = None) -> dict[str, Any] |
         "figures": figs,
         "documents": docs,
         "anomalies": anomalies_for(db, "n.event_id=?", (event_id,), at),
-        "short_version": sv["payload"] if sv else None,
+        "short_version": _split_sv(db, sv["payload"]) if sv else None,
         "parties": plist,
     }
 
@@ -431,7 +451,12 @@ def _voices(by_p: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
                 rest.update(c)
         z = log_odds(counts[p], rest) if rest else {}
         top = [w for w, v in sorted(z.items(), key=lambda x: -x[1]) if v > 1.0][:5]
-        out[p] = {"headline": rs[0]["title"] if rs else None, "words": top, "reports": len(rs)}
+        out[p] = {
+            "headline": rs[0]["title"] if rs else None,
+            "headline_source": rs[0]["source"]["name"] if rs else None,
+            "words": top,
+            "reports": len(rs),
+        }
     return out
 
 
@@ -805,13 +830,15 @@ def today(db: Db, followed_beats: list[str] | None = None) -> dict[str, Any]:
     for sid in public:
         for e in graph.select(db, "events", "n.story_id=?", (sid,)):
             sv = graph.get(db, "short_versions", e["id"])
-            if sv and sv["payload"].get("no_source_published"):
+            split = _split_sv(db, sv["payload"]) if sv else None
+            if split and (split["no_source_published"] or split["untracked"]):
                 blind.append(
                     {
                         "story_id": sid,
                         "title": public[sid]["title"],
                         "event_id": e["id"],
-                        "no_source_published": sv["payload"]["no_source_published"],
+                        "no_source_published": split["no_source_published"],
+                        "untracked": split["untracked"],
                     }
                 )
     followed = [c for c in cards.values() if followed_beats and c["beat"] in followed_beats]
