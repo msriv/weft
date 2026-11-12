@@ -102,4 +102,5 @@ Short record of what was decided and why. Add an entry before changing any of th
 - Calls go through the logged `ModelClient` (prompts `detective@1`, `detective-check@1`) inside each beat's token budget.
 **Before any public launch:** decide to drop it or keep it off. Turning it on publicly needs a new decision entry and the legal review.
 **Eval:** the two prompts are in the baseline prompt list with no scored eval. The hit rate on the panel is the measurement.
+**Amended (Mihir, 2026-11-12, #111, #82):** keep speculations and add tracked open questions. Each prediction carries the model's probability, shown in the UI. Resolution no longer uses a model: a later claim group whose label NLI-entails `confirm_if` (supported) or `refute_if` (contradicted), carried after the guess and by its deadline by reports from at least 2 outlets and 2 perspectives. Expired counts as a miss. The panel shows a Brier score against a coin (0.25) and a calibration table instead of a hit rate. At most 5 open predictions per story. Prompt `detective@2`; `detective-check@1` is retired.
 

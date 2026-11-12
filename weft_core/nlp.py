@@ -146,6 +146,10 @@ class Nli(Protocol):
         """Probability that the two sentences contradict each other."""
         ...
 
+    def entailment(self, premise: str, hypothesis: str) -> float:
+        """Probability that the premise entails the hypothesis."""
+        ...
+
 
 class LexicalNli:
     """Dev stand-in: contradiction when one sentence negates what the other says, or when they
@@ -169,6 +173,12 @@ class LexicalNli:
             return 0.0
         return 0.9 if (a ^ b) & self.NEG else 0.0
 
+    def entailment(self, premise: str, hypothesis: str) -> float:
+        a, b = set(words(premise)), set(words(hypothesis))
+        if not b or (a ^ b) & self.NEG:
+            return 0.0
+        return len(a & b) / len(b)  # share of the hypothesis's words the premise carries
+
 
 class MdebertaNli:
     def __init__(self) -> None:
@@ -184,6 +194,11 @@ class MdebertaNli:
         out = self._p({"text": premise, "text_pair": hypothesis})
         flat = out[0] if isinstance(out[0], list) else out
         return float(next((x["score"] for x in flat if x["label"] == "contradiction"), 0.0))
+
+    def entailment(self, premise: str, hypothesis: str) -> float:
+        out = self._p({"text": premise, "text_pair": hypothesis})
+        flat = out[0] if isinstance(out[0], list) else out
+        return float(next((x["score"] for x in flat if x["label"] == "entailment"), 0.0))
 
 
 class WikidataLinker:
