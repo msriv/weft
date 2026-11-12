@@ -14,12 +14,13 @@ from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
 from time import mktime
+from typing import Any
 from urllib.parse import urljoin, urlsplit
 
 import feedparser
 import httpx
 
-from weft_core import outlets, store
+from weft_core import beats, outlets, store
 from weft_core.nlp import StopwordLangId
 from weft_core.polite import PoliteClient
 
@@ -42,13 +43,12 @@ def parse_gkg(text: str) -> Iterable[tuple[str, str, str]]:
 
 
 def candidate_domains(
-    rows: Iterable[tuple[str, str, str]], patterns: list[str], known: set[str]
+    rows: Iterable[tuple[str, str, str]], beat: dict[str, Any], known: set[str]
 ) -> dict[str, set[str]]:
-    """Unknown domains with the URLs of articles matching any beat pattern."""
-    rx = re.compile("|".join(f"(?:{p})" for p in patterns), re.IGNORECASE)
+    """Unknown domains with the URLs of articles matching the beat."""
     hits: dict[str, set[str]] = defaultdict(set)
     for domain, url, blob in rows:
-        if domain not in known and rx.search(blob):
+        if domain not in known and beats.matches(beat, blob):
             hits[domain].add(url)
     return hits
 
@@ -138,7 +138,7 @@ def discover(
     found: dict[str, list[str]] = {}
     for beat in store.beats(db):
         known = store.known_domains(db)
-        hits = candidate_domains(rows, beat["patterns"], known)
+        hits = candidate_domains(rows, beat, known)
         ranked = sorted(hits, key=lambda d: -len(hits[d]))
         for domain in [d for d in ranked if len(hits[d]) >= MIN_URLS][:limit]:
             name, home, feeds, lang = verified_feeds(http, domain, now)
@@ -190,40 +190,63 @@ def _previous(url: str) -> str:
 
 def seed_beats(db: store.Db) -> None:
     """Initial beat inputs (Mihir, 2026-11-06). Patterns are regexes over GDELT fields in
-    discovery and over title + lede in the stream worker; both are editable in the DB.
+    discovery and over title + lede in the stream worker. A beat the admin has edited is never
+    overwritten; the others pick up improved seed terms on the next run.
     Parties are proposals, stored without a citation until an admin confirms them (D15)."""
-    for id_, name, pats, parties in BEATS:
-        store.add_beat(db, id_, name, pats, parties=parties)
+    edited = {b["id"] for b in store.beats(db) if b.get("edited")}
+    for id_, name, pats, exclude, parties in BEATS:
+        if id_ not in edited:
+            store.add_beat(db, id_, name, pats, parties=parties, exclude=exclude)
 
 
-_CEC = r"chief[\s_-]*election[\s_-]*commissioner|election[\s_-]*commission"
-BEATS: list[tuple[str, str, list[str], list[str]]] = [
+def _both(a: str, b: str) -> str:
+    """Both term groups, in either order."""
+    return rf"\b({a}).*\b({b})|\b({b}).*\b({a})"
+
+
+_IL = r"israel\w*|idf|netanyahu|mossad|tel[\s_-]*aviv|jerusalem"
+_IR = r"iran\w*|tehran|irgc|khamenei|revolutionary[\s_-]*guard|isfahan|natanz|fordow"
+_UA = r"ukrain\w*|kyiv|kiev|zelensk\w*|kharkiv|odesa|donbas|donetsk|luhansk|zaporizh\w*|kherson"
+_RU = r"russia\w*|moscow|kremlin|putin|drones?|missiles?|shelling|front[\s_-]*line|ceasefire"
+_SENATE = r"senate|senator"
+_RACE = r"race|election|seat|candidate|democrat\w*|republican\w*|gop|majority|midterm|poll\w*"
+_CEC = r"chief[\s_-]*election[\s_-]*commissioner|\bcec\b|election[\s_-]*commission"
+_REMOVE = r"impeach\w*|removal[\s_-]*motion|motion[\s_-]*(for|to)[\s_-]*remov\w*|remove[\s_-]*the[\s_-]*(cec|chief)"
+# id, name, match any, but not if any of these match, proposed parties
+BEATS: list[tuple[str, str, list[str], list[str], list[str]]] = [
     (
         "iran-israel-war",
         "Iran-Israel war",
-        [r"\biran\b.*\bisrael\b|\bisrael\b.*\biran\b"],
+        [_both(_IL, _IR)],
+        [r"\b(traders?|stocks?|shares|brent|futures)\b"],
         ["IR", "IL"],
     ),
     (
         "ukraine-russia-war",
         "Ukraine-Russia war",
-        [r"\bukrain\w*\b.*\brussia\w*\b|\brussia\w*\b.*\bukrain\w*\b"],
+        [_both(_UA, _RU)],
+        [r"\b(traders?|stocks?|shares|futures)\b"],
         ["UA", "RU"],
     ),
     (
         "us-senate-democrats",
         "Democrats winning US Senate elections",
-        [r"senate.*democrat|democrat.*senate"],
+        [_both(_SENATE, _RACE)],
+        [
+            r"\bstate[\s_-]*senat",
+            (
+                r"\b(australian?|philippines?|filipino|french|italian|nigerian?|pakistani?|"
+                r"canadian|mexican|brazilian|chilean|colombian|polish|czech|irish)[\s_-]*senat"
+            ),
+        ],
         ["Democratic Party", "Republican Party"],
     ),
     (
         "india-cec-impeachment",
         "Opposition move to impeach CEC Gyanesh Kumar",
-        # the name alone, or impeach/removal talk next to the Election Commission
-        [
-            r"gyanesh[\s_-]*kumar",
-            rf"(impeach|removal|remove)\w*.*({_CEC})|({_CEC}).*(impeach|removal|remove)\w*",
-        ],
+        # the name alone, or an impeachment or removal motion next to the Election Commission
+        [r"gyanesh[\s_-]*kumar", _both(_REMOVE, _CEC)],
+        [],
         ["Election Commission of India", "Indian opposition parties"],
     ),
 ]

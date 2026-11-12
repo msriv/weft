@@ -8,6 +8,7 @@ import asyncio
 import hmac
 import json
 import os
+import re
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
@@ -40,6 +41,11 @@ class SourcePatch(BaseModel):
     state_run_source: str | None = None
     owner_id: str | None = None
     ownership_source: str | None = None
+
+
+class BeatTerms(BaseModel):
+    patterns: list[str]
+    exclude: list[str] = []
 
 
 class Subscription(BaseModel):
@@ -241,6 +247,40 @@ def create_app(
             {**{k: s.get(k) for k in keys}, "last_report_at": last.get(s["id"])}
             for s in sorted(store.all_sources(db), key=lambda s: (s["status"] != "active", s["id"]))
         ]
+
+    @adm.get("/beats")
+    def admin_beats() -> list[dict[str, Any]]:
+        return store.beats(db)
+
+    @adm.put("/beats/{beat_id}")
+    def edit_beat(beat_id: str, body: BeatTerms) -> dict[str, Any]:
+        """Replace a beat's match terms. Applies to reports that arrive from now on. Marks the
+        beat edited, so seed updates never overwrite it."""
+        beat = next((b for b in store.beats(db) if b["id"] == beat_id), None)
+        if beat is None:
+            raise HTTPException(404, "no such beat")
+        pats = [p.strip() for p in body.patterns if p.strip()]
+        excl = [p.strip() for p in body.exclude if p.strip()]
+        if not pats:
+            raise HTTPException(422, "a beat needs at least one pattern")
+        for p in pats + excl:
+            try:
+                re.compile(p)
+            except re.error as exc:
+                raise HTTPException(422, f"bad pattern {p!r}: {exc}") from exc
+        store.add_beat(db, beat_id, beat["name"], pats, parties=beat["parties"], exclude=excl)
+        db.execute("MATCH (n:Beat {id: ?}) SET n.edited=1", (beat_id,))
+        return {"id": beat_id, "patterns": pats, "exclude": excl}
+
+    @adm.get("/unplaced")
+    def unplaced(limit: int = 50) -> list[dict[str, Any]]:
+        """Newest reports that matched no beat, so the admin can see what the terms miss."""
+        return db.execute(
+            "MATCH (r:Report) WHERE r.story_id IS NULL "
+            "RETURN r.id AS id, r.title AS title, r.url AS url, r.source_id AS source_id, "
+            "r.fetched_at AS fetched_at ORDER BY r.fetched_at DESC LIMIT ?",
+            (min(limit, 500),),
+        )
 
     @adm.get("/runs")
     def runs(limit: int = 200) -> list[dict[str, Any]]:

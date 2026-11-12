@@ -14,7 +14,7 @@ from weft_core.polite import PoliteClient
 
 def main() -> int:
     db = store.from_env()
-    discovery.seed_beats(db) if not store.beats(db) else None
+    discovery.seed_beats(db)  # adds new seed terms; admin-edited beats are left alone
     with httpx.Client(timeout=30, follow_redirects=True) as http:
         gkg = discovery.latest_gkg(http, int(os.environ.get("GKG_FILES", "4")))
         found = discovery.discover(db, PoliteClient(http), gkg)
