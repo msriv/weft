@@ -70,8 +70,8 @@ services:
   init:
     build: { context: ., dockerfile: services/api/Dockerfile }
     command: ["uv", "run", "--no-sync", "python", "/local/init.py"]
-    environment: *env
-    volumes: ["./local:/local:ro"]
+    environment: { <<: *env, PYTHONPATH: /app }
+    volumes: ["./local:/local:ro", "./infra/modules/bigquery/schemas:/app/infra/modules/bigquery/schemas:ro"]
     depends_on: [gcs, bigquery, pubsub, tasks]
     restart: "no"
 
