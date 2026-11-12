@@ -225,6 +225,16 @@ def create_app(
     def all_stories() -> list[dict[str, Any]]:
         return store.stories(db, public_only=False)
 
+    @adm.get("/runs")
+    def runs(limit: int = 200) -> list[dict[str, Any]]:
+        """Recent nightly pipeline stages, newest first. A stage still 'running' is live."""
+        return store.nodes(
+            db,
+            "BatchRun",
+            "MATCH (n:BatchRun) RETURN n ORDER BY n.started_at DESC LIMIT ?",
+            (min(limit, 1000),),
+        )
+
     @adm.put("/stories/{story_id}/public")
     def set_public(story_id: str, body: Visibility) -> dict[str, Any]:
         if not store.set_public(db, story_id, body.public):
