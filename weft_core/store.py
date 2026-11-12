@@ -20,7 +20,15 @@ from typing import Any, Protocol
 # label -> property -> default. `V` marks versioned nodes (valid_from / valid_to, see graph.py).
 V = {"valid_from": None, "valid_to": None}
 NODES: dict[str, dict[str, Any]] = {
-    "Beat": {"id": None, "name": None, "patterns": "[]", "languages": '["en"]', "parties": "[]"},
+    "Beat": {
+        "id": None,
+        "name": None,
+        "patterns": "[]",
+        "exclude": "[]",
+        "languages": '["en"]',
+        "parties": "[]",
+        "edited": None,
+    },
     "Source": {
         "id": None,
         "name": None,
@@ -336,13 +344,16 @@ def add_beat(
     patterns: list[str],
     languages: list[str] | None = None,
     parties: list[str] | None = None,
+    exclude: list[str] | None = None,
 ) -> None:
     db.execute(
-        "MERGE (n:Beat {id: ?}) SET n.name=?, n.patterns=?, n.languages=?, n.parties=?",
+        "MERGE (n:Beat {id: ?}) "
+        "SET n.name=?, n.patterns=?, n.exclude=?, n.languages=?, n.parties=?",
         (
             id,
             name,
             json.dumps(patterns),
+            json.dumps(exclude or []),
             json.dumps(languages or ["en"]),
             json.dumps(parties or []),
         ),
@@ -351,7 +362,12 @@ def add_beat(
 
 def beats(db: Db) -> list[dict[str, Any]]:
     return [
-        {**r, "patterns": json.loads(r["patterns"]), "parties": json.loads(r["parties"])}
+        {
+            **r,
+            "patterns": json.loads(r["patterns"]),
+            "exclude": json.loads(r["exclude"] or "[]"),
+            "parties": json.loads(r["parties"]),
+        }
         for r in nodes(db, "Beat", "MATCH (n:Beat) RETURN n")
     ]
 

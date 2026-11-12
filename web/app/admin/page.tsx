@@ -6,6 +6,8 @@ type Story = { id: string; beat_id: string; title: string; public: boolean };
 type Item = { id: string; kind: string; payload: Record<string, unknown> };
 type Problem = { id: number; kind: string; ref_id: string | null; message: string };
 type Src = { id: string; name: string; domain: string; country: string | null; country_source: string | null; paywalled: number; status: string; last_report_at: string | null };
+type Beat = { id: string; name: string; patterns: string[]; exclude: string[]; edited: number | null };
+type Unplaced = { id: string; title: string | null; url: string | null; source_id: string; fetched_at: string };
 type Run = { run_id: string; stage: string; started_at: string; ended_at: string | null; rows_out: number | null; status: string; error: string | null };
 
 export default function Admin() {
@@ -15,6 +17,8 @@ export default function Admin() {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [sources, setSources] = useState<Src[]>([]);
+  const [beats, setBeats] = useState<Beat[]>([]);
+  const [unplaced, setUnplaced] = useState<Unplaced[]>([]);
   const [err, setErr] = useState("");
   const call = useCallback(async (path: string, init: RequestInit = {}) => {
     const r = await fetch(`/api/admin${path}`, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
@@ -24,7 +28,7 @@ export default function Admin() {
   const load = useCallback(async () => {
     try {
       setErr("");
-      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs")); setSources(await call("/sources"));
+      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs")); setSources(await call("/sources")); setBeats(await call("/beats")); setUnplaced(await call("/unplaced"));
     } catch { setErr("Could not load. Check the token."); }
   }, [call]);
   useEffect(() => { setToken(sessionStorage.getItem("weft:admin") ?? ""); }, []);
@@ -79,6 +83,29 @@ export default function Admin() {
           <label><input type="checkbox" checked={!!s.paywalled} onChange={(e) => act(`/sources/${s.id}`, { paywalled: e.target.checked }, "PATCH")} /> paywalled</label>
           <label><input type="checkbox" checked={s.status === "active"} onChange={(e) => act(`/sources/${s.id}`, { status: e.target.checked ? "active" : "rejected" }, "PATCH")} /> active</label>
           <span className="muted">{s.last_report_at ? `last report ${new Date(s.last_report_at).toLocaleString()}` : "no reports yet"}</span>
+        </div>
+      ))}
+      <hr /><Kicker>Beats. A report joins a beat when any pattern matches its title or lede and no exclusion does. One regex per line; applies to new reports.</Kicker>
+      {beats.map((b) => (
+        <form className="card" key={b.id} onSubmit={(e) => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          const lines = (k: string) => String(f.get(k) ?? "").split("\n");
+          void act(`/beats/${b.id}`, { patterns: lines("patterns"), exclude: lines("exclude") }, "PUT");
+        }}>
+          <Kicker>{b.name}{b.edited ? " · edited" : ""}</Kicker>
+          <label className="muted" htmlFor={`p-${b.id}`}>Match any</label>
+          <textarea id={`p-${b.id}`} name="patterns" rows={3} style={{ width: "100%" }} defaultValue={b.patterns.join("\n")} />
+          <label className="muted" htmlFor={`x-${b.id}`}>But not</label>
+          <textarea id={`x-${b.id}`} name="exclude" rows={2} style={{ width: "100%" }} defaultValue={b.exclude.join("\n")} />
+          <button>Save</button>
+        </form>
+      ))}
+      <hr /><Kicker>Unplaced reports (newest {unplaced.length}). These matched no beat; use them to tune the terms above.</Kicker>
+      {unplaced.map((r) => (
+        <div className="row" key={r.id}>
+          {r.url ? <a href={r.url} target="_blank" rel="noreferrer">{r.title ?? r.url}</a> : <span>{r.title ?? r.id}</span>}
+          <span className="muted">{r.source_id}</span>
         </div>
       ))}
       <hr /><Kicker>Review sample (optional, never blocks publishing)</Kicker>

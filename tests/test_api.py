@@ -236,3 +236,20 @@ def test_admin_edits_source_country_and_reports_follow() -> None:
     [src] = store.all_sources(ctx.db, "n.id=?", ("a-il",))
     assert src["paywalled"] == 1 and src["country_source"] == "admin"
     assert c.patch("/admin/sources/a-il", json={"status": "gone"}, headers=H).status_code == 422
+
+
+def test_admin_edits_beat_terms_and_sees_unplaced() -> None:
+    c, ctx = build()
+    assert c.put("/admin/beats/nope", json={"patterns": ["x"]}, headers=H).status_code == 404
+    bad = c.put("/admin/beats/iran-israel-war", json={"patterns": ["(unclosed"]}, headers=H)
+    assert bad.status_code == 422
+    ok = c.put(
+        "/admin/beats/iran-israel-war",
+        json={"patterns": [r"\biran\b", " "], "exclude": [r"\boil\b"]},
+        headers=H,
+    )
+    assert ok.json()["patterns"] == [r"\biran\b"]
+    [b] = [b for b in c.get("/admin/beats", headers=H).json() if b["id"] == "iran-israel-war"]
+    assert b["exclude"] == [r"\boil\b"] and b["edited"] == 1
+    graph.put(ctx.db, "reports", {"id": "u1", "title": "Bakery", "fetched_at": "2026-11-07"})
+    assert "u1" in [r["id"] for r in c.get("/admin/unplaced", headers=H).json()]

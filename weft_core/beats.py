@@ -6,9 +6,18 @@ from typing import Any
 from weft_core import store
 
 
-def matching(beats: list[dict[str, Any]], text: str) -> list[dict[str, Any]]:
+def matches(beat: dict[str, Any], text: str) -> bool:
+    """Any pattern matches and no exclusion does."""
     flat = " ".join(text.split())
-    return [b for b in beats if any(re.search(p, flat, re.IGNORECASE) for p in b["patterns"])]
+
+    def hit(ps: list[str]) -> bool:
+        return any(re.search(p, flat, re.IGNORECASE) for p in ps)
+
+    return hit(beat["patterns"]) and not hit(beat.get("exclude") or [])
+
+
+def matching(beats: list[dict[str, Any]], text: str) -> list[dict[str, Any]]:
+    return [b for b in beats if matches(b, text)]
 
 
 def ensure_story(db: store.Db, beat: dict[str, Any]) -> str:

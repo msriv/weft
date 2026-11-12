@@ -195,3 +195,31 @@ def test_glot_langid_works_with_numpy_2(tmp_path: Any) -> None:
     path = str(tmp_path / "m.bin")
     fasttext.train_supervised(str(data), epoch=5, verbose=0).save_model(path)
     assert GlotLangId(path).detect("the cat\nis here") == "en"
+
+
+def test_beat_terms_catch_core_reports_and_skip_lookalikes() -> None:
+    from weft_core.beats import matching
+
+    beats = [{"id": b[0], "patterns": b[2], "exclude": b[3]} for b in discovery.BEATS]
+    cases = {
+        "IDF strikes Tehran missile sites": ["iran-israel-war"],
+        "Kyiv hit by drone barrage; Zelensky urges allies": ["ukraine-russia-war"],
+        "Ohio Senate race: Brown leads Moreno": ["us-senate-democrats"],
+        "Opposition moves to impeach Chief Election Commissioner": ["india-cec-impeachment"],
+        "Texas state Senate Democrats walk out": [],
+        "Philippine Senate votes on budget": [],
+        "Election Commission removes 3 lakh names from Bihar voter roll": [],
+        "Oil prices jump. Traders watch Iran after Israel warning": [],
+    }
+    for text, want in cases.items():
+        assert [b["id"] for b in matching(beats, text)] == want, text
+
+
+def test_seed_never_overwrites_an_admin_edited_beat() -> None:
+    db = local_db()
+    discovery.seed_beats(db)
+    store.add_beat(db, "iran-israel-war", "Iran-Israel war", ["mine"])
+    db.execute("MATCH (n:Beat {id: 'iran-israel-war'}) SET n.edited=1")
+    discovery.seed_beats(db)
+    [b] = [b for b in store.beats(db) if b["id"] == "iran-israel-war"]
+    assert b["patterns"] == ["mine"]
