@@ -15,7 +15,7 @@ export default async function WorldPage({ searchParams }: { searchParams: Promis
       <h1>Where the reporting comes from</h1>
       <div className="row" style={{ margin: "12px 0" }}>
         <Link className={`pill${view !== "globe" ? " on" : ""}`} href="/world">Threads</Link>
-        <Link className={`pill${view === "globe" ? " on" : ""}`} href="/world?view=globe">Globe</Link>
+        <Link className="pill" href="/">Globe</Link>
       </div>
       {view === "globe" ? <Globe world={w} /> : (
         <>

@@ -5,7 +5,7 @@
 import countries from "i18n-iso-countries";
 import { geoCentroid, geoDistance, geoGraticule10, geoOrthographic, geoPath } from "d3-geo";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import land from "world-atlas/countries-110m.json";
@@ -53,6 +53,25 @@ export default function Globe({ world }: { world: World }) {
   const [pinned, setPinned] = useState<Marker | null>(null);
   const drag = useRef<{ x: number; y: number; rot: [number, number] } | null>(null);
 
+  // Slow auto-rotation. Pauses while dragging, hovering, or with a card open, and never runs
+  // for people who ask for reduced motion.
+  const [paused, setPaused] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const idle = !paused && !hover && !pinned && !dragging;
+  useEffect(() => {
+    if (!idle || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (t: number) => {
+      const step = Math.min(t - last, 100) * 0.006; // about 6 degrees a second
+      last = t;
+      setRot(([a, b]) => [a + step, b]);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [idle]);
+
   const proj = geoOrthographic().scale(W / 2 - 8).translate([W / 2, W / 2]).rotate([rot[0], rot[1]]);
   const path = geoPath(proj);
   const visible = (m: Marker) => geoDistance(m.at, [-rot[0], -rot[1]]) < Math.PI / 2;
@@ -72,12 +91,12 @@ export default function Globe({ world }: { world: World }) {
         </div>
         <svg
           viewBox={`0 0 ${W} ${W}`} role="img" aria-label="Globe of stories and coverage gaps by country" style={{ width: "100%", touchAction: "none", cursor: "grab" }}
-          onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY, rot }; (e.target as Element).setPointerCapture?.(e.pointerId); }}
+          onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY, rot }; setDragging(true); (e.target as Element).setPointerCapture?.(e.pointerId); }}
           onPointerMove={(e) => {
             const d = drag.current;
             if (d) setRot([d.rot[0] + (e.clientX - d.x) * 0.4, Math.max(-80, Math.min(80, d.rot[1] - (e.clientY - d.y) * 0.4))]);
           }}
-          onPointerUp={() => (drag.current = null)}
+          onPointerUp={() => { drag.current = null; setDragging(false); }}
         >
           <circle cx={W / 2} cy={W / 2} r={W / 2 - 8} fill="#0b0d10" stroke="var(--hair)" />
           <path d={path(geoGraticule10()) ?? ""} fill="none" stroke="var(--hair)" strokeWidth={0.4} />
@@ -104,6 +123,7 @@ export default function Globe({ world }: { world: World }) {
           <button onClick={() => setRot(([a, b]) => [a + 25, b])}>← West</button>
           <button onClick={() => setRot(([a, b]) => [a - 25, b])}>East →</button>
           <button onClick={() => setRot([-20, -20])}>Reset view</button>
+          <button aria-pressed={!paused} onClick={() => setPaused((p) => !p)}>{paused ? "Resume rotation" : "Pause rotation"}</button>
         </div>
         {card && (
           <div className="card" role="dialog" aria-label="Marker details">

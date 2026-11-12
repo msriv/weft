@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 const LINKS: [string, string][] = [
-  ["/", "Today"], ["/world", "World"], ["/stories", "Stories"], ["/sources", "Sources"],
+  ["/", "Globe"], ["/today", "Today"], ["/world", "Threads"], ["/stories", "Stories"], ["/sources", "Sources"],
   ["/ask", "Ask"], ["/method", "How we weigh"], ["/admin", "Admin"],
 ];
 
