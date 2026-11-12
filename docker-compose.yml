@@ -17,6 +17,7 @@ x-env: &env
   REFETCH_QUEUE: refetch
   TASKS_SERVICE_ACCOUNT: local@weft-local.iam.gserviceaccount.com
   MODEL_API_KEY: ${MODEL_API_KEY:-}
+  PYTHONUNBUFFERED: "1"  # print() shows in `docker compose logs` straight away
   HF_TOKEN: ${HF_TOKEN:-}  # optional; huggingface_hub reads it for faster model downloads
   MODEL_BASE_URL: ${MODEL_BASE_URL:-https://openrouter.ai/api/v1}
   MODEL_NAME: ${MODEL_NAME:-}
