@@ -223,3 +223,16 @@ def test_admin_sees_pipeline_runs() -> None:
     runs = c.get("/admin/runs", headers=H).json()
     assert [(r["stage"], r["status"]) for r in runs] == [("figures", "ok")]
     assert runs[0]["ended_at"] and runs[0]["rows_out"] is not None
+
+
+def test_admin_edits_source_country_and_reports_follow() -> None:
+    c, ctx = build()
+    rows = c.get("/admin/sources", headers=H).json()
+    assert {"id", "country", "paywalled", "status", "last_report_at"} <= rows[0].keys()
+    ok = c.patch("/admin/sources/a-il", json={"country": "us", "paywalled": True}, headers=H)
+    assert ok.status_code == 200
+    reps = graph.select(ctx.db, "reports", "n.source_id=?", ("a-il",))
+    assert reps and {r["perspective"] for r in reps} == {"US"}  # re-tagged, not frozen
+    [src] = store.all_sources(ctx.db, "n.id=?", ("a-il",))
+    assert src["paywalled"] == 1 and src["country_source"] == "admin"
+    assert c.patch("/admin/sources/a-il", json={"status": "gone"}, headers=H).status_code == 422

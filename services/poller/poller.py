@@ -60,7 +60,9 @@ class Poller:
         n = 0
         for e in feedparser.parse(resp.content).entries:
             if link := e.get("link"):
-                self._emit(source, str(link), e.get("title"), e.get("published"))
+                self._emit(
+                    source, str(link), e.get("title"), e.get("published") or e.get("updated")
+                )
                 n += 1
         return n
 

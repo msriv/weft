@@ -27,6 +27,7 @@ NODES: dict[str, dict[str, Any]] = {
         "homepage": None,
         "domain": None,
         "country": None,
+        "country_source": None,
         "languages": '["en"]',
         "type": "news",
         "state_run": None,
@@ -402,6 +403,20 @@ def set_health(db: Db, unhealthy_ids: list[str]) -> None:
     db.execute(
         "MATCH (n:Source) SET n.healthy = CASE WHEN n.id IN ? THEN 0 ELSE 1 END", (unhealthy_ids,)
     )
+
+
+def set_country(db: Db, source_id: str, country: str | None, citation: str | None) -> None:
+    """Set a source's country and re-tag its reports, whose perspective is copied at ingest."""
+    db.execute(
+        "MATCH (n:Source {id: ?}) SET n.country=?, n.country_source=?",
+        (source_id, country.upper() if country else None, citation),
+    )
+    from weft_core.perspectives import perspective_of
+
+    for src in all_sources(db, "n.id=?", (source_id,)):
+        db.execute(
+            "MATCH (r:Report {source_id: ?}) SET r.perspective=?", (source_id, perspective_of(src))
+        )
 
 
 def all_sources(db: Db, where: str = "true", args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:

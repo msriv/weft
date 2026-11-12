@@ -5,6 +5,7 @@ import { Kicker } from "@/components/bits";
 type Story = { id: string; beat_id: string; title: string; public: boolean };
 type Item = { id: string; kind: string; payload: Record<string, unknown> };
 type Problem = { id: number; kind: string; ref_id: string | null; message: string };
+type Src = { id: string; name: string; domain: string; country: string | null; country_source: string | null; paywalled: number; status: string; last_report_at: string | null };
 type Run = { run_id: string; stage: string; started_at: string; ended_at: string | null; rows_out: number | null; status: string; error: string | null };
 
 export default function Admin() {
@@ -13,6 +14,7 @@ export default function Admin() {
   const [review, setReview] = useState<{ open: Item[] } | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
+  const [sources, setSources] = useState<Src[]>([]);
   const [err, setErr] = useState("");
   const call = useCallback(async (path: string, init: RequestInit = {}) => {
     const r = await fetch(`/api/admin${path}`, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
@@ -22,7 +24,7 @@ export default function Admin() {
   const load = useCallback(async () => {
     try {
       setErr("");
-      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs"));
+      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs")); setSources(await call("/sources"));
     } catch { setErr("Could not load. Check the token."); }
   }, [call]);
   useEffect(() => { setToken(sessionStorage.getItem("weft:admin") ?? ""); }, []);
@@ -65,6 +67,18 @@ export default function Admin() {
         <div className="row" key={s.id}>
           <label><input type="checkbox" checked={s.public} onChange={(e) => act(`/stories/${s.id}/public`, { public: e.target.checked }, "PUT")} /> public</label>
           <b>{s.title}</b><span className="muted">{s.beat_id}</span>
+        </div>
+      ))}
+      <hr /><Kicker>Sources. Country decides the perspective a report counts for; changing it re-tags that source's reports.</Kicker>
+      {sources.map((s) => (
+        <div className="row" key={s.id}>
+          <b>{s.name}</b><span className="muted">{s.domain}</span>
+          <label>country <input defaultValue={s.country ?? ""} size={3} maxLength={2} aria-label={`Country of ${s.name}`}
+            onBlur={(e) => { const v = e.target.value.trim().toUpperCase(); if (v !== (s.country ?? "")) void act(`/sources/${s.id}`, { country: v || null }, "PATCH"); }} /></label>
+          {s.country_source && <span className="muted">from {s.country_source}</span>}
+          <label><input type="checkbox" checked={!!s.paywalled} onChange={(e) => act(`/sources/${s.id}`, { paywalled: e.target.checked }, "PATCH")} /> paywalled</label>
+          <label><input type="checkbox" checked={s.status === "active"} onChange={(e) => act(`/sources/${s.id}`, { status: e.target.checked ? "active" : "rejected" }, "PATCH")} /> active</label>
+          <span className="muted">{s.last_report_at ? `last report ${new Date(s.last_report_at).toLocaleString()}` : "no reports yet"}</span>
         </div>
       ))}
       <hr /><Kicker>Review sample (optional, never blocks publishing)</Kicker>

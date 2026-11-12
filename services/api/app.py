@@ -10,7 +10,7 @@ import json
 import os
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -34,6 +34,8 @@ class Problem(BaseModel):
 
 class SourcePatch(BaseModel):
     country: str | None = None
+    paywalled: bool | None = None
+    status: Literal["active", "rejected"] | None = None
     state_run: bool | None = None
     state_run_source: str | None = None
     owner_id: str | None = None
@@ -225,6 +227,21 @@ def create_app(
     def all_stories() -> list[dict[str, Any]]:
         return store.stories(db, public_only=False)
 
+    @adm.get("/sources")
+    def admin_sources() -> list[dict[str, Any]]:
+        """Every source, rejected ones too, with when Weft last stored a report from it."""
+        last = {
+            r["id"]: r["last"]
+            for r in db.execute(
+                "MATCH (r:Report) RETURN r.source_id AS id, max(r.fetched_at) AS last"
+            )
+        }
+        keys = ("id", "name", "domain", "country", "country_source", "paywalled", "status")
+        return [
+            {**{k: s.get(k) for k in keys}, "last_report_at": last.get(s["id"])}
+            for s in sorted(store.all_sources(db), key=lambda s: (s["status"] != "active", s["id"]))
+        ]
+
     @adm.get("/runs")
     def runs(limit: int = 200) -> list[dict[str, Any]]:
         """Recent nightly pipeline stages, newest first. A stage still 'running' is live."""
@@ -252,12 +269,14 @@ def create_app(
             raise HTTPException(422, "owner_id needs ownership_source")
         if not store.all_sources(db, "n.id=?", (source_id,)):
             raise HTTPException(404, "no such source")
+        if "country" in data:  # also re-tags the source's reports
+            store.set_country(db, source_id, data.pop("country"), "admin")
         for col, val in data.items():  # col is a SourcePatch field name, never user text
             db.execute(
                 f"MATCH (n:Source {{id: ?}}) SET n.{col}=?",
                 (source_id, int(val) if isinstance(val, bool) else val),
             )
-        return {"id": source_id, **data}
+        return {"id": source_id, **body.model_dump(exclude_unset=True)}
 
     @adm.put("/stories/{story_id}/parties/{party}")
     def confirm_party(story_id: str, party: str, citation: str) -> dict[str, str]:

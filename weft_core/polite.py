@@ -26,7 +26,8 @@ class PoliteClient:
         self._cooldown_until: dict[str, float] = {}  # host -> backoff end after 429
         self._robots: dict[str, urllib.robotparser.RobotFileParser | None] = {}
 
-    def _allowed(self, url: str) -> bool:
+    def allowed(self, url: str) -> bool:
+        """False when robots.txt disallows the URL or cannot be read (cached per origin)."""
         parts = urlsplit(url)
         origin = f"{parts.scheme}://{parts.netloc}"
         if origin not in self._robots:
@@ -46,7 +47,7 @@ class PoliteClient:
         now = self._clock()
         if self._cooldown_until.get(host, 0) > now:
             return None
-        if not self._allowed(url):
+        if not self.allowed(url):
             return None
         wait = self._last_request.get(host, -1e9) + min_interval - self._clock()
         if wait > 0:
