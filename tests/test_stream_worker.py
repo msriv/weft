@@ -181,3 +181,17 @@ def test_push_endpoint_drops_malformed() -> None:
         },
     )
     assert bad.status_code == good.status_code == 204 and len(sent) == 1
+
+
+def test_glot_langid_works_with_numpy_2(tmp_path: Any) -> None:
+    """fasttext's single-string predict breaks on NumPy 2; detect must not use it."""
+    import pytest
+
+    fasttext = pytest.importorskip("fasttext")  # only in the `ml` dependency group
+    from weft_core.nlp import GlotLangId
+
+    data = tmp_path / "train.txt"
+    data.write_text("__label__eng_Latn the cat is here\n__label__fra_Latn le chat est ici\n")
+    path = str(tmp_path / "m.bin")
+    fasttext.train_supervised(str(data), epoch=5, verbose=0).save_model(path)
+    assert GlotLangId(path).detect("the cat\nis here") == "en"

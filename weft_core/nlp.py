@@ -99,7 +99,9 @@ class GlotLangId:
         self._m = fasttext.load_model(model_path)
 
     def detect(self, text: str) -> str:
-        label = str(self._m.predict(" ".join(text.split()))[0][0])  # e.g. __label__eng_Latn
+        # List input: fasttext's single-string path calls np.array(copy=False), which NumPy 2 rejects.
+        labels, _ = self._m.predict([" ".join(text.split())])
+        label = str(labels[0][0])  # e.g. __label__eng_Latn
         code = label.removeprefix("__label__")[:3]
         return {"eng": "en"}.get(code, code)
 
