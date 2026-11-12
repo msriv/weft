@@ -1,7 +1,7 @@
 """Email digest (Phase 4): what changed in the stories a reader follows.
 
 Coverage language only. Provisional anomalies never notify (readmodel.today leaves them out).
-Subscriptions live in Turso; the unsubscribe token is in every mail.
+Subscriptions are Subscription nodes in Neo4j; the unsubscribe token is in every mail.
 """
 
 import json
@@ -11,7 +11,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from weft_core import readmodel
+from weft_core import readmodel, store
 from weft_core.store import Db
 
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -22,23 +22,20 @@ def subscribe(db: Db, email: str, frequency: str, follows: list[str]) -> None:
     if not EMAIL.match(email) or frequency not in ("daily", "weekly"):
         raise ValueError("bad email or frequency")
     db.execute(
-        "INSERT INTO subscriptions(email,frequency,follows,token,created_at) VALUES(?,?,?,?,?) "
-        "ON CONFLICT(email) DO UPDATE SET frequency=excluded.frequency, follows=excluded.follows",
+        "MERGE (n:Subscription {email: ?}) "
+        "ON CREATE SET n.token=?, n.created_at=? SET n.frequency=?, n.follows=?",
         (
             email,
-            frequency,
-            json.dumps(follows),
             secrets.token_urlsafe(16),
             datetime.now(UTC).isoformat(),
+            frequency,
+            json.dumps(follows),
         ),
     )
 
 
 def unsubscribe(db: Db, token: str) -> bool:
-    if not db.execute("SELECT 1 FROM subscriptions WHERE token=?", (token,)):
-        return False
-    db.execute("DELETE FROM subscriptions WHERE token=?", (token,))
-    return True
+    return bool(db.execute("MATCH (n:Subscription {token: ?}) DELETE n RETURN 1 AS x", (token,)))
 
 
 def compose(db: Db, sub: dict[str, Any], site: str) -> tuple[str, str] | None:
@@ -69,12 +66,12 @@ def send_due(db: Db, send: Send, site: str, now: datetime | None = None) -> int:
     now = now or datetime.now(UTC)
     today = now.date().isoformat()
     sent = 0
-    for sub in db.execute("SELECT * FROM subscriptions"):
+    for sub in store.nodes(db, "Subscription", "MATCH (n:Subscription) RETURN n"):
         if sub["last_sent"] == today or (sub["frequency"] == "weekly" and now.weekday() != 0):
             continue
         mail = compose(db, sub, site)
         if mail:
             send(sub["email"], *mail)
             sent += 1
-        db.execute("UPDATE subscriptions SET last_sent=? WHERE email=?", (today, sub["email"]))
+        db.execute("MATCH (n:Subscription {email: ?}) SET n.last_sent=?", (sub["email"], today))
     return sent

@@ -10,7 +10,7 @@ from services.stream_worker.worker import Deps, process
 from weft_core import config, discovery, graph, store
 from weft_core.models import ModelCall, ModelClient
 from weft_core.nlp import HashEmbedder, LexicalNli, Nlp, RegexEntities, StopwordLangId
-from weft_core.store import SqliteDb
+from weft_core.store import local_db
 
 NOW = "2026-11-06T12:00:00+00:00"
 TEXTS = {
@@ -44,7 +44,7 @@ def model(answers: list[str]) -> tuple[ModelClient, list[ModelCall]]:
 
 
 def setup(answers: list[str]) -> tuple[Ctx, list[ModelCall]]:
-    db = SqliteDb()
+    db = local_db()
     graph.init(db)
     discovery.seed_beats(db)
     for dom in ("a.il", "b.ir", "c.com"):
@@ -82,12 +82,12 @@ def test_claims_have_offsets_into_source_and_ignore_bad_model_output() -> None:
 def test_figures() -> None:
     ctx, _ = setup([])
     figures.run(ctx)
-    nums = graph.select(ctx.db, "figures", "kind='number'")
+    nums = graph.select(ctx.db, "figures", "n.kind='number'")
     assert {(f["report_id"], f["quantity"], f["value"]) for f in nums} >= {
         ("1", "missile", 40.0),
         ("2", "missile", 25.0),
     }
-    q = graph.select(ctx.db, "figures", "kind='quote'")[0]
+    q = graph.select(ctx.db, "figures", "n.kind='quote'")[0]
     assert (
         q["speaker"] == "Tehran"
         and TEXTS["1"][q["start_char"] : q["end_char"]].startswith("“")
@@ -167,6 +167,6 @@ def test_runner_logs_batch_runs() -> None:
     ctx, _ = setup(['{"claims":[]}'] * 3)
     done = run_stages(ctx, only="figures")
     assert list(done) == ["figures"]
-    row: dict[str, Any] = ctx.db.execute("SELECT * FROM batch_runs")[0]
+    row: dict[str, Any] = ctx.db.execute("MATCH (n:BatchRun) RETURN n")[0]["n"]
     assert row["stage"] == "figures" and row["status"] == "ok"
     assert next(iter(STAGES)) == "regroup"

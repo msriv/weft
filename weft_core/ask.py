@@ -53,11 +53,13 @@ NONE = "No source in our coverage answers this."
 def retrieve(db: Db, embedder: Embedder, question: str) -> list[dict[str, Any]]:
     """Fixed template: current claims of public stories, nearest to the question first."""
     rows = db.execute(
-        "SELECT c.id, c.text, c.report_id, c.start_char, c.end_char, c.embedding, "
-        "r.url, r.title, r.source_id, r.perspective FROM claims c "
-        "JOIN reports r ON r.id=c.report_id AND r.valid_to IS NULL "
-        "JOIN stories s ON s.id=r.story_id AND s.public=1 "
-        "WHERE c.valid_to IS NULL ORDER BY c.valid_from DESC LIMIT ?",
+        "MATCH (c:Claim) WHERE c.valid_to IS NULL "
+        "MATCH (r:Report {id: c.report_id}) WHERE r.valid_to IS NULL "
+        "MATCH (s:Story {id: r.story_id, public: 1}) "
+        "RETURN c.id AS id, c.text AS text, c.report_id AS report_id, c.start_char AS start_char, "
+        "c.end_char AS end_char, c.embedding AS embedding, r.url AS url, r.title AS title, "
+        "r.source_id AS source_id, r.perspective AS perspective "
+        "ORDER BY c.valid_from DESC LIMIT ?",
         (MAX_POOL,),
     )
     q = embedder.embed(question)
@@ -70,7 +72,7 @@ def retrieve(db: Db, embedder: Embedder, question: str) -> list[dict[str, Any]]:
 
 
 def graph_sources(db: Db) -> list[dict[str, Any]]:
-    return db.execute("SELECT id, name FROM sources")
+    return db.execute("MATCH (n:Source) RETURN n.id AS id, n.name AS name")
 
 
 def answer(db: Db, embedder: Embedder, model: ModelClient, question: str) -> dict[str, Any]:

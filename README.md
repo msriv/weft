@@ -13,7 +13,7 @@ Start here:
 
 ## Run locally (docker compose)
 
-Runs the whole platform on your machine with local stand-ins for GCP: sqld (Turso), fake-gcs-server (GCS), bigquery-emulator, Pub/Sub emulator, Cloud Tasks emulator, and the Firebase emulators (Auth + Firestore, for reader accounts). No GCP account needed. Needs Docker and an OpenRouter key.
+Runs the whole platform on your machine with Neo4j and local stand-ins for GCP: fake-gcs-server (GCS), bigquery-emulator, Pub/Sub emulator, Cloud Tasks emulator, and the Firebase emulators (Auth + Firestore, for reader accounts). No GCP account needed. Needs Docker and an OpenRouter key.
 
 ```bash
 cp .env.example .env          # set MODEL_API_KEY
@@ -31,4 +31,4 @@ Stories start private. Flip one public with the admin toggle (`Authorization: Be
 
 Run a job now: `docker compose run --rm --no-deps --entrypoint "uv run --no-sync python -m pipeline.run" pipeline --stage anomalies`. Reset everything: `docker compose down -v`.
 
-Limits: the emulators are not the real services, so BigQuery and Cloud Tasks behaviour can differ in edge cases. Discovery and polling hit the live internet and obey robots.txt. Neo4j is not used: the story graph lives in Turso (D17 in `docs/decisions.md`).
+Limits: the emulators are not the real services, so BigQuery and Cloud Tasks behaviour can differ in edge cases. Discovery and polling hit the live internet and obey robots.txt. The graph runs in Neo4j 5 Community (Neo4j Browser at http://localhost:7474, user `neo4j`, password `NEO4J_PASSWORD`); production uses Neo4j AuraDB (D19).

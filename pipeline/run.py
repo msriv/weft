@@ -57,20 +57,21 @@ def run_stages(ctx: Ctx, only: str | None = None, start: str | None = None) -> d
     for name in names:
         began = datetime.now(UTC).isoformat()
         ctx.db.execute(
-            "INSERT INTO batch_runs(run_id,stage,started_at,status) VALUES(?,?,?,'running')",
+            "CREATE (:BatchRun {run_id: ?, stage: ?, started_at: ?, status: 'running'})",
             (run_id, name, began),
         )
         try:
             rows = STAGES[name](ctx)
         except Exception as exc:
             ctx.db.execute(
-                "UPDATE batch_runs SET ended_at=?,status='failed',error=? WHERE run_id=? AND stage=?",
-                (datetime.now(UTC).isoformat(), repr(exc)[:500], run_id, name),
+                "MATCH (n:BatchRun {run_id: ?, stage: ?}) "
+                "SET n.ended_at=?, n.status='failed', n.error=?",
+                (run_id, name, datetime.now(UTC).isoformat(), repr(exc)[:500]),
             )
             raise
         ctx.db.execute(
-            "UPDATE batch_runs SET ended_at=?,rows_out=?,status='ok' WHERE run_id=? AND stage=?",
-            (datetime.now(UTC).isoformat(), rows, run_id, name),
+            "MATCH (n:BatchRun {run_id: ?, stage: ?}) SET n.ended_at=?, n.rows_out=?, n.status='ok'",
+            (run_id, name, datetime.now(UTC).isoformat(), rows),
         )
         print(f'{{"event":"stage_done","stage":"{name}","rows":{rows}}}')
         done[name] = rows

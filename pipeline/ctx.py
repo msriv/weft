@@ -50,6 +50,6 @@ class Ctx:
         return graph.select(
             self.db,
             "reports",
-            "story_id IS NOT NULL AND COALESCE(published_at, fetched_at) >= ?",
+            "n.story_id IS NOT NULL AND coalesce(n.published_at, n.fetched_at) >= ?",
             (since,),
         )

@@ -194,7 +194,7 @@ def test_digest_only_for_followed_stories_never_provisional_and_unsubscribes() -
             == 200
         )
     ctx.db.execute(
-        "INSERT OR REPLACE INTO daily_diffs(day,payload) VALUES('2026-11-06','{\"new_events\":[\"e\"]}')"
+        "MERGE (n:DailyDiff {day: '2026-11-06'}) SET n.payload=?", ('{"new_events":["e"]}',)
     )
     sent: list[tuple[str, str, str]] = []
     n = digest.send_due(
@@ -207,6 +207,8 @@ def test_digest_only_for_followed_stories_never_provisional_and_unsubscribes() -
         )
         == 0
     )
-    token = ctx.db.execute("SELECT token FROM subscriptions WHERE email='a@x.org'")[0]["token"]
+    token = ctx.db.execute("MATCH (n:Subscription {email: 'a@x.org'}) RETURN n.token AS token")[0][
+        "token"
+    ]
     assert c.get(f"/v1/unsubscribe?token={token}").json() == {"unsubscribed": True}
     assert c.get(f"/v1/unsubscribe?token={token}").status_code == 404

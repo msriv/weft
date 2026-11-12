@@ -169,7 +169,10 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
     ).isoformat()
     copies = []
     for r in graph.select(
-        d.db, "reports", "COALESCE(published_at, fetched_at) >= ? AND minhash IS NOT NULL", (since,)
+        d.db,
+        "reports",
+        "coalesce(n.published_at, n.fetched_at) >= ? AND n.minhash IS NOT NULL",
+        (since,),
     ):
         j = minhash_similarity(sig, r["minhash"])
         if j >= cfg["near_dup_jaccard"]:
@@ -201,17 +204,17 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
     )
     if msg.get("text_hash"):  # version 0 for the silent-edit rule; later versions come from refetch
         d.db.execute(
-            "INSERT OR IGNORE INTO report_versions(report_id,n,fetched_at,text_hash) VALUES(?,0,?,?)",
+            "MERGE (v:ReportVersion {report_id: ?, n: 0}) ON CREATE SET v.fetched_at=?, v.text_hash=?",
             (rid, now, msg["text_hash"]),
         )
     for name, kind in ents:
         d.db.execute(
-            "INSERT OR IGNORE INTO report_entities(report_id,name,kind) VALUES(?,?,?)",
+            "MERGE (e:ReportEntity {report_id: ?, name: ?}) ON CREATE SET e.kind=?",
             (rid, name, kind),
         )
     for other, j in copies:
         d.db.execute(
-            "INSERT OR IGNORE INTO copies(report_id,copy_of,jaccard) VALUES(?,?,?)", (rid, other, j)
+            "MERGE (c:Copy {report_id: ?, copy_of: ?}) ON CREATE SET c.jaccard=?", (rid, other, j)
         )
     d.publish({"report_id": rid, "event_id": event_id, "story_id": story_id, "status": status})
     return status

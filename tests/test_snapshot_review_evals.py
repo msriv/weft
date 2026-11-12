@@ -10,11 +10,11 @@ from pipeline import review_sample, snapshot
 from pipeline.ctx import Ctx
 from weft_core import config, graph, review
 from weft_core.nlp import HashEmbedder, LexicalNli, Nlp, RegexEntities, StopwordLangId
-from weft_core.store import SqliteDb
+from weft_core.store import local_db
 
 
 def ctx() -> Ctx:
-    db = SqliteDb()
+    db = local_db()
     graph.init(db)
     return Ctx(
         db,
@@ -66,7 +66,7 @@ def test_snapshot_exports_parquet_and_diff_sees_moves_and_new() -> None:
     report(c, "r2", "e2", t0)
     report(c, "r1", "e2", t1)  # regroup moved r1
     report(c, "r3", "e2", t1)
-    c.db.execute("UPDATE events SET valid_to=? WHERE id='e1'", (t1,))  # e1 merged away
+    c.db.execute("MATCH (n:Event {id: 'e1'}) SET n.valid_to=?", (t1,))  # e1 merged away
     d = snapshot.diff(c, "2026-11-05T12:00:00+00:00")
     assert d["new_reports"] == ["r3"] and d["moved_reports"] == ["r1"]
     assert d["merged_events"] == ["e1"]
@@ -76,9 +76,9 @@ def test_snapshot_exports_parquet_and_diff_sees_moves_and_new() -> None:
     assert {r["id"] for r in rows} == {"r1", "r2", "r3"} and all(
         r["valid_to"] is None for r in rows
     )
-    assert json.loads(c.db.execute("SELECT payload FROM daily_diffs")[0]["payload"])[
-        "new_reports"
-    ] == ["r3"]
+    assert json.loads(
+        c.db.execute("MATCH (n:DailyDiff) RETURN n.payload AS payload")[0]["payload"]
+    )["new_reports"] == ["r3"]
 
 
 def test_review_sample_is_deterministic_rated_and_measured() -> None:

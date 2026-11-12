@@ -36,7 +36,7 @@ def emulator(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def client() -> TestClient:
-    return TestClient(create_app(store.SqliteDb(), "t0k", prefs=Mem(), project="p"))
+    return TestClient(create_app(store.local_db(), "t0k", prefs=Mem(), project="p"))
 
 
 def test_prefs_need_a_valid_token_and_are_per_reader() -> None:

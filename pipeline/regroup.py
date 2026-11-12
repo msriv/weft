@@ -60,7 +60,8 @@ def run(ctx: Ctx) -> int:
     merged = 0
     for story_id in {r["story_id"] for r in ctx.recent_reports(cfg["regroup_days"])}:
         events = sorted(
-            graph.select(ctx.db, "events", "story_id=?", (story_id,)), key=lambda e: e["first_seen"]
+            graph.select(ctx.db, "events", "n.story_id=?", (story_id,)),
+            key=lambda e: e["first_seen"],
         )
         gone: set[str] = set()
         for i, a in enumerate(events):
@@ -106,7 +107,7 @@ def _merge(ctx: Ctx, keep: dict[str, Any], drop: dict[str, Any], score: float) -
         },
     )
     ctx.db.execute(
-        "UPDATE events SET valid_to=? WHERE id=? AND valid_to IS NULL", (ctx.now, drop["id"])
+        "MATCH (n:Event {id: ?}) WHERE n.valid_to IS NULL SET n.valid_to=?", (drop["id"], ctx.now)
     )
 
 

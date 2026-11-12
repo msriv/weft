@@ -9,12 +9,12 @@ from services.stream_worker.worker import Deps, classify_type, process
 from weft_core import config, discovery, graph, store
 from weft_core.nlp import HashEmbedder, LexicalNli, Nlp, RegexEntities, StopwordLangId
 from weft_core.perspectives import perspective_of
-from weft_core.store import SqliteDb
+from weft_core.store import Neo4jDb, local_db
 from weft_core.textutil import minhash, minhash_similarity, sentences, shingles
 
 
-def setup() -> tuple[SqliteDb, Deps, list[dict[str, Any]]]:
-    db = SqliteDb()
+def setup() -> tuple[Neo4jDb, Deps, list[dict[str, Any]]]:
+    db = local_db()
     graph.init(db)
     discovery.seed_beats(db)
     for dom in ("a.il", "b.ir", "c.com"):
@@ -84,7 +84,7 @@ def test_attach_and_new_event() -> None:
     assert r1 and r2 and r1["event_id"] == r2["event_id"] and r1["story_id"] == "iran-israel-war"
     assert (r1["perspective"], r2["perspective"]) == ("IL", "IR")
     assert (
-        db.execute("SELECT COUNT(*) AS n FROM copies")[0]["n"] == 1
+        db.execute("MATCH (n:Copy) RETURN count(n) AS n")[0]["n"] == 1
     )  # identical text: copy candidate
     assert process(msg("2", "b-ir", t, "x", "2026-11-06T02:00:00+00:00"), d) == "duplicate"
     assert [m["status"] for m in sent] == ["new_event", "attached", "new_event"]
@@ -128,7 +128,8 @@ def test_india_cec_beat_matches_name_and_impeachment_wording() -> None:
     assert a != "no_beat" and b != "no_beat"
     assert graph.get(db, "reports", "a")["story_id"] == "india-cec-impeachment"  # type: ignore[index]
     parties = db.execute(
-        "SELECT party, citation FROM story_parties WHERE story_id='india-cec-impeachment'"
+        "MATCH (n:StoryParty {story_id: 'india-cec-impeachment'}) "
+        "RETURN n.party AS party, n.citation AS citation"
     )
     assert parties and all(p["citation"] is None for p in parties)  # proposed, unverified
 

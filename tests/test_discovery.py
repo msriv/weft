@@ -47,8 +47,8 @@ def handler(req: httpx.Request) -> httpx.Response:
     return httpx.Response(404)
 
 
-def setup() -> tuple[store.SqliteDb, PoliteClient]:
-    db = store.SqliteDb()
+def setup() -> tuple[store.Neo4jDb, PoliteClient]:
+    db = store.local_db()
     store.init(db)
     discovery.seed_beats(db)
     http = PoliteClient(httpx.Client(transport=httpx.MockTransport(handler)), sleep=lambda _: None)
@@ -88,7 +88,7 @@ def test_robots_block_registers_nothing() -> None:
 
 
 def test_story_toggle_gates_public_list() -> None:
-    db = store.SqliteDb()
+    db = store.local_db()
     store.init(db)
     store.add_beat(db, "b", "Beat", ["x"])
     store.create_story(db, "s1", "b", "A story")
@@ -111,7 +111,7 @@ def test_story_toggle_gates_public_list() -> None:
 
 
 def test_live_sources_see_late_registration() -> None:
-    db = store.SqliteDb()
+    db = store.local_db()
     store.init(db)
     live = store.LiveSources(db)
     assert "a-example" not in live

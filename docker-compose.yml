@@ -1,4 +1,4 @@
-# Local stack. Stand-ins: sqld for Turso, fake-gcs-server for GCS, bigquery-emulator for BigQuery,
+# Local stack. Neo4j (graph), fake-gcs-server for GCS, bigquery-emulator for BigQuery,
 # Pub/Sub emulator, Cloud Tasks emulator, Firebase Auth + Firestore emulators.
 # `docker compose up` starts everything, including the scheduled jobs.
 
@@ -8,8 +8,8 @@ x-env: &env
   RAW_BUCKET: weft-raw
   STATE_BUCKET: weft-state
   SNAPSHOT_BUCKET: weft-snapshots
-  TURSO_URL: http://sqld:8080
-  TURSO_TOKEN: local
+  NEO4J_URI: bolt://neo4j:7687
+  NEO4J_PASSWORD: ${NEO4J_PASSWORD:-weft-local-pw}
   STORAGE_EMULATOR_HOST: http://gcs:4443
   PUBSUB_EMULATOR_HOST: pubsub:8085
   BIGQUERY_EMULATOR_HOST: http://bigquery:9050
@@ -32,7 +32,7 @@ x-env: &env
   FIRESTORE_EMULATOR_HOST: firebase:8080
 
 x-deps: &deps
-  sqld: { condition: service_started }
+  neo4j: { condition: service_healthy }
   init: { condition: service_completed_successfully }
 
 x-job: &job
@@ -41,9 +41,16 @@ x-job: &job
   restart: unless-stopped
 
 services:
-  sqld:
-    image: ghcr.io/tursodatabase/libsql-server:latest
-    volumes: ["sqld:/var/lib/sqld"]
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-weft-local-pw}
+    volumes: ["neo4j:/data"]
+    ports: ["7474:7474", "7687:7687"]  # Neo4j Browser at http://localhost:7474
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-weft-local-pw}", "RETURN 1"]
+      interval: 5s
+      retries: 30
   gcs:
     image: fsouza/fake-gcs-server
     command: ["-scheme", "http", "-port", "4443", "-backend", "memory"]
@@ -115,4 +122,4 @@ services:
     environment: { <<: *env, DELAY: "1800", EVERY: "86400", JOB: "python -m pipeline.run" }
 
 volumes:
-  sqld:
+  neo4j:

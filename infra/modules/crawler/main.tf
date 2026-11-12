@@ -9,8 +9,8 @@ variable "raw_bucket" { type = string }
 variable "state_bucket" { type = string }
 variable "dataset_id" { type = string }
 variable "documents_topic" { type = string }
-variable "turso_secret_ids" {
-  description = "Env var name to Secret Manager secret id for the Turso source store."
+variable "neo4j_secret_ids" {
+  description = "Env var name to Secret Manager secret id for the Neo4j connection."
   type        = map(string)
 }
 variable "schedule" {
@@ -58,8 +58,8 @@ resource "google_pubsub_topic_iam_member" "publish" {
   member  = "serviceAccount:${var.service_account_email}"
 }
 
-resource "google_secret_manager_secret_iam_member" "turso" {
-  for_each  = var.turso_secret_ids
+resource "google_secret_manager_secret_iam_member" "neo4j" {
+  for_each  = var.neo4j_secret_ids
   project   = var.project_id
   secret_id = each.value
   role      = "roles/secretmanager.secretAccessor"
@@ -92,7 +92,7 @@ resource "google_cloud_run_v2_job" "crawler" {
           value = var.state_bucket
         }
         dynamic "env" {
-          for_each = var.turso_secret_ids
+          for_each = var.neo4j_secret_ids
           content {
             name = env.key
             value_source {
@@ -107,7 +107,7 @@ resource "google_cloud_run_v2_job" "crawler" {
     }
   }
 
-  depends_on = [google_project_service.apis, google_secret_manager_secret_iam_member.turso]
+  depends_on = [google_project_service.apis, google_secret_manager_secret_iam_member.neo4j]
 }
 
 resource "google_service_account" "scheduler" {

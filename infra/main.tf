@@ -24,7 +24,7 @@ module "platform" {
 
 module "poller" {
   source                = "./modules/poller"
-  turso_secret_ids      = module.discovery.turso_secret_ids
+  neo4j_secret_ids      = module.discovery.neo4j_secret_ids
   project_id            = var.project_id
   region                = var.region
   image                 = var.poller_image
@@ -36,7 +36,7 @@ module "poller" {
 
 module "fetcher" {
   source                = "./modules/fetcher"
-  turso_secret_ids      = module.discovery.turso_secret_ids
+  neo4j_secret_ids      = module.discovery.neo4j_secret_ids
   project_id            = var.project_id
   region                = var.region
   image                 = var.fetcher_image
@@ -62,7 +62,7 @@ module "crawler" {
   state_bucket          = module.storage.bucket_names["weft-snapshots"]
   dataset_id            = module.bigquery.dataset_id
   documents_topic       = module.messaging.topic_names["documents-new"]
-  turso_secret_ids      = module.discovery.turso_secret_ids
+  neo4j_secret_ids      = module.discovery.neo4j_secret_ids
 }
 
 module "discovery" {
@@ -80,7 +80,7 @@ module "stream_worker" {
   name                  = "weft-stream-worker"
   image                 = var.stream_worker_image
   service_account_email = module.platform.service_account_emails["stream-worker"]
-  secret_env            = module.discovery.turso_secret_ids
+  secret_env            = module.discovery.neo4j_secret_ids
   env                   = { PROJECT_ID = var.project_id, WEFT_NLP = "real" }
   memory                = "4Gi"
   cpu                   = "2"
@@ -126,7 +126,7 @@ module "nightly" {
   image                 = var.nightly_image
   service_account_email = module.platform.service_account_emails["nightly"]
   stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "statements", "anomalies", "weights", "snapshot", "review_sample", "notify"]
-  secret_env = merge(module.discovery.turso_secret_ids, {
+  secret_env = merge(module.discovery.neo4j_secret_ids, {
     MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
   }, var.smtp_host == "" ? {} : { SMTP_PASSWORD = google_secret_manager_secret.smtp_password.secret_id })
   env = merge({
@@ -213,7 +213,7 @@ module "api" {
   name                  = "weft-api"
   image                 = var.api_image
   service_account_email = module.platform.service_account_emails["api"]
-  secret_env = merge(module.discovery.turso_secret_ids, {
+  secret_env = merge(module.discovery.neo4j_secret_ids, {
     ADMIN_TOKEN   = module.discovery.admin_token_secret_id
     MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
   })

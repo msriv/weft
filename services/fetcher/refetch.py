@@ -55,12 +55,13 @@ def refetch(
         return "unchanged"  # page gone or paywalled now; never treat an empty page as an edit
     h = text_hash(text)
     last = db.execute(
-        "SELECT text_hash FROM report_versions WHERE report_id=? ORDER BY n DESC LIMIT 1",
+        "MATCH (v:ReportVersion {report_id: ?}) RETURN v.text_hash AS text_hash "
+        "ORDER BY v.n DESC LIMIT 1",
         (task["item_id"],),
     )
     files.save_version(task["item_id"], task["n"], resp.content, ext)
     db.execute(
-        "INSERT OR REPLACE INTO report_versions(report_id,n,fetched_at,text_hash) VALUES(?,?,?,?)",
+        "MERGE (v:ReportVersion {report_id: ?, n: ?}) SET v.fetched_at=?, v.text_hash=?",
         (task["item_id"], task["n"], datetime.now(UTC).isoformat(), h),
     )
     return "changed" if last and last[0]["text_hash"] != h else "unchanged"

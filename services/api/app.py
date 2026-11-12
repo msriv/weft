@@ -232,27 +232,26 @@ def create_app(
             raise HTTPException(422, "state_run needs state_run_source")
         if data.get("owner_id") and not data.get("ownership_source"):
             raise HTTPException(422, "owner_id needs ownership_source")
-        if not db.execute("SELECT 1 FROM sources WHERE id=?", (source_id,)):
+        if not store.all_sources(db, "n.id=?", (source_id,)):
             raise HTTPException(404, "no such source")
-        for col, val in data.items():
+        for col, val in data.items():  # col is a SourcePatch field name, never user text
             db.execute(
-                f"UPDATE sources SET {col}=? WHERE id=?",
-                (int(val) if isinstance(val, bool) else val, source_id),
+                f"MATCH (n:Source {{id: ?}}) SET n.{col}=?",
+                (source_id, int(val) if isinstance(val, bool) else val),
             )
         return {"id": source_id, **data}
 
     @adm.put("/stories/{story_id}/parties/{party}")
     def confirm_party(story_id: str, party: str, citation: str) -> dict[str, str]:
         db.execute(
-            "INSERT INTO story_parties(story_id,party,citation) VALUES(?,?,?) "
-            "ON CONFLICT(story_id,party) DO UPDATE SET citation=excluded.citation",
+            "MERGE (n:StoryParty {story_id: ?, party: ?}) SET n.citation=?",
             (story_id, party, citation),
         )
         return {"story_id": story_id, "party": party}
 
     @adm.delete("/stories/{story_id}/parties/{party}")
     def remove_party(story_id: str, party: str) -> dict[str, str]:
-        db.execute("DELETE FROM story_parties WHERE story_id=? AND party=?", (story_id, party))
+        db.execute("MATCH (n:StoryParty {story_id: ?, party: ?}) DELETE n", (story_id, party))
         return {"story_id": story_id, "party": party}
 
     @adm.get("/review")
@@ -270,16 +269,18 @@ def create_app(
 
     @adm.get("/reader-reports")
     def reader_reports(status: str = "open") -> list[dict[str, Any]]:
-        return db.execute(
-            "SELECT rowid AS id, * FROM reader_reports WHERE status=? ORDER BY created_at",
+        return store.nodes(
+            db,
+            "ReaderReport",
+            "MATCH (n:ReaderReport {status: ?}) RETURN n ORDER BY n.created_at",
             (status,),
         )
 
     @adm.post("/reader-reports/{report_id}/resolve")
     def resolve(report_id: int, body: Resolve) -> dict[str, Any]:
         db.execute(
-            "UPDATE reader_reports SET status='resolved', resolution=? WHERE rowid=?",
-            (body.resolution, report_id),
+            "MATCH (n:ReaderReport {id: ?}) SET n.status='resolved', n.resolution=?",
+            (report_id, body.resolution),
         )
         return {"id": report_id}
 
