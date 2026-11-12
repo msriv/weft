@@ -55,7 +55,8 @@ export type EventPage = {
   parties: Party[];
 };
 export type WorldItem = { story_id: string; title: string; country: string; reports: number; perspectives: number; anomalies: number; provisional: boolean; last_report_at: string | null };
-export type World = { stories: WorldItem[]; gaps: { story_id: string; title: string; country: string; reports: number }[] };
+export type WorldPlace = WorldItem & { from: Record<string, number> };
+export type World = { stories: WorldItem[]; places?: WorldPlace[]; gaps: { story_id: string; title: string; country: string; reports: number }[] };
 export type Today = {
   day: string | null; changes: { kind: string; label: string; count: number }[];
   new_anomalies: Anomaly[]; breaking: StoryCard[];

@@ -7,6 +7,7 @@ nothing here has a citation for them.
 """
 
 import io
+import json
 import re
 import zipfile
 from collections import defaultdict
@@ -258,6 +259,10 @@ def seed_beats(db: store.Db) -> None:
     for id_, name, pats, exclude, parties in BEATS:
         if id_ not in edited:
             store.add_beat(db, id_, name, pats, parties=parties, exclude=exclude)
+        # where the story happens, for the globe; editing terms never changes this
+        db.execute(
+            "MATCH (n:Beat {id: ?}) SET n.places=?", (id_, json.dumps(BEAT_PLACES.get(id_, [])))
+        )
 
 
 def _both(a: str, b: str) -> str:
@@ -273,6 +278,14 @@ _SENATE = r"senate|senator"
 _RACE = r"race|election|seat|candidate|democrat\w*|republican\w*|gop|majority|midterm|poll\w*"
 _CEC = r"chief[\s_-]*election[\s_-]*commissioner|\bcec\b|election[\s_-]*commission"
 _REMOVE = r"impeach\w*|removal[\s_-]*motion|motion[\s_-]*(for|to)[\s_-]*remov\w*|remove[\s_-]*the[\s_-]*(cec|chief)"
+# countries each beat's story is about (ISO 3166). Country parties count too; these cover
+# domestic beats whose parties are not countries.
+BEAT_PLACES = {
+    "iran-israel-war": ["IR", "IL"],
+    "ukraine-russia-war": ["UA", "RU"],
+    "us-senate-democrats": ["US"],
+    "india-cec-impeachment": ["IN"],
+}
 # id, name, match any, but not if any of these match, proposed parties
 BEATS: list[tuple[str, str, list[str], list[str], list[str]]] = [
     (

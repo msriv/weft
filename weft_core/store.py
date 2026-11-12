@@ -27,6 +27,7 @@ NODES: dict[str, dict[str, Any]] = {
         "exclude": "[]",
         "languages": '["en"]',
         "parties": "[]",
+        "places": "[]",
         "edited": None,
     },
     "Source": {
@@ -367,6 +368,7 @@ def beats(db: Db) -> list[dict[str, Any]]:
             **r,
             "patterns": json.loads(r["patterns"]),
             "exclude": json.loads(r["exclude"] or "[]"),
+            "places": json.loads(r["places"] or "[]"),
             "parties": json.loads(r["parties"]),
         }
         for r in nodes(db, "Beat", "MATCH (n:Beat) RETURN n")

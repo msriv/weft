@@ -9,8 +9,8 @@ export default async function Home() {
   return (
     <>
       <Kicker>World desk</Kicker>
-      <h1>Where the reporting comes from</h1>
-      <p className="muted">Who reported what, and from where. Weft shows coverage; it never says what is true. <Link href="/today">See today&apos;s changes</Link>.</p>
+      <h1>Where the news is</h1>
+      <p className="muted">Each story sits on the countries it is about; open one to see where its reports come from. Weft shows coverage; it never says what is true. <Link href="/today">See today&apos;s changes</Link>.</p>
       <Globe world={w} />
     </>
   );

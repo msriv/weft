@@ -662,9 +662,11 @@ def actor_page(db: Db, actor_id: str) -> dict[str, Any] | None:
 
 
 def world(db: Db) -> dict[str, Any]:
-    """Coverage by country for the Threads and Globe views. A gap is a party country to a story
-    where we hold few reports; it describes our coverage, not the story."""
-    items, gaps = [], []
+    """`stories`: reports per story per outlet country (Threads view). `places`: each story at
+    the countries it is about, with where its reports come from (Globe). A gap is a party
+    country to a story where we hold few reports; it describes our coverage, not the story."""
+    items, gaps, places = [], [], []
+    beat_places = {b["id"]: b["places"] for b in store.beats(db)}
     for s in store.nodes(db, "Story", "MATCH (n:Story {public: 1}) RETURN n ORDER BY n.id"):
         card = story_card(db, s)
         counts = Counter(
@@ -685,8 +687,25 @@ def world(db: Db) -> dict[str, Any]:
                         "last_report_at": card["last_report_at"],
                     }
                 )
-        for p in parties(db, s["id"]):
-            code = p["party"].upper()
+        party_codes = [p["party"].upper() for p in parties(db, s["id"])]
+        # Globe: one marker per country the story is about, with where its reports come from
+        for code in sorted(
+            {*beat_places.get(s["beat_id"], []), *(c for c in party_codes if len(c) == 2)}
+        ):
+            places.append(
+                {
+                    "story_id": s["id"],
+                    "title": s["title"],
+                    "country": code,
+                    "reports": sum(counts.values()),
+                    "perspectives": len(counts),
+                    "anomalies": len([a for a in anomalies if a["status"] == "active"]),
+                    "provisional": any(a["status"] == "provisional" for a in anomalies),
+                    "last_report_at": card["last_report_at"],
+                    "from": dict(counts.most_common()),
+                }
+            )
+        for code in party_codes:
             if len(code) == 2 and counts.get(code, 0) < GAP_BELOW:
                 gaps.append(
                     {
@@ -696,7 +715,7 @@ def world(db: Db) -> dict[str, Any]:
                         "reports": counts.get(code, 0),
                     }
                 )
-    return {"stories": items, "gaps": gaps}
+    return {"stories": items, "places": places, "gaps": gaps}
 
 
 GAP_BELOW = 3  # fewer reports than this from a party country is shown as a coverage gap

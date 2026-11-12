@@ -1,7 +1,8 @@
 "use client";
 // Rotatable orthographic globe in SVG. Real country shapes (Natural Earth via world-atlas and
-// d3-geo). Marker size = number of reports; orange ring = story with anomalies; dashed ring =
-// coverage gap (a place we cannot see well). Never the only way in: the story list sits beside it.
+// d3-geo). A story's marker sits on the countries it is about (not where its outlets are);
+// size = number of reports; orange ring = story with anomalies; dashed ring = coverage gap
+// (a party country we hold few reports from). The story list sits beside it.
 import countries from "i18n-iso-countries";
 import { geoCentroid, geoDistance, geoGraticule10, geoOrthographic, geoPath } from "d3-geo";
 import Link from "next/link";
@@ -15,6 +16,7 @@ import type { World } from "@/lib/types";
 type Marker = {
   key: string; kind: "story" | "gap"; storyId: string; title: string; country: string;
   reports: number; perspectives: number; anomalies: number; provisional: boolean; at: [number, number];
+  from?: Record<string, number>;
 };
 type Filter = "all" | "anomalies" | "gaps";
 const W = 560;
@@ -36,9 +38,9 @@ export default function Globe({ world }: { world: World }) {
 
   const markers: Marker[] = useMemo(() => {
     const out: Marker[] = [];
-    for (const s of world.stories) {
+    for (const s of world.places ?? []) {
       const at = centroid.get(s.country);
-      if (at) out.push({ key: `s-${s.story_id}-${s.country}`, kind: "story", storyId: s.story_id, title: s.title, country: s.country, reports: s.reports, perspectives: s.perspectives, anomalies: s.anomalies, provisional: s.provisional, at });
+      if (at) out.push({ key: `s-${s.story_id}-${s.country}`, kind: "story", storyId: s.story_id, title: s.title, country: s.country, reports: s.reports, perspectives: s.perspectives, anomalies: s.anomalies, provisional: s.provisional, at, from: s.from });
     }
     for (const g of world.gaps) {
       const at = centroid.get(g.country);
@@ -90,7 +92,7 @@ export default function Globe({ world }: { world: World }) {
           ))}
         </div>
         <svg
-          viewBox={`0 0 ${W} ${W}`} role="img" aria-label="Globe of stories and coverage gaps by country" style={{ width: "100%", touchAction: "none", cursor: "grab" }}
+          viewBox={`0 0 ${W} ${W}`} role="img" aria-label="Globe of stories by the countries they are about, and coverage gaps" style={{ width: "100%", touchAction: "none", cursor: "grab" }}
           onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY, rot }; setDragging(true); (e.target as Element).setPointerCapture?.(e.pointerId); }}
           onPointerMove={(e) => {
             const d = drag.current;
@@ -134,8 +136,13 @@ export default function Globe({ world }: { world: World }) {
             <p className="muted">
               {card.kind === "gap"
                 ? `We hold ${card.reports} reports from ${perspectiveName(card.country)} on this story. That describes our coverage, not the story.`
-                : `${card.reports} reports from ${perspectiveName(card.country)} · ${card.perspectives} perspectives in the story`}
+                : `About ${perspectiveName(card.country)} · ${card.reports} reports from ${card.perspectives} perspectives`}
             </p>
+            {card.from && (
+              <p className="muted" style={{ fontSize: 13 }}>
+                Reports from: {Object.entries(card.from).map(([c, n]) => `${perspectiveName(c)} ${n}`).join(" · ")}
+              </p>
+            )}
             <Link href={`/s/${card.storyId}`}>Open the story</Link>
             {pinned && <button style={{ marginLeft: 12 }} onClick={() => setPinned(null)}>Close</button>}
           </div>
@@ -148,7 +155,7 @@ export default function Globe({ world }: { world: World }) {
             <b>{perspectiveName(g.country)}</b> · {g.reports} reports on <Link href={`/s/${g.story_id}`}>{g.title}</Link>
           </div>
         )) : <p className="muted">No gaps recorded.</p>}
-        <div className="kicker" style={{ marginTop: 18 }}>Stories on the globe</div>
+        <div className="kicker" style={{ marginTop: 18 }}>Stories on the globe, by where they happen</div>
         {markers.filter((m) => m.kind === "story").map((m) => (
           <button key={m.key} style={{ display: "block", width: "100%", textAlign: "left", margin: "6px 0" }} onClick={() => { turn(m); setPinned(m); }}>
             {perspectiveName(m.country)} · {m.title} · {m.reports}
