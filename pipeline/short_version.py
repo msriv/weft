@@ -34,7 +34,7 @@ def short_version(
             continue
         if len(named) >= 2 and p >= named:
             out["reported_by_all"].append(g["id"])
-        elif len(p) == 1:
+        elif len(p) == 1 and len(named) >= 2:  # "only one" means something only if others reported
             out["one_perspective_only"].append({"group": g["id"], "perspective": next(iter(p))})
     return out
 

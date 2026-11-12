@@ -50,36 +50,54 @@ def cluster(
 
 
 def run_groups(ctx: Ctx) -> int:
-    perspective = {r["id"]: r["perspective"] for r in ctx.recent_reports(2)}
-    by_event: dict[str, list[dict[str, Any]]] = {}
+    """Re-cluster claims of events that got reports inside the regroup window. A group is
+    written only when it is new or changed, and groups that no longer exist are closed, so
+    `valid_from` means "first seen in this form" and stale groups never stay current."""
+    days = ctx.cfg["nightly"]["regroup_days"]
+    touched = {r["event_id"] for r in ctx.recent_reports(days) if r["event_id"]}
+    by_event: dict[str, list[dict[str, Any]]] = {e: [] for e in touched}
     for c in graph.select(ctx.db, "claims", "n.event_id IS NOT NULL"):
-        by_event.setdefault(c["event_id"], []).append(c)
+        if c["event_id"] in touched:
+            by_event[c["event_id"]].append(c)
     made = 0
     for event_id, claims in by_event.items():
+        perspective = {r["id"]: r["perspective"] for r in graph.reports_of_event(ctx.db, event_id)}
+        old = {
+            g["id"]: g for g in graph.select(ctx.db, "claim_groups", "n.event_id=?", (event_id,))
+        }
+        keep: set[str] = set()
         for members in cluster(
             claims, ctx.cfg["nightly"]["claim_group_cosine"], lambda a, b: _contradict(ctx, a, b)
         ):
             members.sort(key=lambda c: (c["report_id"], c["start_char"]))
-            gid = hashlib.sha256(f"{event_id}:{members[0]['id']}".encode()).hexdigest()[:32]
+            gid = hashlib.sha256(
+                f"{event_id}:{'|'.join(sorted(c['id'] for c in members))}".encode()
+            ).hexdigest()[:32]  # id = membership: a changed group is a new group
+            keep.add(gid)
             persp = sorted(
                 {perspective[c["report_id"]] for c in members if c["report_id"] in perspective}
             )
-            label = min(members, key=lambda c: len(c["text"]))["text"]
-            graph.put(
-                ctx.db,
-                "claim_groups",
-                {
-                    "id": gid,
-                    "event_id": event_id,
-                    "label": label[:300],
-                    "perspectives": persp,
-                    "n_reports": len({c["report_id"] for c in members}),
-                },
-            )
+            row = {
+                "id": gid,
+                "event_id": event_id,
+                "label": min(members, key=lambda c: len(c["text"]))["text"][:300],
+                "perspectives": persp,
+                "n_reports": len({c["report_id"] for c in members}),
+            }
+            prev = old.get(gid)
+            if prev is None or any(
+                prev[k] != row[k] for k in ("label", "perspectives", "n_reports")
+            ):
+                graph.put(ctx.db, "claim_groups", row)
+                made += 1
             for c in members:
                 if c["group_id"] != gid:
                     graph.put(ctx.db, "claims", {**_row(c), "group_id": gid})
-            made += 1
+        for gid in set(old) - keep:  # superseded groups stop being current
+            ctx.db.execute(
+                "MATCH (n:ClaimGroup {id: ?}) WHERE n.valid_to IS NULL SET n.valid_to=?",
+                (gid, ctx.now),
+            )
     return made
 
 

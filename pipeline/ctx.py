@@ -38,9 +38,13 @@ class Ctx:
     rules: dict[str, Any] = field(default_factory=config.rules)  # config/rules.yaml
     budgets: dict[str, Budget] = field(default_factory=dict)
 
-    def budget(self, story_id: str) -> Budget:
+    def budget(self, story_id: str, stage: str = "claims") -> Budget:
+        """Each stage has its own share of the beat's nightly tokens, so an early stage
+        (regroup) can never starve claim extraction."""
+        n = self.cfg["nightly"]
+        share = n.get("token_shares", {}).get(stage, 1.0)
         return self.budgets.setdefault(
-            story_id, Budget(self.cfg["nightly"]["token_budget_per_beat"])
+            f"{stage}:{story_id}", Budget(int(n["token_budget_per_beat"] * share))
         )
 
     def recent_reports(self, days: int) -> list[dict[str, Any]]:
