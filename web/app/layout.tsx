@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 const LINKS: [string, string][] = [
   ["/", "Today"], ["/world", "World"], ["/stories", "Stories"], ["/sources", "Sources"],
-  ["/ask", "Ask"], ["/method", "How we weigh"],
+  ["/ask", "Ask"], ["/method", "How we weigh"], ["/admin", "Admin"],
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

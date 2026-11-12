@@ -175,3 +175,26 @@ def test_latest_gkg_reads_several_slots_and_skips_missing() -> None:
     http = httpx.Client(transport=httpx.MockTransport(handler))
     assert latest_gkg(http, 2).split("\n") == ["a", "b"]
     assert latest_gkg(http) == "a"
+
+
+def test_outlet_table_fills_country_and_retags_reports() -> None:
+    from weft_core import graph, outlets
+
+    assert outlets.country_for("www.timesofisrael.com") == "IL"
+    assert outlets.country_for("example.com") is None
+    db = store.local_db()
+    store.init(db)
+    store.register_source(
+        db,
+        domain="www.thehindu.com",
+        name="H",
+        homepage="https://www.thehindu.com/",
+        feeds=[],
+        via="t",
+    )
+    graph.put(
+        db, "reports", {"id": "r1", "source_id": "www-thehindu-com", "perspective": "unattributed"}
+    )
+    assert outlets.fill_countries(db) == 1
+    assert graph.get(db, "reports", "r1")["perspective"] == "IN"  # type: ignore[index]
+    assert outlets.fill_countries(db) == 0  # already set: never overwritten

@@ -30,7 +30,7 @@ class GcpStore:
 
     def seen(self, canonical_url: str | None, text_hash: str) -> bool:
         job = self._bq.query(
-            f"SELECT 1 FROM `{self._ds}.raw_items` WHERE canonical_url = @u OR text_hash = @h LIMIT 1",
+            f"SELECT 1 FROM `{self._ds}.raw_items` WHERE canonical_url = @u OR url = @u OR text_hash = @h LIMIT 1",
             job_config=bigquery.QueryJobConfig(
                 query_parameters=[
                     bigquery.ScalarQueryParameter("u", "STRING", canonical_url),

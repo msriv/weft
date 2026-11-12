@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from services.fetcher.app import create_app
-from services.fetcher.fetcher import fetch_item, normalize_url
+from services.fetcher.fetcher import fetch_item, normalize_url, published_at
 from weft_core.polite import PoliteClient
 
 BODY = " ".join(f"Sentence number {i} of the report." for i in range(60))
@@ -24,7 +24,7 @@ class MemStore:
 
     def seen(self, canonical_url: str | None, text_hash: str) -> bool:
         return any(
-            r[0]["canonical_url"] == canonical_url or r[0]["text_hash"] == text_hash
+            canonical_url in (r[0]["canonical_url"], r[0]["url"]) or r[0]["text_hash"] == text_hash
             for r in self.rows
         )
 
@@ -75,7 +75,32 @@ def test_robots_block_is_skipped_not_fetched() -> None:
         raise AssertionError("fetched a disallowed page")
 
     http = PoliteClient(httpx.Client(transport=httpx.MockTransport(h)), sleep=lambda s: None)
-    assert fetch_item(MSG, SRC, http, MemStore()).status == "skipped"
+    assert fetch_item(MSG, SRC, http, MemStore()).status == "blocked"  # acked, not retried
+
+
+def test_known_url_is_not_downloaded_again() -> None:
+    store = MemStore()
+    calls: list[str] = []
+
+    def h(req: httpx.Request) -> httpx.Response:
+        calls.append(req.url.path)
+        return (
+            httpx.Response(404) if req.url.path == "/robots.txt" else httpx.Response(200, text=HTML)
+        )
+
+    http = PoliteClient(httpx.Client(transport=httpx.MockTransport(h)), sleep=lambda s: None)
+    assert fetch_item(MSG, SRC, http, store).status == "stored"
+    assert fetch_item(MSG, SRC, http, store).status == "duplicate"
+    assert calls.count("/story/1") == 1
+
+
+def test_published_at_is_a_full_timestamp() -> None:
+    now = "2026-11-12T10:00:00+00:00"
+    assert published_at("Wed, 11 Nov 2026 22:15:00 +0530", "", now) == "2026-11-11T16:45:00+00:00"
+    meta = '<meta property="article:published_time" content="2026-11-12T08:30:00Z">'
+    assert published_at(None, meta, now) == "2026-11-12T08:30:00+00:00"
+    assert published_at("2026-11-12", "", now) == now  # bare date: fall back, never midnight
+    assert published_at("2026-11-13T09:00:00+00:00", "", now) == now  # future: clamped
 
 
 def _push(c: TestClient, msg: dict[str, Any]) -> httpx.Response:

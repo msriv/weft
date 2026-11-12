@@ -8,8 +8,10 @@ get the lede only and the paywall is never bypassed.
 import hashlib
 import io
 import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, Protocol
 from urllib.parse import urlsplit, urlunsplit
 
@@ -36,7 +38,8 @@ def ocr_page(page: Any) -> str:
 
 class Store(Protocol):
     def seen(self, canonical_url: str | None, text_hash: str) -> bool:
-        """True if the URL (when given) or the text hash is already stored."""
+        """True if the URL (when given; matched against both the fetched and the canonical URL)
+        or the text hash is already stored."""
         ...
 
     def save(
@@ -47,7 +50,7 @@ class Store(Protocol):
 
 @dataclass
 class Result:
-    status: str  # stored | duplicate | skipped | extract_failed
+    status: str  # stored | duplicate | skipped | blocked | extract_failed
     item_id: str | None = None
     message: dict[str, Any] | None = None  # `items-extracted` payload, set when stored
 
@@ -60,9 +63,13 @@ def normalize_url(url: str) -> str:
 def fetch_item(
     msg: dict[str, Any], source: dict[str, Any], http: PoliteClient, store: Store
 ) -> Result:
+    if store.seen(msg["url"], ""):
+        return Result("duplicate")  # feeds repeat entries every poll: never re-download them
     resp = http.get(msg["url"], interval(source), {})
     if resp is None:
-        return Result("skipped")  # robots, cooldown or 429: caller retries later
+        if not http.allowed(msg["url"]):
+            return Result("blocked")  # robots.txt: permanent, so the caller must not retry
+        return Result("skipped")  # cooldown or 429: caller retries later
     return ingest(msg, resp.content, resp.headers.get("content-type", ""), resp.status_code, store)
 
 
@@ -146,7 +153,7 @@ def ingest(
             "url": msg["url"],
             "title": d.get("title"),
             "summary": lede,
-            "published_at": _iso(d.get("date")),
+            "published_at": published_at(msg.get("published"), html, now),
             "section": ",".join(d.get("categories") or [])
             if isinstance(d.get("categories"), list)
             else (d.get("categories") or ""),
@@ -158,18 +165,36 @@ def ingest(
     )
 
 
-def _iso(v: Any) -> str | None:
-    """trafilatura gives YYYY-MM-DD (or a datetime); the graph wants an ISO timestamp."""
-    if not v:
+_PUBLISHED_META = re.compile(
+    r"<meta[^>]+(?:property|name|itemprop)=[\"'](?:article:published_time|datePublished|pubdate)"
+    r"[\"'][^>]*content=[\"']([^\"']+)",
+    re.IGNORECASE,
+)
+
+
+def published_at(feed_time: Any, html: str, now: str) -> str:
+    """A full timestamp, never a bare date: the feed entry's time, then the page's
+    article:published_time, then the fetch time. Clamped to `now` so a wrong zone can't
+    put a report in the future."""
+    m = _PUBLISHED_META.search(html)
+    for v in (feed_time, m.group(1) if m else None):
+        if ts := _timestamp(v):
+            return min(ts, datetime.fromisoformat(now)).isoformat()
+    return now
+
+
+def _timestamp(v: Any) -> datetime | None:
+    s = str(v or "").strip()
+    if len(s) <= 10:  # empty, or a date with no time: midnight would be a guess
         return None
     try:
-        return (
-            datetime.fromisoformat(str(v)).replace(tzinfo=UTC).isoformat()
-            if "+" not in str(v)
-            else str(v)
-        )
+        ts = datetime.fromisoformat(s)
     except ValueError:
-        return None
+        try:
+            ts = parsedate_to_datetime(s)  # RSS pubDate (RFC 822)
+        except (TypeError, ValueError):
+            return None
+    return (ts if ts.tzinfo else ts.replace(tzinfo=UTC)).astimezone(UTC)
 
 
 _META_KEYS = {"author", "date", "sitename", "categories", "tags", "description", "hostname"}

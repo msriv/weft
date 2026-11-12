@@ -19,7 +19,7 @@ from urllib.parse import urljoin, urlsplit
 import feedparser
 import httpx
 
-from weft_core import store
+from weft_core import outlets, store
 from weft_core.nlp import StopwordLangId
 from weft_core.polite import PoliteClient
 
@@ -155,6 +155,7 @@ def discover(
             )
             if ok:
                 found[domain] = feeds
+    outlets.fill_countries(db)
     return found
 
 
