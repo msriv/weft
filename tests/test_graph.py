@@ -31,3 +31,18 @@ def test_init_is_idempotent() -> None:
     d = db()
     graph.init(d)
     assert store.beats(d) == []
+
+
+def test_init_survives_concurrent_startup() -> None:
+    """Services start together and all run init; losing the IF NOT EXISTS race must not crash."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from weft_core import store
+
+    db = store.local_db()
+    for r in db.execute("SHOW CONSTRAINTS YIELD name RETURN name"):
+        db.execute(f"DROP CONSTRAINT {r['name']}")
+    for r in db.execute("SHOW INDEXES YIELD name, type WHERE type = 'RANGE' RETURN name"):
+        db.execute(f"DROP INDEX {r['name']}")
+    with ThreadPoolExecutor(6) as ex:
+        list(ex.map(lambda _: store.init(db), range(6)))
