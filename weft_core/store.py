@@ -13,6 +13,7 @@ call sites pass a plain tuple of arguments.
 import json
 import os
 import re
+import time
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -294,15 +295,24 @@ def _clean(props: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _schema(db: Db, query: str) -> None:
-    from neo4j.exceptions import ClientError
+def _schema(db: Db, query: str, attempts: int = 5) -> None:
+    """Run one IF NOT EXISTS schema statement. Services start together and race on these: losing
+    the race (AlreadyExists) is fine, and a deadlock or failed result is retried, since by then
+    the other writer has usually finished and IF NOT EXISTS is a no-op."""
+    from neo4j.exceptions import ClientError, DriverError, TransientError
 
-    try:
-        db.execute(query)
-    except ClientError as e:
-        # Services start together and race on IF NOT EXISTS; losing the race is fine.
-        if "AlreadyExists" not in (e.code or ""):
+    for i in range(attempts):
+        try:
+            db.execute(query)
+            return
+        except ClientError as e:
+            if "AlreadyExists" in (e.code or ""):
+                return
             raise
+        except (TransientError, DriverError):
+            if i == attempts - 1:
+                raise
+            time.sleep(0.2 * (i + 1))
 
 
 def init(db: Db) -> None:
