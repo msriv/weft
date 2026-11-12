@@ -26,6 +26,7 @@ ml = [
     "sentence-transformers>=3.0.0",
     "spacy>=3.8.0",
     "transformers>=4.50.0",
+    "torch>=2.15.0",
 ]
 dev = [
     "ruff",
@@ -34,6 +35,15 @@ dev = [
     "types-pyyaml>=6.0.12.20261103",
     "types-jsonschema>=4.26.0.20261006",
 ]
+
+# CPU-only torch on Linux: we never run on GPUs, and the default wheels pull ~3 GB of CUDA.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [build-system]
 requires = ["hatchling"]
