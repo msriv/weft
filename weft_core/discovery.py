@@ -21,12 +21,16 @@ import feedparser
 import httpx
 
 from weft_core import beats, outlets, store
-from weft_core.nlp import StopwordLangId
+from weft_core.nlp import STOP_EN, StopwordLangId
 from weft_core.polite import PoliteClient
+from weft_core.textutil import words
 
 GDELT_LAST = "http://data.gdeltproject.org/gdeltv2/lastupdate.txt"
 FALLBACK_PATHS = ("/feed", "/rss", "/rss.xml", "/feed.xml", "/atom.xml")
-MIN_URLS = 3  # a domain needs this many matching articles in the window to be probed
+MIN_URLS = 3  # a domain needs this many matching articles, summed across runs, to be probed
+RETRY_AFTER = timedelta(days=14)  # a rejected domain is probed again after this
+CANDIDATE_TTL = timedelta(days=7)  # hits not topped up within this are forgotten
+MAX_FEEDS = 3  # live feeds kept per source, beat-matching sections first
 MAX_AGE = timedelta(days=7)  # a feed with nothing newer than this is not live
 PROBE_INTERVAL = 10.0
 # Launch languages (owner, 2026-11-06: English only, more later). Beat patterns are English, so a
@@ -99,64 +103,121 @@ def feed_language(resp: httpx.Response) -> str:
     if declared:
         return declared[:2]
     text = " ".join(f"{e.get('title', '')}. {e.get('summary', '')}" for e in parsed.entries[:20])
-    return StopwordLangId().detect(text)
+    if (lang := StopwordLangId().detect(text)) != "und":
+        return lang
+    # Headlines carry few stopwords. Plain-ASCII text with some English stopwords is English.
+    letters = [c for c in text if c.isalpha()]
+    ascii_share = sum(c.isascii() for c in letters) / len(letters) if letters else 0.0
+    w = words(text)
+    stop_share = sum(x in STOP_EN for x in w) / len(w) if w else 0.0
+    return "en" if ascii_share > 0.97 and stop_share > 0.05 else "und"
 
 
 def verified_feeds(
-    http: PoliteClient, domain: str, now: datetime
-) -> tuple[str, str, list[str], str]:
-    """(name, homepage, live feeds, feed language) for one domain. No feeds = nothing verified."""
+    http: PoliteClient, domain: str, now: datetime, beat: dict[str, Any] | None = None
+) -> tuple[str, str, list[str], str, str]:
+    """(name, homepage, live feeds, feed language, rejection reason) for one domain. No feeds =
+    nothing verified. Feeds whose entries match the beat come first (section feeds over the
+    all-topics one), at most MAX_FEEDS."""
     home = f"https://{domain}/"
     try:
         page = http.get(home, PROBE_INTERVAL, {})
-    except httpx.HTTPError:
-        return domain, home, [], "und"
+    except httpx.HTTPError as exc:
+        return domain, home, [], "und", f"homepage error: {type(exc).__name__}"
     if page is None:
-        return domain, home, [], "und"
-    title = re.search(r"<title[^>]*>([^<]{1,120})", page.text, re.IGNORECASE)
-    name = title.group(1).strip() if title else domain
-    live: list[str] = []
+        return domain, home, [], "und", "robots.txt disallows or rate limited"
+    name = site_name(page.text) or domain
+    live: list[tuple[int, str]] = []
     lang = "und"
-    for url in feed_urls(str(page.url), page.text)[:6]:
+    for url in feed_urls(str(page.url), page.text)[:8]:
         try:
             resp = http.get(url, PROBE_INTERVAL, {})
         except httpx.HTTPError:
             continue
         if resp is not None and feed_is_live(resp, now):
-            live.append(url)
-            lang = feed_language(resp)
-            break  # one verified feed is enough to register
-    return name, home, live, lang
+            entries = feedparser.parse(resp.content).entries[:30]
+            hits = (
+                sum(
+                    beats.matches(beat, f"{e.get('title', '')} {e.get('summary', '')}")
+                    for e in entries
+                )
+                if beat
+                else 0
+            )
+            live.append((hits, url))
+            if lang == "und":
+                lang = feed_language(resp)
+    if not live:
+        return name, home, [], lang, "no live feed found"
+    ranked = sorted(live, key=lambda x: -x[0])
+    keep = [u for h, u in ranked if h] or [ranked[0][1]]
+    return name, home, keep[:MAX_FEEDS], lang, "" if lang in LANGUAGES else f"language {lang}"
+
+
+def site_name(html: str) -> str | None:
+    """og:site_name, else the <title> up to its first separator ("Home | Paper" -> "Paper")."""
+    og = re.search(
+        r"<meta[^>]+property=[\"']og:site_name[\"'][^>]*content=[\"']([^\"']{1,80})",
+        html,
+        re.IGNORECASE,
+    )
+    if og:
+        return og.group(1).strip()
+    title = re.search(r"<title[^>]*>([^<]{1,200})", html, re.IGNORECASE)
+    if not title:
+        return None
+    parts = [p.strip() for p in re.split(r"\s[|\-–—:]\s", title.group(1)) if p.strip()]
+    return min(parts, key=len)[:80] if parts else None
 
 
 def discover(
     db: store.Db, http: PoliteClient, gkg_text: str, now: datetime | None = None, limit: int = 20
 ) -> dict[str, list[str]]:
-    """One pass over one GKG file. Returns {domain: feeds} for newly registered sources."""
+    """One pass over recent GKG rows. Hits per domain add up across runs, so a niche beat's
+    outlets qualify over hours or days. Domains the admin asked for are probed first.
+    Returns {domain: feeds} for newly registered sources."""
     now = now or datetime.now(UTC)
     rows = list(parse_gkg(gkg_text))
     found: dict[str, list[str]] = {}
+    store.prune_candidates(db, (now - CANDIDATE_TTL).isoformat())
     for beat in store.beats(db):
-        known = store.known_domains(db)
-        hits = candidate_domains(rows, beat, known)
-        ranked = sorted(hits, key=lambda d: -len(hits[d]))
-        for domain in [d for d in ranked if len(hits[d]) >= MIN_URLS][:limit]:
-            name, home, feeds, lang = verified_feeds(http, domain, now)
-            ok = bool(feeds) and lang in LANGUAGES
-            store.register_source(
-                db,
-                domain=domain,
-                name=name,
-                homepage=home,
-                feeds=feeds,
-                via=f"gdelt:{beat['id']}",
-                rejected=not ok,  # remembered either way, so it is not probed again
-                languages=[lang],
-            )
-            if ok:
+        known = store.known_domains(db, retry_before=(now - RETRY_AFTER).isoformat())
+        for domain, urls in candidate_domains(rows, beat, known).items():
+            store.add_candidate_hits(db, domain, beat["id"], len(urls), now.isoformat())
+        for domain in store.candidates(db, beat["id"], MIN_URLS, limit):
+            if (feeds := _probe(db, http, domain, beat, now)) is not None:
                 found[domain] = feeds
+    for c in store.requested_sources(db):  # admin "add source": any beat
+        wanted = next((b for b in store.beats(db) if b["id"] == c["beat_id"]), None)
+        if (feeds := _probe(db, http, c["domain"], wanted, now, via="admin")) is not None:
+            found[c["domain"]] = feeds
     outlets.fill_countries(db)
     return found
+
+
+def _probe(
+    db: store.Db,
+    http: PoliteClient,
+    domain: str,
+    beat: dict[str, Any] | None,
+    now: datetime,
+    via: str | None = None,
+) -> list[str] | None:
+    """Probe and register (or re-register) one domain. Returns its feeds when accepted."""
+    name, home, feeds, lang, reason = verified_feeds(http, domain, now, beat)
+    store.register_source(
+        db,
+        domain=domain,
+        name=name,
+        homepage=home,
+        feeds=feeds,
+        via=via or f"gdelt:{beat['id'] if beat else ''}",
+        rejected=bool(reason),  # remembered either way; a rejection is retried after RETRY_AFTER
+        rejected_reason=reason or None,
+        languages=[lang],
+    )
+    store.clear_candidate(db, domain)
+    return None if reason else feeds
 
 
 def latest_gkg(http: httpx.Client, files: int = 1) -> str:

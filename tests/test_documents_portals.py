@@ -31,6 +31,7 @@ def test_portal_discovery_registers_crawlable_portal_and_rejects_empty() -> None
     db = local_db()
     store.init(db)
     portals.record_candidates(db, {"eci.gov.in", "empty.gov.xx"}, "https://paper.example/a")
+    portals.record_candidates(db, {"eci.gov.in", "empty.gov.xx"}, "https://paper.example/c")
     portals.record_candidates(
         db, {"eci.gov.in", "empty.gov.xx", "once.gov.yy"}, "https://paper.example/b"
     )

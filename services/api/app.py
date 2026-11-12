@@ -12,6 +12,7 @@ import re
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -41,6 +42,11 @@ class SourcePatch(BaseModel):
     state_run_source: str | None = None
     owner_id: str | None = None
     ownership_source: str | None = None
+
+
+class NewSource(BaseModel):
+    url: str
+    beat_id: str | None = None
 
 
 class BeatTerms(BaseModel):
@@ -242,11 +248,30 @@ def create_app(
                 "MATCH (r:Report) RETURN r.source_id AS id, max(r.fetched_at) AS last"
             )
         }
-        keys = ("id", "name", "domain", "country", "country_source", "paywalled", "status")
+        keys = (
+            "id",
+            "name",
+            "domain",
+            "country",
+            "country_source",
+            "paywalled",
+            "status",
+            "rejected_reason",
+        )
         return [
             {**{k: s.get(k) for k in keys}, "last_report_at": last.get(s["id"])}
             for s in sorted(store.all_sources(db), key=lambda s: (s["status"] != "active", s["id"]))
         ]
+
+    @adm.post("/sources", status_code=202)
+    def add_source(body: NewSource) -> dict[str, Any]:
+        """Queue an outlet for the next discovery run, which checks robots.txt, finds its live
+        feeds and registers it. Nothing is fetched here."""
+        domain = urlsplit(body.url if "//" in body.url else f"https://{body.url}").netloc.lower()
+        if not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", domain):
+            raise HTTPException(422, "not a site address")
+        store.request_source(db, domain, body.beat_id)
+        return {"domain": domain, "queued": True}
 
     @adm.get("/beats")
     def admin_beats() -> list[dict[str, Any]]:
