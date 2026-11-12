@@ -21,7 +21,9 @@ for name in (os.environ["RAW_BUCKET"], os.environ["STATE_BUCKET"], os.environ["S
 
 bq = bigquery_client(PROJECT)
 bq.create_dataset("weft", exists_ok=True)
-for f in sorted(Path("infra/modules/bigquery/schemas").glob("*.json")):
+schemas = sorted(Path("infra/modules/bigquery/schemas").glob("*.json"))
+assert schemas, "no BigQuery schemas found; is infra/modules/bigquery/schemas mounted?"
+for f in schemas:
     schema = [bigquery.SchemaField.from_api_repr(c) for c in json.loads(f.read_text())]
     bq.create_table(bigquery.Table(f"{PROJECT}.weft.{f.stem}", schema=schema), exists_ok=True)
 
