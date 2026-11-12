@@ -6,7 +6,7 @@ REG=$R-docker.pkg.dev/$P/weft
 cd "$(dirname "$0")/.."
 build() { # name dockerfile context
   local cfg; cfg=$(mktemp --suffix=.yaml)
-  printf 'steps:\n- name: gcr.io/cloud-builders/docker\n  args: [build, -f, %s, -t, %s/%s:%s, .]\nimages: [%s/%s:%s]\n' \
+  printf 'steps:\n- name: gcr.io/cloud-builders/docker\n  env: [DOCKER_BUILDKIT=1]\n  args: [build, -f, %s, -t, %s/%s:%s, .]\nimages: [%s/%s:%s]\n' \
     "$2" "$REG" "$1" "$TAG" "$REG" "$1" "$TAG" > "$cfg"
   gcloud builds submit "$3" --config "$cfg" --project "$P" --region "$R"
   echo "$1_image = \"$REG/$1:$TAG\"" >> images.auto.tfvars

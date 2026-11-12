@@ -1,8 +1,11 @@
+# syntax=docker/dockerfile:1
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --group ml --no-install-project
+# Shared download cache: compose builds every image at once, and retries reuse what arrived.
+ENV UV_HTTP_TIMEOUT=300 UV_LINK_MODE=copy
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --group ml --no-install-project
 RUN uv pip install "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
 RUN uv run --no-sync python -c "from huggingface_hub import hf_hub_download as d; d('cis-lmu/glotlid','model.bin',local_dir='/models/glotlid')" \
  && uv run --no-sync python -c "from sentence_transformers import SentenceTransformer as S; S('BAAI/bge-m3')"
