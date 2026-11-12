@@ -38,9 +38,21 @@ x-deps: &deps
   neo4j: { condition: service_healthy }
   init: { condition: service_completed_successfully }
 
+# Ready = the FastAPI app answers (stream-worker loads its models before it does).
+x-ready: &ready
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/openapi.json')"]
+  interval: 10s
+  timeout: 5s
+  retries: 6
+  start_period: 15m  # first start downloads the Hugging Face models
+
 x-job: &job
   entrypoint: ["sh", "-c", "sleep $$DELAY; while true; do uv run --no-sync $$JOB || echo job failed; sleep $$EVERY; done"]
-  depends_on: { seed: { condition: service_completed_successfully } }
+  # Nothing is published until the push targets are up, so Pub/Sub never pushes into a dead port.
+  depends_on:
+    seed: { condition: service_completed_successfully }
+    fetcher: { condition: service_healthy }
+    stream-worker: { condition: service_healthy }
   restart: unless-stopped
 
 services:
@@ -88,11 +100,13 @@ services:
     restart: unless-stopped  # like Cloud Run: a crashed service comes back
     environment: *env
     depends_on: *deps
+    healthcheck: *ready
   stream-worker:
     build: { context: ., dockerfile: services/stream_worker/Dockerfile }
     restart: unless-stopped  # like Cloud Run: a crashed service comes back
     environment: *env
     depends_on: *deps
+    healthcheck: *ready
   web:
     build: ./web
     restart: unless-stopped  # like Cloud Run: a crashed service comes back
