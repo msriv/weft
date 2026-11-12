@@ -33,12 +33,50 @@ export function AnomalyCard({ a }: { a: Anomaly }) {
         {a.status === "provisional" ? " · provisional" : ""}
       </Kicker>
       <p style={{ color: "var(--anomaly-light)", margin: "6px 0" }}>{a.summary}</p>
+      <AnomalyDetail a={a} />
       <div className="muted" style={{ fontSize: 12 }}>
         Rule {a.rule} version {a.rule_version} · {a.evidence_ids.length} pieces of evidence ·{" "}
         <Link href={`/nodes/${a.id}`}>See the rule and evidence</Link>
       </div>
     </div>
   );
+}
+
+const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/** What the rule looked at, shown per rule: the claim, the two figures, or the changed lines. */
+export function AnomalyDetail({ a, max = 6 }: { a: Pick<Anomaly, "rule" | "detail">; max?: number }) {
+  const d = a.detail ?? {};
+  if ((a.rule === "omission" || a.rule === "unattributed") && str(d.label)) {
+    return <blockquote style={{ margin: "6px 0" }}>Claim group: {str(d.label)}</blockquote>;
+  }
+  if (a.rule === "numbers_differ" && Array.isArray(d.figures)) {
+    const figs = d.figures as { id: string; text: string; value: number }[];
+    return (
+      <div className="row" style={{ gap: 12, alignItems: "stretch", margin: "6px 0" }}>
+        {figs.map((f) => (
+          <blockquote key={f.id} style={{ flex: 1, margin: 0 }}><b>{f.value}</b> · {f.text}</blockquote>
+        ))}
+      </div>
+    );
+  }
+  if (a.rule === "silent_edit" && Array.isArray(d.diff)) {
+    const lines = (d.diff as string[]).slice(0, max);
+    return (
+      <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, margin: "6px 0" }}>
+        {lines.map((ln, i) => (
+          <div key={i} style={{ color: ln.startsWith("-") ? "var(--anomaly-light)" : undefined }}>
+            {ln.startsWith("-") ? "Removed: " : "Added: "}{ln.slice(1)}
+          </div>
+        ))}
+        {(d.diff as string[]).length > max && <div className="muted">and more changed lines</div>}
+      </pre>
+    );
+  }
+  if (a.rule === "loaded_wording" && str(d.term)) {
+    return <p className="muted" style={{ margin: "6px 0" }}>Word: “{str(d.term)}”</p>;
+  }
+  return null;
 }
 
 export function StoryRow({ s }: { s: StoryCard }) {

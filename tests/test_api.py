@@ -279,3 +279,29 @@ def test_globe_places_stories_where_they_happen() -> None:
     places = {p["country"] for p in w["places"] if p["story_id"] == "iran-israel-war"}
     assert places == {"IR", "IL"}  # where it happens, not where the outlets are
     assert sum(w["places"][0]["from"].values()) == w["places"][0]["reports"]
+
+
+def test_anomaly_evidence_is_named_by_outlet_and_headline() -> None:
+    from weft_core import readmodel
+
+    _, ctx = build()
+    r = graph.get(ctx.db, "reports", "1")
+    assert r is not None
+    graph.put(
+        ctx.db,
+        "figures",
+        {
+            "id": "f1",
+            "report_id": "1",
+            "event_id": r["event_id"],
+            "kind": "number",
+            "text": "12",
+            "start_char": 0,
+            "end_char": 2,
+        },
+    )
+    rep = readmodel._evidence(ctx.db, "1")
+    assert rep["id"] == "1" and r["title"] in rep["label"]
+    fig = readmodel._evidence(ctx.db, "f1")
+    assert fig["id"] == "1" and fig["quote"]  # links to the report, quotes the sentence
+    assert readmodel._evidence(ctx.db, "nope") == {"label": "Evidence", "id": "nope"}
