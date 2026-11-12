@@ -361,6 +361,7 @@ def register_source(
     rejected: bool = False,
     type: str = "news",
     crawl: dict[str, Any] | None = None,
+    languages: list[str] | None = None,
 ) -> None:
     """Insert a discovered source. Ownership and state_run stay null: nothing here cites them."""
     if db.execute(
@@ -381,6 +382,7 @@ def register_source(
         "verified_at": None if rejected else _now(),
         "type": type,
         "crawl": crawl or None,
+        **({"languages": languages} if languages else {}),
     }
     create(db, "Source", props)
 

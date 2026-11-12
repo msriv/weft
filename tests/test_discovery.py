@@ -21,10 +21,12 @@ def gkg(domain: str, n: int, text: str = "iran israel strike") -> str:
 
 
 RSS = (
-    '<rss version="2.0"><channel><item><title>t</title><link>https://good.example/a</link>'
+    '<rss version="2.0"><channel><item><title>The talks will resume in the capital on Monday'
+    "</title><link>https://good.example/a</link>"
     f"<pubDate>{format_datetime(NOW)}</pubDate></item></channel></rss>"
 )
 STALE = RSS.replace(format_datetime(NOW), "Mon, 01 Jan 2024 00:00:00 +0000")
+ARABIC = RSS.replace("<channel>", "<channel><language>ar</language>")
 
 
 def handler(req: httpx.Request) -> httpx.Response:
@@ -38,6 +40,12 @@ def handler(req: httpx.Request) -> httpx.Response:
                 text='<title>Good News</title><link rel="alternate" type="application/rss+xml" href="/f.xml">',
             )
         return httpx.Response(200, content=RSS) if path == "/f.xml" else httpx.Response(404)
+    if host == "arabic.example":
+        return (
+            httpx.Response(200, text="<title>Arabic</title>")
+            if path == "/"
+            else (httpx.Response(200, content=ARABIC) if path == "/feed" else httpx.Response(404))
+        )
     if host == "stale.example":
         return (
             httpx.Response(200, text="<title>Stale</title>")
@@ -66,6 +74,13 @@ def test_registers_only_verified_live_feeds_with_unverified_ownership() -> None:
     # stale feed is remembered as rejected, so it is not probed again
     assert {"good.example", "stale.example"} <= store.known_domains(db)
     assert "thin.example" not in store.known_domains(db)
+
+
+def test_non_english_feed_is_remembered_but_not_activated() -> None:
+    db, http = setup()
+    assert discovery.discover(db, http, gkg("arabic.example", 3), NOW) == {}
+    assert store.active_sources(db) == []
+    assert "arabic.example" in store.known_domains(db)  # not probed again
 
 
 def test_non_matching_articles_ignored() -> None:
