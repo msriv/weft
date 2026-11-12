@@ -124,3 +124,39 @@ def test_live_sources_see_late_registration() -> None:
         via="t",
     )
     assert live["a-example"]["feeds"] == ["https://a.example/f"]
+
+
+def test_latest_gkg_reads_several_slots_and_skips_missing() -> None:
+    import io
+    import zipfile
+
+    import httpx
+
+    from weft_core.discovery import GDELT_LAST, latest_gkg
+
+    def zipped(text: str) -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("x.csv", text)
+        return buf.getvalue()
+
+    base = "http://data.gdeltproject.org/gdeltv2/"
+    served = {
+        "20261112120000": "a",  # 12:15 is listed but not served yet
+        "20261112114500": "b",
+        "20261112113000": "c",
+    }
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if str(req.url) == GDELT_LAST:
+            return httpx.Response(200, text=f"1 x {base}20261112121500.gkg.csv.zip\n")
+        stamp = str(req.url).removeprefix(base)[:14]
+        return (
+            httpx.Response(200, content=zipped(served[stamp]))
+            if stamp in served
+            else (httpx.Response(404))
+        )
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    assert latest_gkg(http, 2).split("\n") == ["a", "b"]
+    assert latest_gkg(http) == "a"

@@ -137,18 +137,26 @@ def discover(
     return found
 
 
-def latest_gkg(http: httpx.Client) -> str:
-    """Download the newest published GKG file (GDELT 2.0, every 15 min)."""
+def latest_gkg(http: httpx.Client, files: int = 1) -> str:
+    """The newest `files` published GKG files (GDELT 2.0, one per 15 min), joined.
+    One file is a thin sample; a domain rarely has MIN_URLS beat articles in 15 minutes."""
     index = http.get(GDELT_LAST)
     index.raise_for_status()
     url = next(line.split()[2] for line in index.text.splitlines() if "gkg.csv.zip" in line)
-    # the newest file is sometimes listed before it is served; fall back one slot (15 min)
-    for u in (url, _previous(url)):
-        r = http.get(u)
+    texts: list[str] = []
+    # the newest file is sometimes listed before it is served, and GDELT skips a slot now and
+    # then: walk back one slot per file plus one spare
+    for _ in range(files + 1):
+        r = http.get(url)
         if r.status_code == 200:
             with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-                return z.read(z.namelist()[0]).decode("utf-8", "replace")
-    raise RuntimeError(f"GDELT GKG not available: {url}")
+                texts.append(z.read(z.namelist()[0]).decode("utf-8", "replace"))
+            if len(texts) == files:
+                break
+        url = _previous(url)
+    if not texts:
+        raise RuntimeError(f"GDELT GKG not available: {url}")
+    return "\n".join(texts)
 
 
 def _previous(url: str) -> str:

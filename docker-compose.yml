@@ -107,7 +107,7 @@ services:
   # itself through the real pipeline; nothing is hand-seeded.
   seed:
     build: { context: ., dockerfile: services/discovery/Dockerfile }
-    environment: *env
+    environment: { <<: *env, GKG_FILES: "96" }  # the last 24 hours of GDELT
     depends_on: *deps
     restart: "no"
   discovery:
