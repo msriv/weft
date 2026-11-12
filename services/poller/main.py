@@ -58,8 +58,12 @@ def main() -> int:
     publisher = pubsub_v1.PublisherClient()
     topic = publisher.topic_path(project, "items-new")
 
+    published = 0
+
     def publish(msg: dict[str, object]) -> None:
+        nonlocal published
         publisher.publish(topic, json.dumps(msg).encode()).result()
+        published += 1
 
     db = store.from_env()
     with httpx.Client(timeout=30, follow_redirects=True) as http:
@@ -69,6 +73,8 @@ def main() -> int:
     for sid, err in results.items():
         if err:
             print(f"poll failed: {sid}: {err}", file=sys.stderr)
+    failed = sum(1 for e in results.values() if e)
+    print(f"polled {len(results)} sources, {failed} failed, {published} new items", flush=True)
     # the rules engine reads this flag to suppress silence anomalies for unhealthy feeds
     store.set_health(db, record_and_report(project, results))
     return 0
