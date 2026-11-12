@@ -91,3 +91,15 @@ Short record of what was decided and why. Add an entry before changing any of th
 **How:** One Cypher client in `weft_core/store.py`; every node type and its properties are declared in `store.NODES`. `valid_from`/`valid_to` versioning is unchanged: each version is its own node. Local and CI run Neo4j 5 Community; production runs Neo4j AuraDB (credentials in Secret Manager: `weft-neo4j-uri`, `weft-neo4j-password`).
 **Shortcut:** nodes join on id properties (indexed) and vectors are still searched in Python; relationships and the Neo4j vector index come when graph size makes that slow. Callers go through `weft_core.graph` and `weft_core.store`, so only those change.
 
+## D20. Detective mode: labelled speculation, private, scored against later reports
+**Decided (Mihir, 2026-11-12):** An experiment, allowed while Weft is not public. A model reads a story's claim groups each night and writes up to 3 predictions (what later reports will say happens, by a date within 90 days, what would confirm or refute it). Each night it also checks open predictions against claim groups published after they were made: supported, contradicted, or expired when the date passes with nothing reported. The panel shows the hit rate.
+**This is a deliberate, scoped exception to rule 1** (Weft never claims what is true) and to rule 3's list of what models may do. The exception holds only under these conditions:
+- Predictions are `Prediction` nodes, never anomalies, and never feed rules, weights, summaries or the digest.
+- They are served only when `DETECTIVE=on` (on in docker compose, never set in Terraform), and only for stories already switched public.
+- The UI labels every prediction as speculation not backed by data.
+- Every prediction and every verdict cites claim groups. Uncited ones are dropped, and verdicts may cite only later claim groups.
+- The prompts tell the model to predict events, never anyone's guilt.
+- Calls go through the logged `ModelClient` (prompts `detective@1`, `detective-check@1`) inside each beat's token budget.
+**Before any public launch:** decide to drop it or keep it off. Turning it on publicly needs a new decision entry and the legal review.
+**Eval:** the two prompts are in the baseline prompt list with no scored eval. The hit rate on the panel is the measurement.
+

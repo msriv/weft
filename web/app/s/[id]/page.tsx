@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AnomalyCard, Empty, Kicker } from "@/components/bits";
+import DetectivePanel from "@/components/DetectivePanel";
 import FollowButton from "@/components/FollowButton";
 import LiveFeed from "@/components/LiveFeed";
 import StoryGraph from "@/components/StoryGraph";
@@ -31,6 +32,8 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
         <FollowButton beat={g.story.beat} />
       </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 24, alignItems: "start" }}>
+      <div>
       <div className="grid g2">
         <div className="card">
           <Kicker>Reported by all perspectives</Kicker>
@@ -80,6 +83,9 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
       <Kicker anomaly>Anomalies</Kicker>
       {g.anomalies.length ? g.anomalies.map((a) => <AnomalyCard key={a.id} a={a} />) : <Empty>No anomalies. Every flag comes from a written rule you can read on <Link href="/method">How we weigh</Link>.</Empty>}
       <p className="muted" style={{ fontSize: 13 }}>Weight changes the order sources appear in. No report is hidden.</p>
+      </div>
+      <DetectivePanel storyId={id} />
+      </div>
     </>
   );
 }

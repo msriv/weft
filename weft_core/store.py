@@ -201,6 +201,19 @@ NODES: dict[str, dict[str, Any]] = {
         "last_sent": None,
     },
     "DailyDiff": {"day": None, "payload": None},
+    "Prediction": {
+        "id": None,
+        "story_id": None,
+        "text": None,
+        "expected_by": None,
+        "confirm_if": None,
+        "refute_if": None,
+        "based_on": "[]",
+        "made_at": None,
+        "status": "open",
+        "evidence": "[]",
+        "checked_at": None,
+    },
     "BatchRun": {
         "run_id": None,
         "stage": None,
@@ -225,6 +238,7 @@ UNIQUE = {
     "DailyDiff": "day",
     "EntityLink": "name",
     "ReaderReport": "id",
+    "Prediction": "id",
 }
 INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
 

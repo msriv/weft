@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pipeline import (
     anomalies,
     claims,
+    detective,
     figures,
     groups,
     notify,
@@ -33,6 +34,7 @@ STAGES: dict[str, Callable[[Ctx], int]] = {
     "statements": statements.run,
     "anomalies": anomalies.run,
     "weights": weights.run,
+    "detective": detective.run,
     "snapshot": lambda ctx: snapshot.run(ctx, _sink()),
     "review_sample": review_sample.run,
     "notify": notify.run,

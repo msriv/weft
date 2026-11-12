@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from weft_core import accounts, digest, graph, readmodel, review, store
+from weft_core import accounts, detective, digest, graph, readmodel, review, store
 
 STREAM_POLL_SECONDS = 5
 
@@ -124,6 +124,14 @@ def create_app(
         # `at=YYYY-MM-DD` replays the story as it was at the end of that day
         when = f"{at[:10]}T23:59:59+00:00" if at else None
         return found(readmodel.story_graph(db, story_id, when))
+
+    @v1.get("/stories/{story_id}/detective")
+    def story_detective(story_id: str) -> dict[str, Any]:
+        # D20: experimental speculation, served only when switched on and only for shown stories
+        if not detective.enabled():
+            raise HTTPException(404, "not found")
+        found(readmodel.public_story(db, story_id))
+        return detective.scorecard(db, story_id)
 
     @v1.get("/events/{event_id}")
     def event(event_id: str) -> Any:
