@@ -36,6 +36,7 @@ NODES: dict[str, dict[str, Any]] = {
         "domain": None,
         "country": None,
         "country_source": None,
+        "rejected_reason": None,
         "languages": '["en"]',
         "type": "news",
         "state_run": None,
@@ -372,9 +373,63 @@ def beats(db: Db) -> list[dict[str, Any]]:
     ]
 
 
-def known_domains(db: Db) -> set[str]:
-    """Domains already decided on, including rejected ones, so they are not re-probed forever."""
-    return {r["domain"] for r in db.execute("MATCH (n:Source) RETURN n.domain AS domain")}
+def known_domains(db: Db, retry_before: str | None = None) -> set[str]:
+    """Domains already decided on, so they are not re-probed every run. With `retry_before`,
+    domains rejected before that time are left out, so discovery tries them again."""
+    rows = db.execute(
+        "MATCH (n:Source) RETURN n.domain AS domain, n.status AS status, n.discovered_at AS at"
+    )
+    return {
+        r["domain"]
+        for r in rows
+        if not (retry_before and r["status"] == "rejected" and (r["at"] or "") < retry_before)
+    }
+
+
+def add_candidate_hits(db: Db, domain: str, beat_id: str, n: int, now: str) -> None:
+    """Add beat-matching article URLs seen for an unknown domain. Counts add up across runs."""
+    db.execute(
+        "MERGE (n:DomainCandidate {domain: ?, beat_id: ?}) ON CREATE SET n.hits=0, n.first_seen=? "
+        "SET n.hits=n.hits+?, n.last_seen=?",
+        (domain, beat_id, now, n, now),
+    )
+
+
+def candidates(db: Db, beat_id: str, min_hits: int, limit: int) -> list[str]:
+    return [
+        r["domain"]
+        for r in db.execute(
+            "MATCH (n:DomainCandidate {beat_id: ?}) WHERE n.hits >= ? "
+            "RETURN n.domain AS domain ORDER BY n.hits DESC LIMIT ?",
+            (beat_id, min_hits, limit),
+        )
+    ]
+
+
+def prune_candidates(db: Db, before: str) -> None:
+    db.execute(
+        "MATCH (n:DomainCandidate) WHERE n.last_seen < ? AND n.requested IS NULL DETACH DELETE n",
+        (before,),
+    )
+
+
+def clear_candidate(db: Db, domain: str) -> None:
+    db.execute("MATCH (n:DomainCandidate {domain: ?}) DETACH DELETE n", (domain,))
+
+
+def request_source(db: Db, domain: str, beat_id: str | None) -> None:
+    """Admin asks discovery to probe a domain on its next run, whatever its hit count."""
+    db.execute(
+        "MERGE (n:DomainCandidate {domain: ?, beat_id: ?}) SET n.requested=1, n.hits=0",
+        (domain, beat_id or ""),
+    )
+
+
+def requested_sources(db: Db) -> list[dict[str, Any]]:
+    return db.execute(
+        "MATCH (n:DomainCandidate) WHERE n.requested=1 "
+        "RETURN n.domain AS domain, n.beat_id AS beat_id"
+    )
 
 
 def register_source(
@@ -386,15 +441,18 @@ def register_source(
     feeds: list[str],
     via: str,
     rejected: bool = False,
+    rejected_reason: str | None = None,
     type: str = "news",
     crawl: dict[str, Any] | None = None,
     languages: list[str] | None = None,
 ) -> None:
-    """Insert a discovered source. Ownership and state_run stay null: nothing here cites them."""
-    if db.execute(
-        "MATCH (n:Source) WHERE n.domain=? OR n.id=? RETURN 1 AS x LIMIT 1",
+    """Insert a discovered source, or re-probe result for a rejected one. Ownership and
+    state_run stay null: nothing here cites them. An active source is never touched."""
+    existing = db.execute(
+        "MATCH (n:Source) WHERE n.domain=? OR n.id=? RETURN n.status AS status LIMIT 1",
         (domain, domain.replace(".", "-")),
-    ):
+    )
+    if existing and existing[0]["status"] != "rejected":
         return
     props = {
         **{k: v for k, v in NODES["Source"].items() if v is not None},
@@ -404,6 +462,7 @@ def register_source(
         "domain": domain,
         "feeds": feeds,
         "status": "rejected" if rejected else "active",
+        "rejected_reason": rejected_reason if rejected else None,
         "discovered_via": via,
         "discovered_at": _now(),
         "verified_at": None if rejected else _now(),
@@ -411,7 +470,10 @@ def register_source(
         "crawl": crawl or None,
         **({"languages": languages} if languages else {}),
     }
-    create(db, "Source", props)
+    if existing:  # keeps fields the admin set, such as country
+        db.execute("MATCH (n:Source) WHERE n.domain=? SET n += ?", (domain, _clean(props)))
+    else:
+        create(db, "Source", props)
 
 
 def set_health(db: Db, unhealthy_ids: list[str]) -> None:

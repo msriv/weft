@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from weft_core import beats as beats_mod
-from weft_core import graph, store
+from weft_core import graph, portals, store
 from weft_core.models import ModelClient
 from weft_core.nlp import Nlp
 from weft_core.perspectives import perspective_of
@@ -216,6 +216,8 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
         d.db.execute(
             "MERGE (c:Copy {report_id: ?, copy_of: ?}) ON CREATE SET c.jaccard=?", (rid, other, j)
         )
+    if story_id and msg.get("gov_domains"):  # only on-beat reports suggest portals worth crawling
+        portals.record_candidates(d.db, set(msg["gov_domains"]), msg["url"])
     d.publish({"report_id": rid, "event_id": event_id, "story_id": story_id, "status": status})
     return status
 

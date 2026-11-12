@@ -5,7 +5,7 @@ import { Kicker } from "@/components/bits";
 type Story = { id: string; beat_id: string; title: string; public: boolean };
 type Item = { id: string; kind: string; payload: Record<string, unknown> };
 type Problem = { id: number; kind: string; ref_id: string | null; message: string };
-type Src = { id: string; name: string; domain: string; country: string | null; country_source: string | null; paywalled: number; status: string; last_report_at: string | null };
+type Src = { id: string; name: string; domain: string; country: string | null; country_source: string | null; paywalled: number; status: string; rejected_reason: string | null; last_report_at: string | null };
 type Beat = { id: string; name: string; patterns: string[]; exclude: string[]; edited: number | null };
 type Unplaced = { id: string; title: string | null; url: string | null; source_id: string; fetched_at: string };
 type Run = { run_id: string; stage: string; started_at: string; ended_at: string | null; rows_out: number | null; status: string; error: string | null };
@@ -74,6 +74,10 @@ export default function Admin() {
         </div>
       ))}
       <hr /><Kicker>Sources. Country decides the perspective a report counts for; changing it re-tags that source's reports.</Kicker>
+      <form className="row" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; void act("/sources", { url: new FormData(f).get("url") }).then(() => f.reset()); }}>
+        <label htmlFor="add-src" className="muted">Add an outlet (checked and registered on the next discovery run, within the hour)</label>
+        <input id="add-src" name="url" placeholder="https://example.com" required /> <button>Add</button>
+      </form>
       {sources.map((s) => (
         <div className="row" key={s.id}>
           <b>{s.name}</b><span className="muted">{s.domain}</span>
@@ -82,6 +86,7 @@ export default function Admin() {
           {s.country_source && <span className="muted">from {s.country_source}</span>}
           <label><input type="checkbox" checked={!!s.paywalled} onChange={(e) => act(`/sources/${s.id}`, { paywalled: e.target.checked }, "PATCH")} /> paywalled</label>
           <label><input type="checkbox" checked={s.status === "active"} onChange={(e) => act(`/sources/${s.id}`, { status: e.target.checked ? "active" : "rejected" }, "PATCH")} /> active</label>
+          {s.status === "rejected" && s.rejected_reason && <span className="muted">rejected: {s.rejected_reason}</span>}
           <span className="muted">{s.last_report_at ? `last report ${new Date(s.last_report_at).toLocaleString()}` : "no reports yet"}</span>
         </div>
       ))}

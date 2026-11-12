@@ -223,3 +223,15 @@ def test_seed_never_overwrites_an_admin_edited_beat() -> None:
     discovery.seed_beats(db)
     [b] = [b for b in store.beats(db) if b["id"] == "iran-israel-war"]
     assert b["patterns"] == ["mine"]
+
+
+def test_only_on_beat_reports_suggest_portals() -> None:
+    db, d, _ = setup()
+    off = msg("o", "c-com", "Local bakery wins award", "Bread.", "2026-11-06T01:00:00+00:00")
+    on = msg(
+        "p", "c-com", "Israel and Iran trade strikes", "Missiles.", "2026-11-06T01:00:00+00:00"
+    )
+    process({**off, "gov_domains": ["bakery.gov.xx"]}, d)
+    process({**on, "gov_domains": ["mfa.gov.il"]}, d)
+    got = {r["domain"] for r in db.execute("MATCH (n:PortalCandidate) RETURN n.domain AS domain")}
+    assert got == {"mfa.gov.il"}

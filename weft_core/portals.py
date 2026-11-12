@@ -26,7 +26,7 @@ SECTIONS = re.compile(
     re.IGNORECASE,
 )
 PROBE_INTERVAL = 10.0
-MIN_HITS = 2
+MIN_HITS = 3  # links from this many on-beat reports (stream worker) before probing
 
 
 def is_gov(domain: str) -> bool:

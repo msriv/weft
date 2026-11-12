@@ -253,3 +253,11 @@ def test_admin_edits_beat_terms_and_sees_unplaced() -> None:
     assert b["exclude"] == [r"\boil\b"] and b["edited"] == 1
     graph.put(ctx.db, "reports", {"id": "u1", "title": "Bakery", "fetched_at": "2026-11-07"})
     assert "u1" in [r["id"] for r in c.get("/admin/unplaced", headers=H).json()]
+
+
+def test_admin_queues_a_source_for_discovery() -> None:
+    c, ctx = build()
+    assert c.post("/admin/sources", json={"url": "not a url"}, headers=H).status_code == 422
+    ok = c.post("/admin/sources", json={"url": "https://www.Example.org/news"}, headers=H)
+    assert ok.status_code == 202 and ok.json()["domain"] == "www.example.org"
+    assert store.requested_sources(ctx.db) == [{"domain": "www.example.org", "beat_id": ""}]

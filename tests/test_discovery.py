@@ -198,3 +198,51 @@ def test_outlet_table_fills_country_and_retags_reports() -> None:
     assert outlets.fill_countries(db) == 1
     assert graph.get(db, "reports", "r1")["perspective"] == "IN"  # type: ignore[index]
     assert outlets.fill_countries(db) == 0  # already set: never overwritten
+
+
+def test_hits_add_up_across_runs() -> None:
+    db, http = setup()
+    assert discovery.discover(db, http, gkg("good.example", 2), NOW) == {}  # 2 < MIN_URLS
+    assert discovery.discover(db, http, gkg("good.example", 1), NOW) == {
+        "good.example": ["https://good.example/f.xml"]
+    }
+
+
+def test_rejected_domain_is_retried_after_a_while() -> None:
+    from datetime import timedelta
+
+    db, http = setup()
+    discovery.discover(db, http, gkg("stale.example", 3), NOW)
+    [row] = db.execute("MATCH (n:Source {domain: 'stale.example'}) RETURN n.rejected_reason AS r")
+    assert row["r"] == "no live feed found"
+    later = NOW + discovery.RETRY_AFTER + timedelta(days=1)
+    db.execute(
+        "MATCH (n:Source {domain: 'stale.example'}) SET n.discovered_at=?", (NOW.isoformat(),)
+    )
+    assert "stale.example" not in store.known_domains(
+        db, (later - discovery.RETRY_AFTER).isoformat()
+    )
+
+
+def test_admin_requested_source_is_probed_without_hits() -> None:
+    db, http = setup()
+    store.request_source(db, "good.example", None)
+    assert discovery.discover(db, http, "", NOW) == {"good.example": ["https://good.example/f.xml"]}
+    assert store.requested_sources(db) == []
+
+
+def test_site_name_and_headline_language() -> None:
+    assert discovery.site_name('<meta property="og:site_name" content="The Paper">') == "The Paper"
+    assert discovery.site_name("<title>World news | The Paper</title>") == "The Paper"
+    rss = "".join(
+        f"<item><title>{t}</title></item>"
+        for t in [
+            "Israel strikes Iran air defences",
+            "Senate race tightens in Ohio",
+            "Markets rally on rate cut hopes",
+            "Kyiv says drones downed overnight",
+            "Election body faces scrutiny in the capital",
+        ]
+    )
+    resp = httpx.Response(200, content=f"<rss><channel>{rss}</channel></rss>")
+    assert discovery.feed_language(resp) == "en"
