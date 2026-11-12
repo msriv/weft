@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 
-from google.api_core.exceptions import AlreadyExists, Conflict
+from google.api_core.exceptions import AlreadyExists, Conflict, NotFound
 from google.cloud import bigquery, pubsub_v1, storage  # type: ignore[attr-defined]
 
 from weft_core.gcp import bigquery_client
@@ -20,12 +20,20 @@ for name in (os.environ["RAW_BUCKET"], os.environ["STATE_BUCKET"], os.environ["S
         pass
 
 bq = bigquery_client(PROJECT)
-bq.create_dataset("weft", exists_ok=True)
+# The emulator answers "already exists" with a 500, not 409, so exists_ok can't catch it.
+try:
+    bq.get_dataset("weft")
+except NotFound:
+    bq.create_dataset("weft")
 schemas = sorted(Path("infra/modules/bigquery/schemas").glob("*.json"))
 assert schemas, "no BigQuery schemas found; is infra/modules/bigquery/schemas mounted?"
 for f in schemas:
     schema = [bigquery.SchemaField.from_api_repr(c) for c in json.loads(f.read_text())]
-    bq.create_table(bigquery.Table(f"{PROJECT}.weft.{f.stem}", schema=schema), exists_ok=True)
+    table = f"{PROJECT}.weft.{f.stem}"
+    try:
+        bq.get_table(table)
+    except NotFound:
+        bq.create_table(bigquery.Table(table, schema=schema))
 
 pub, sub = pubsub_v1.PublisherClient(), pubsub_v1.SubscriberClient()
 topics = {
