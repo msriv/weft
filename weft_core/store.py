@@ -256,7 +256,10 @@ class Neo4jDb:
     def __init__(self, uri: str, user: str, password: str, database: str | None = None) -> None:
         from neo4j import GraphDatabase
 
-        self._driver = GraphDatabase.driver(uri, auth=(user, password))
+        # Notifications off: "property does not exist" warnings on empty labels are just noise.
+        self._driver = GraphDatabase.driver(
+            uri, auth=(user, password), notifications_min_severity="OFF"
+        )
         self._database = database
 
     def execute(self, query: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
@@ -291,13 +294,24 @@ def _clean(props: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _schema(db: Db, query: str) -> None:
+    from neo4j.exceptions import ClientError
+
+    try:
+        db.execute(query)
+    except ClientError as e:
+        # Services start together and race on IF NOT EXISTS; losing the race is fine.
+        if "AlreadyExists" not in (e.code or ""):
+            raise
+
+
 def init(db: Db) -> None:
     for label, key in UNIQUE.items():
-        db.execute(f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{key} IS UNIQUE")
+        _schema(db, f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{key} IS UNIQUE")
     for label, props in NODES.items():
         for p in INDEXED:
             if p in props and UNIQUE.get(label) != p:
-                db.execute(f"CREATE INDEX IF NOT EXISTS FOR (n:{label}) ON (n.{p})")
+                _schema(db, f"CREATE INDEX IF NOT EXISTS FOR (n:{label}) ON (n.{p})")
 
 
 def _now() -> str:
