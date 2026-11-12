@@ -1,5 +1,6 @@
-"""Detective mode: predictions must cite claim groups, are checked only against later reports,
-expire when due, and are served only when switched on."""
+"""Detective mode: predictions must cite claim groups and carry a probability, are resolved by a
+fixed rule over later reports (never by a model), expire when due, are scored by Brier, and are
+served only when switched on."""
 
 import json
 
@@ -31,14 +32,49 @@ def put_group(db: store.Neo4jDb, gid: str, label: str, at: str) -> None:
     )
 
 
-def pred(text: str, due: str, based_on: list[int]) -> dict[str, object]:
+def pred(
+    text: str, due: str, based_on: list[int], p: float = 0.7, confirm: str = "c", refute: str = "r"
+) -> dict[str, object]:
     return {
         "text": text,
+        "probability": p,
         "expected_by": due,
-        "confirm_if": "c",
-        "refute_if": "r",
+        "confirm_if": confirm,
+        "refute_if": refute,
         "based_on": based_on,
     }
+
+
+def later_reports(db: store.Neo4jDb, gid: str, when: str, sources: list[tuple[str, str]]) -> None:
+    for i, (src, persp) in enumerate(sources):
+        rid = f"{gid}-r{i}"
+        graph.put(
+            db,
+            "reports",
+            {
+                "id": rid,
+                "source_id": src,
+                "perspective": persp,
+                "story_id": "st",
+                "event_id": "e",
+                "published_at": when,
+            },
+            when,
+        )
+        graph.put(
+            db,
+            "claims",
+            {
+                "id": f"{rid}-c",
+                "report_id": rid,
+                "event_id": "e",
+                "group_id": gid,
+                "text": "x",
+                "start_char": 0,
+                "end_char": 1,
+            },
+            when,
+        )
 
 
 def test_predictions_need_citations_and_a_bounded_date() -> None:
@@ -58,18 +94,22 @@ def test_predictions_need_citations_and_a_bounded_date() -> None:
     assert detective.predict(db, m, "st", T0) == 1
     (p,) = detective.predictions(db, "st")
     assert p["text"] == "Talks happen" and p["based_on"] == ["g1"] and p["status"] == "open"
-    assert log[0].prompt_template == "detective@1"
+    assert p["probability"] == 0.7
+    assert log[0].prompt_template == "detective@2"
 
 
-def test_check_uses_only_later_evidence_and_expires_due_predictions() -> None:
+def test_rule_resolves_with_later_multi_outlet_evidence_and_expires_due_ones() -> None:
+    from weft_core.nlp import LexicalNli
+
     db = db_with_story()
     m, _ = model(
         [
             json.dumps(
                 {
                     "predictions": [
-                        pred("Talks happen", "2026-11-20", [1]),
-                        pred("Ceasefire", "2026-11-08", [1]),
+                        pred("Talks happen", "2026-11-20", [1], 0.8, "talks took place monday"),
+                        pred("Ceasefire", "2026-11-08", [1], 0.6, "ceasefire agreed"),
+                        pred("Lone outlet", "2026-11-20", [1], 0.3, "port reopened today"),
                     ]
                 }
             )
@@ -77,21 +117,33 @@ def test_check_uses_only_later_evidence_and_expires_due_predictions() -> None:
     )
     detective.predict(db, m, "st", T0)
     put_group(db, "g2", "Talks took place on Monday", T1)
-    ps = {p["text"]: i + 1 for i, p in enumerate(detective.predictions(db, "st"))}
-    verdict = {
-        "results": [
-            {"prediction": ps["Talks happen"], "verdict": "supported", "evidence": [1, 2]},
-            {"prediction": ps["Ceasefire"], "verdict": "contradicted", "evidence": []},
-        ]
-    }
-    m2, _ = model([json.dumps(verdict)])
-    assert detective.check(db, m2, "st", T2) == 2
+    later_reports(db, "g2", T1, [("a", "IL"), ("b", "IR")])  # two outlets, two perspectives
+    put_group(db, "g3", "Port reopened today", T1)
+    later_reports(db, "g3", T1, [("a", "IL")])  # one outlet: not enough
+    assert detective.check(db, LexicalNli(), "st", T2) == 2
     by = {p["text"]: p for p in detective.predictions(db, "st")}
-    # groups are listed newest first, so 1 is g2 (later) and 2 is g1 (earlier, not evidence)
     assert by["Talks happen"]["status"] == "supported" and by["Talks happen"]["evidence"] == ["g2"]
-    assert by["Ceasefire"]["status"] == "expired"  # verdict without evidence dropped; now past due
+    assert by["Ceasefire"]["status"] == "expired"  # nothing matched and now past due
+    assert by["Lone outlet"]["status"] == "open"
     card = detective.scorecard(db, "st")
-    assert card["hit_rate"] == 1.0 and "Speculation" in card["disclaimer"]
+    # Brier: supported at 0.8 -> 0.04; expired at 0.6 -> 0.36
+    assert card["resolved"] == 2 and abs(card["brier"] - 0.2) < 1e-9 and card["brier_coin"] == 0.25
+    assert "Speculation" in card["disclaimer"] and card["calibration"]
+
+
+def test_at_most_five_open_predictions_per_story() -> None:
+    db = db_with_story()
+    five = [pred(f"P{i}", "2026-11-20", [1]) for i in range(3)]
+    m, _ = model(
+        [
+            json.dumps({"predictions": five}),
+            json.dumps(
+                {"predictions": five[:1] + [pred(f"Q{i}", "2026-11-20", [1]) for i in range(3)]}
+            ),
+        ]
+    )
+    assert detective.predict(db, m, "st", T0) == 3
+    assert detective.predict(db, m, "st", T1) == 2  # room for two more only
 
 
 def test_api_serves_detective_only_when_on_and_story_public(
