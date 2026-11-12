@@ -27,6 +27,8 @@ Web: http://localhost:3000. Create a reader account on `/welcome` to try sign-in
 
 Seeding is part of startup, through the real pipeline and no hand-seeded sources. `seed` runs the first discovery (reads GDELT, registers real feeds and portals per beat). Then the same jobs production runs, on production's cadence, loop in their own containers: `poller` every 10 min, `discovery` hourly, `crawler` daily, `pipeline` (nightly stages) daily, first run 30 min after start. `fetcher` and `stream-worker` process what the poller publishes.
 
+Detective mode (D20) shows a side panel of clearly labelled speculation on each story page, made during the nightly run and checked against later reports; set `DETECTIVE=off` in `.env` to hide it.
+
 Stories start private. Flip one public with the admin toggle (`Authorization: Bearer $ADMIN_TOKEN` against the API) to see it on the site.
 
 Run a job now: `docker compose run --rm --no-deps --entrypoint "uv run --no-sync python -m pipeline.run" pipeline --stage anomalies`. Reset everything: `docker compose down -v`.

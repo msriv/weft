@@ -28,6 +28,7 @@ x-env: &env
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   MAIL_FROM: ${MAIL_FROM:-}
   SITE_URL: http://localhost:3000
+  DETECTIVE: ${DETECTIVE:-on}  # D20 speculation panel; never set in production Terraform
   FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
   FIRESTORE_EMULATOR_HOST: firebase:8080
 
