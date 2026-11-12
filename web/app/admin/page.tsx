@@ -5,12 +5,14 @@ import { Kicker } from "@/components/bits";
 type Story = { id: string; beat_id: string; title: string; public: boolean };
 type Item = { id: string; kind: string; payload: Record<string, unknown> };
 type Problem = { id: number; kind: string; ref_id: string | null; message: string };
+type Run = { run_id: string; stage: string; started_at: string; ended_at: string | null; rows_out: number | null; status: string; error: string | null };
 
 export default function Admin() {
   const [token, setToken] = useState("");
   const [stories, setStories] = useState<Story[]>([]);
   const [review, setReview] = useState<{ open: Item[] } | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
   const [err, setErr] = useState("");
   const call = useCallback(async (path: string, init: RequestInit = {}) => {
     const r = await fetch(`/api/admin${path}`, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
@@ -20,11 +22,19 @@ export default function Admin() {
   const load = useCallback(async () => {
     try {
       setErr("");
-      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports"));
+      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs"));
     } catch { setErr("Could not load. Check the token."); }
   }, [call]);
   useEffect(() => { setToken(sessionStorage.getItem("weft:admin") ?? ""); }, []);
   useEffect(() => { if (token) void load(); }, [token, load]);
+  // Refresh pipeline runs while a stage is running, so progress shows without reloading.
+  const live = runs.some((r) => r.status === "running");
+  useEffect(() => {
+    if (!token || !live) return;
+    const t = setInterval(() => { call("/runs").then(setRuns).catch(() => {}); }, 10000);
+    return () => clearInterval(t);
+  }, [token, live, call]);
+  const byRun = [...new Set(runs.map((r) => r.run_id))].slice(0, 5).map((id) => runs.filter((r) => r.run_id === id).reverse());
   const act = (p: string, body: unknown, method = "POST") => call(p, { method, body: JSON.stringify(body) }).then(load).catch(() => setErr("Action failed."));
   return (
     <>
@@ -34,6 +44,22 @@ export default function Admin() {
         <label className="kicker" htmlFor="t">Admin token</label> <input id="t" name="t" type="password" /> <button>Use</button>
       </form>
       {err && <p role="alert">{err}</p>}
+      <hr /><Kicker>Pipeline runs (nightly batch, last 5){live ? " · running, refreshing every 10s" : ""}</Kicker>
+      {byRun.map((stages) => (
+        <div className="card" key={stages[0].run_id}>
+          <Kicker>Run {stages[0].run_id} · started {new Date(stages[0].started_at).toLocaleString()}</Kicker>
+          {stages.map((r) => (
+            <div className="row" key={r.stage}>
+              <b>{r.stage}</b>
+              <span className={r.status === "ok" ? "muted" : undefined}>{r.status}</span>
+              {r.rows_out != null && <span className="muted">{r.rows_out} rows</span>}
+              {r.ended_at && <span className="muted">{Math.round((Date.parse(r.ended_at) - Date.parse(r.started_at)) / 1000)}s</span>}
+              {r.error && <code>{r.error}</code>}
+            </div>
+          ))}
+        </div>
+      ))}
+      {token && runs.length === 0 && <p className="muted">No pipeline runs yet. The first starts about 30 minutes after startup, then daily.</p>}
       <hr /><Kicker>Stories. Public stories appear on the site; the rest return 404.</Kicker>
       {stories.map((s) => (
         <div className="row" key={s.id}>

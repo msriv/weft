@@ -212,3 +212,14 @@ def test_digest_only_for_followed_stories_never_provisional_and_unsubscribes() -
     ]
     assert c.get(f"/v1/unsubscribe?token={token}").json() == {"unsubscribed": True}
     assert c.get(f"/v1/unsubscribe?token={token}").status_code == 404
+
+
+def test_admin_sees_pipeline_runs() -> None:
+    from pipeline.run import run_stages
+
+    c, ctx = build()
+    run_stages(ctx, only="figures")
+    assert c.get("/admin/runs").status_code == 401
+    runs = c.get("/admin/runs", headers=H).json()
+    assert [(r["stage"], r["status"]) for r in runs] == [("figures", "ok")]
+    assert runs[0]["ended_at"] and runs[0]["rows_out"] is not None
