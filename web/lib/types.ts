@@ -31,11 +31,12 @@ export type ShortVersion = {
   reports_conflict_on: { event_id: string; labels: string[] }[];
   one_perspective_only: { event_id: string; label: string; perspective: string }[];
   no_source_published: string[];
+  untracked?: string[];
 };
 export type StoryGraph = {
   story: StoryCard; as_of: string | null; summary: string[]; perspectives: string[];
   nodes: GraphNode[]; edges: GraphEdge[]; anomalies: Anomaly[];
-  events: { id: string; label: string | null; first_seen: string; reports: number; perspectives: string[] }[];
+  events: { id: string; label: string | null; label_source?: string | null; first_seen: string; reports: number; perspectives: string[] }[];
   short_version: ShortVersion;
 };
 export type ReportView = {
@@ -43,14 +44,14 @@ export type ReportView = {
   published_at: string | null; source: SourceLabel; copy_of: string[];
 };
 export type EventPage = {
-  event: { id: string; story_id: string; label: string | null; first_seen: string; reports: number; perspectives: string[] };
-  voices: Record<string, { headline: string | null; words: string[]; reports: number }>;
+  event: { id: string; story_id: string; label: string | null; label_source?: string | null; first_seen: string; reports: number; perspectives: string[] };
+  voices: Record<string, { headline: string | null; headline_source: string | null; words: string[]; reports: number }>;
   perspectives: Record<string, ReportView[]>;
   claim_groups: { id: string; label: string; perspectives: string[]; n_reports: number }[];
   conflicts: { groups: string[]; nli_score: number }[];
   documents: { id: string; title: string; kind: string; url: string; published_at: string | null; issuer: Issuer | null }[];
   anomalies: Anomaly[];
-  short_version: { reported_by_all: string[]; reports_conflict_on: string[][]; one_perspective_only: { group: string; perspective: string }[]; no_source_published: string[] } | null;
+  short_version: { reported_by_all: string[]; reports_conflict_on: string[][]; one_perspective_only: { group: string; perspective: string }[]; no_source_published: string[]; untracked?: string[] } | null;
   parties: Party[];
 };
 export type WorldItem = { story_id: string; title: string; country: string; reports: number; perspectives: number; anomalies: number; provisional: boolean; last_report_at: string | null };
@@ -58,6 +59,6 @@ export type World = { stories: WorldItem[]; gaps: { story_id: string; title: str
 export type Today = {
   day: string | null; changes: { kind: string; label: string; count: number }[];
   new_anomalies: Anomaly[]; breaking: StoryCard[];
-  blind_spots: { story_id: string; title: string; event_id: string; no_source_published: string[] }[];
+  blind_spots: { story_id: string; title: string; event_id: string; no_source_published: string[]; untracked: string[] }[];
   followed: StoryCard[];
 };

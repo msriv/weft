@@ -261,3 +261,12 @@ def test_admin_queues_a_source_for_discovery() -> None:
     ok = c.post("/admin/sources", json={"url": "https://www.Example.org/news"}, headers=H)
     assert ok.status_code == 202 and ok.json()["domain"] == "www.example.org"
     assert store.requested_sources(ctx.db) == [{"domain": "www.example.org", "beat_id": ""}]
+
+
+def test_untracked_party_is_not_called_silent() -> None:
+    from weft_core import readmodel
+    from weft_core.perspectives import perspective_of
+
+    _, ctx = build()
+    have = perspective_of(store.all_sources(ctx.db, "n.status='active'")[0])
+    assert readmodel.untracked(ctx.db, [have, "ZZ"]) == ([have], ["ZZ"])
