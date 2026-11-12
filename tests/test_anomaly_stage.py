@@ -54,6 +54,21 @@ def make() -> Ctx:
             },
             t0,
         )
+    for i in (0, 1):  # both figures sit in claims of the same group
+        graph.put(
+            db,
+            "claims",
+            {
+                "id": f"c{i}",
+                "report_id": f"r{i}",
+                "event_id": "e",
+                "group_id": "g",
+                "text": "missiles",
+                "start_char": 0,
+                "end_char": 50,
+            },
+            t0,
+        )
     nlp = Nlp(HashEmbedder(), StopwordLangId(), RegexEntities(), LexicalNli())
     return Ctx(
         db,
@@ -69,13 +84,13 @@ def test_reconcile_appears_changes_and_withdraws_with_log() -> None:
     c = make()
     assert anomalies.run(c) == 1
     (a,) = graph.select(c.db, "anomalies")
-    assert a["rule"] == "numbers_differ" and a["status"] == "active" and a["rule_version"] == 1
+    assert a["rule"] == "numbers_differ" and a["status"] == "active" and a["rule_version"] == 2
     assert a["evidence_ids"] and a["inputs"]["threshold"] == 0.2
     assert anomalies.run(c) == 0  # nothing changed: no new version, no log line
     c.now = (NOW + timedelta(days=1)).isoformat()
     c.rules = {
         **c.rules,
-        "version": 2,
+        "version": 3,
         "rules": {
             **c.rules["rules"],
             "numbers_differ": {"enabled": True, "min_relative_difference": 0.9},
@@ -87,7 +102,7 @@ def test_reconcile_appears_changes_and_withdraws_with_log() -> None:
         "MATCH (n:AnomalyLog) RETURN n.change AS change, n.rule_version AS rule_version "
         "ORDER BY n.seq"
     )
-    assert [(r["change"], r["rule_version"]) for r in log] == [("appeared", 1), ("withdrawn", 2)]
+    assert [(r["change"], r["rule_version"]) for r in log] == [("appeared", 2), ("withdrawn", 3)]
     assert c.db.execute("MATCH (n:Anomaly) RETURN count(n) AS n")[0]["n"] == 2  # history kept
 
 
@@ -103,3 +118,12 @@ def test_unhealthy_feed_marks_source_and_weights_stage_writes_rows() -> None:
     w = store.nodes(c.db, "SourceWeight", "MATCH (n:SourceWeight {source_id: 's1-il'}) RETURN n")[0]
     assert w["insufficient"] == 1 and w["weight"] == 0.5  # one report: neutral, not hidden
     assert "silent_edit_count" in json.loads(w["factors"])
+
+
+def test_anomaly_on_an_aged_out_event_is_kept_not_withdrawn() -> None:
+    c = make()
+    assert anomalies.run(c) == 1
+    (a,) = graph.select(c.db, "anomalies")
+    c.now = (NOW + timedelta(days=60)).isoformat()  # event far outside the regroup window
+    assert anomalies.run(c) == 0
+    assert graph.get(c.db, "anomalies", a["id"])["status"] == "active"  # type: ignore[index]

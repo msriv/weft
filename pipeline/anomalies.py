@@ -47,14 +47,34 @@ def load_event(
         Group(g["id"], g["label"], {c["report_id"] for c in by_group[g["id"]]}, by_group[g["id"]])
         for g in graph.select(ctx.db, "claim_groups", "n.event_id=?", (ev["id"],))
     ]
+
+    def group_of(f: dict[str, Any]) -> str | None:
+        """The claim group of the claim sentence that contains the figure."""
+        for c in claims:
+            if (
+                c["report_id"] == f["report_id"]
+                and c["group_id"]
+                and (c["start_char"] or 0) <= (f["start_char"] or 0) < (c["end_char"] or 0)
+            ):
+                return str(c["group_id"])
+        return None
+
     figs = [
-        Figure(f["id"], f["report_id"], f["quantity"], f["value"], f["text"])
+        Figure(f["id"], f["report_id"], f["quantity"], f["value"], f["text"], group_of(f))
         for f in graph.select(ctx.db, "figures", "n.event_id=? AND n.kind='number'", (ev["id"],))
     ]
     return EventInput(ev["id"], ev["story_id"], _dt(ev["first_seen"]), rr, groups, figs)
 
 
-def reconcile(ctx: Ctx, found: list[Anomaly]) -> int:
+def reconcile(
+    ctx: Ctx,
+    found: list[Anomaly],
+    events: set[str] | None = None,
+    stories: set[str] | None = None,
+) -> int:
+    """`events` and `stories` are what this run evaluated. An anomaly outside them (its event
+    aged out of the window) keeps its last state: not firing on unevaluated input is not a
+    withdrawal. None means everything was evaluated."""
     ver = ctx.rules["version"]
     current = {a["id"]: a for a in graph.select(ctx.db, "anomalies")}
     changes = 0
@@ -97,8 +117,16 @@ def reconcile(ctx: Ctx, found: list[Anomaly]) -> int:
             graph.put(ctx.db, "anomalies", row, ctx.now)
             log(a.id, "changed", a.rule, a.rule_version, a.status)
             changes += 1
+
+    def in_scope(a: dict[str, Any]) -> bool:
+        if events is None:
+            return True
+        if a["event_id"]:
+            return a["event_id"] in events
+        return (a["story_id"] or "") in (stories or set())
+
     for a_id, old in current.items():
-        if a_id not in seen and old["status"] != "withdrawn":
+        if a_id not in seen and old["status"] != "withdrawn" and in_scope(old):
             graph.put(
                 ctx.db,
                 "anomalies",
@@ -119,7 +147,9 @@ def run(ctx: Ctx) -> int:
     found: list[Anomaly] = []
     cutoff = (now - timedelta(days=ctx.cfg["nightly"]["regroup_days"])).isoformat()
     stories: dict[str, list[Rep]] = defaultdict(list)
+    evaluated: set[str] = set()
     for ev in graph.select(ctx.db, "events", "n.first_seen >= ?", (cutoff,)):
+        evaluated.add(ev["id"])
         e = load_event(ctx, ev, sources, texts)
         found += rules.evaluate_event(e, cfg, now)
         stories[ev["story_id"]] += e.reports
@@ -137,7 +167,7 @@ def run(ctx: Ctx) -> int:
         for a in rules.silent_edit(edits, cfg):
             a.story_id = report_story.get(a.subject_id, "")
             found.append(a)
-    return reconcile(ctx, found)
+    return reconcile(ctx, found, evaluated, set(stories))
 
 
 def rules_cfg() -> dict[str, Any]:

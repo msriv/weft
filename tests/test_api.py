@@ -88,7 +88,7 @@ def test_story_event_node_document_actor_world_method() -> None:
     assert {i["country"] for i in w["stories"]} >= {"IL", "IR"}
     assert any(g["country"] == "IR" and g["reports"] < 3 for g in w["gaps"])  # coverage gap wording
     m = c.get("/v1/method").json()
-    assert m["rules_version"] == 1 and len(m["weights"]["factors"]) == 6
+    assert m["rules_version"] == 2 and len(m["weights"]["factors"]) == 6
     assert c.get("/v1/today").json()["day"] is None or True
 
 
