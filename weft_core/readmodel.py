@@ -11,7 +11,7 @@ from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from weft_core import config, graph
+from weft_core import config, graph, store
 from weft_core.perspectives import perspective_of
 from weft_core.rules import log_odds
 from weft_core.store import Db
@@ -25,26 +25,29 @@ QUIET_AFTER = timedelta(hours=48)
 
 
 def public_story(db: Db, story_id: str) -> dict[str, Any] | None:
-    rows = db.execute("SELECT * FROM stories WHERE id=? AND public=1", (story_id,))
-    return rows[0] if rows else None
+    s = store.get_story(db, story_id)
+    return s if s and s["public"] == 1 else None
 
 
 def parties(db: Db, story_id: str) -> list[dict[str, Any]]:
     return [
         {"party": r["party"], "cited": bool(r["citation"]), "citation": r["citation"]}
-        for r in db.execute(
-            "SELECT party, citation FROM story_parties WHERE story_id=?", (story_id,)
+        for r in store.nodes(
+            db,
+            "StoryParty",
+            "MATCH (n:StoryParty {story_id: ?}) RETURN n ORDER BY n.party",
+            (story_id,),
         )
     ]
 
 
 def sources_by_id(db: Db) -> dict[str, dict[str, Any]]:
-    return {s["id"]: s for s in db.execute("SELECT * FROM sources")}
+    return {s["id"]: s for s in store.all_sources(db)}
 
 
 def weights_latest(db: Db) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
-    for r in db.execute("SELECT * FROM source_weights ORDER BY day"):
+    for r in store.nodes(db, "SourceWeight", "MATCH (n:SourceWeight) RETURN n ORDER BY n.day"):
         out[r["source_id"]] = {
             "weight": r["weight"],
             "insufficient": bool(r["insufficient"]),
@@ -110,7 +113,7 @@ def anomalies_for(
 ) -> list[dict[str, Any]]:
     return [
         _anomaly_view(a)
-        for a in graph.select(db, "anomalies", f"status!='withdrawn' AND ({where})", args, at)
+        for a in graph.select(db, "anomalies", f"n.status<>'withdrawn' AND ({where})", args, at)
     ]
 
 
@@ -118,8 +121,8 @@ def anomalies_for(
 
 
 def story_card(db: Db, s: dict[str, Any], at: str | None = None) -> dict[str, Any]:
-    reps = graph.select(db, "reports", "story_id=?", (s["id"],), at)
-    anomalies = anomalies_for(db, "story_id=?", (s["id"],), at)
+    reps = graph.select(db, "reports", "n.story_id=?", (s["id"],), at)
+    anomalies = anomalies_for(db, "n.story_id=?", (s["id"],), at)
     last = max((r["published_at"] or r["fetched_at"] or "" for r in reps), default=None)
     now = datetime.fromisoformat(at) if at else datetime.now(UTC)
     quiet = not last or now - datetime.fromisoformat(last) > QUIET_AFTER
@@ -142,7 +145,10 @@ def story_card(db: Db, s: dict[str, Any], at: str | None = None) -> dict[str, An
 def list_stories(
     db: Db, region: str | None = None, topic: str | None = None, sort: str = "recent"
 ) -> list[dict[str, Any]]:
-    cards = [story_card(db, s) for s in db.execute("SELECT * FROM stories WHERE public=1")]
+    cards = [
+        story_card(db, s)
+        for s in store.nodes(db, "Story", "MATCH (n:Story {public: 1}) RETURN n ORDER BY n.id")
+    ]
     if region:
         cards = [c for c in cards if region.upper() in c["perspectives"]]
     if topic:
@@ -163,12 +169,12 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
         return None
     src = sources_by_id(db)
     plist = parties(db, story_id)
-    reps = graph.select(db, "reports", "story_id=?", (story_id,), at)
+    reps = graph.select(db, "reports", "n.story_id=?", (story_id,), at)
     groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for r in reps:
         if r["event_id"]:
             groups[(r["event_id"], r["perspective"])].append(r)
-    anomalies = anomalies_for(db, "story_id=?", (story_id,), at)
+    anomalies = anomalies_for(db, "n.story_id=?", (story_id,), at)
     flagged = defaultdict(list)
     for a in anomalies:
         for rid in a["evidence_ids"]:
@@ -191,7 +197,7 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
                 "report_ids": [r["id"] for r in rs],
             }
         )
-    for d in graph.select(db, "documents", "story_id=?", (story_id,), at):
+    for d in graph.select(db, "documents", "n.story_id=?", (story_id,), at):
         issuer = src.get(d["issuer_id"])
         nodes.append(
             {
@@ -210,13 +216,13 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
         for g in graph.select(
             db,
             "claim_groups",
-            "event_id IN (SELECT id FROM events WHERE story_id=?)",
+            "EXISTS { MATCH (e:Event {id: n.event_id, story_id: ?}) }",
             (story_id,),
             at,
         )
     }
     edges = []
-    for c in graph.select(db, "conflicts", "1=1", (), at):
+    for c in graph.select(db, "conflicts", "true", (), at):
         if c["group_a"] in gid_persp and c["group_b"] in gid_persp:
             edges.append(
                 {
@@ -237,7 +243,8 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
         "edges": edges,
         "anomalies": anomalies,
         "events": [
-            event_row(db, e, at) for e in graph.select(db, "events", "story_id=?", (story_id,), at)
+            event_row(db, e, at)
+            for e in graph.select(db, "events", "n.story_id=?", (story_id,), at)
         ],
         "short_version": _event_short_versions(db, story_id, at),
         "weights_note": "Source weight changes ordering only. No report is hidden.",
@@ -252,7 +259,7 @@ def _event_short_versions(db: Db, story_id: str, at: str | None) -> dict[str, An
         for g in graph.select(
             db,
             "claim_groups",
-            "event_id IN (SELECT id FROM events WHERE story_id=?)",
+            "EXISTS { MATCH (e:Event {id: n.event_id, story_id: ?}) }",
             (story_id,),
             at,
         )
@@ -263,7 +270,7 @@ def _event_short_versions(db: Db, story_id: str, at: str | None) -> dict[str, An
         "one_perspective_only": [],
         "no_source_published": [],
     }
-    for e in graph.select(db, "events", "story_id=?", (story_id,), at):
+    for e in graph.select(db, "events", "n.story_id=?", (story_id,), at):
         sv = graph.get(db, "short_versions", e["id"], at)
         if not sv:
             continue
@@ -330,14 +337,16 @@ def event_page(db: Db, event_id: str, at: str | None = None) -> dict[str, Any] |
                 "source": source_label(s, wts.get(s["id"])),
                 "copy_of": [
                     c["copy_of"]
-                    for c in db.execute("SELECT copy_of FROM copies WHERE report_id=?", (r["id"],))
+                    for c in db.execute(
+                        "MATCH (c:Copy {report_id: ?}) RETURN c.copy_of AS copy_of", (r["id"],)
+                    )
                 ],
             }
         )
     for rs in by_p.values():  # ordering only: heavier sources first, nothing dropped
         rs.sort(key=lambda r: (-(r["source"]["weight"] or 0), r["published_at"] or ""))
-    groups = graph.select(db, "claim_groups", "event_id=?", (event_id,), at)
-    claims = graph.select(db, "claims", "event_id=?", (event_id,), at)
+    groups = graph.select(db, "claim_groups", "n.event_id=?", (event_id,), at)
+    claims = graph.select(db, "claims", "n.event_id=?", (event_id,), at)
     claim_by_group: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for c in claims:
         if c["group_id"]:
@@ -365,10 +374,10 @@ def event_page(db: Db, event_id: str, at: str | None = None) -> dict[str, Any] |
                 "end_char",
             )
         }
-        for f in graph.select(db, "figures", "event_id=?", (event_id,), at)
+        for f in graph.select(db, "figures", "n.event_id=?", (event_id,), at)
     ]
     docs = []
-    for d in graph.select(db, "documents", "event_id=?", (event_id,), at):
+    for d in graph.select(db, "documents", "n.event_id=?", (event_id,), at):
         s = src.get(d["issuer_id"])
         docs.append(
             {
@@ -397,11 +406,11 @@ def event_page(db: Db, event_id: str, at: str | None = None) -> dict[str, Any] |
         ],
         "conflicts": [
             {"groups": [c["group_a"], c["group_b"]], "nli_score": c["nli_score"]}
-            for c in graph.select(db, "conflicts", "event_id=?", (event_id,), at)
+            for c in graph.select(db, "conflicts", "n.event_id=?", (event_id,), at)
         ],
         "figures": figs,
         "documents": docs,
-        "anomalies": anomalies_for(db, "event_id=?", (event_id,), at),
+        "anomalies": anomalies_for(db, "n.event_id=?", (event_id,), at),
         "short_version": sv["payload"] if sv else None,
         "parties": plist,
     }
@@ -464,10 +473,7 @@ def node(db: Db, node_id: str) -> dict[str, Any] | None:
 
 def list_sources(db: Db) -> list[dict[str, Any]]:
     w = weights_latest(db)
-    out = [
-        source_label(s, w.get(s["id"]))
-        for s in db.execute("SELECT * FROM sources WHERE status='active'")
-    ]
+    out = [source_label(s, w.get(s["id"])) for s in store.all_sources(db, "n.status='active'")]
     return sorted(out, key=lambda s: (-(s["weight"] or 0), s["name"]))
 
 
@@ -480,37 +486,36 @@ def source_profile(db: Db, source_id: str) -> dict[str, Any] | None:
     reps = graph.select(
         db,
         "reports",
-        "source_id=? AND story_id IN (SELECT id FROM stories WHERE public=1)",
+        "n.source_id=? AND EXISTS { MATCH (s:Story {id: n.story_id, public: 1}) }",
         (source_id,),
     )
     ids = {r["id"] for r in reps}
     anomalies = [
         a
-        for a in anomalies_for(db, "1=1")
+        for a in anomalies_for(db, "true")
         if a["subject_id"] == source_id or ids & set(a["evidence_ids"])
     ]
     history = [
         {"day": r["day"], "weight": r["weight"]}
         for r in db.execute(
-            "SELECT day, weight FROM source_weights WHERE source_id=? ORDER BY day", (source_id,)
+            "MATCH (n:SourceWeight {source_id: ?}) RETURN n.day AS day, n.weight AS weight "
+            "ORDER BY n.day",
+            (source_id,),
         )
     ]
     siblings = (
         [
             x["name"]
             for x in db.execute(
-                "SELECT name FROM sources WHERE owner_id=? AND id!=?", (s["owner_id"], source_id)
+                "MATCH (n:Source {owner_id: ?}) WHERE n.id<>? RETURN n.name AS name",
+                (s["owner_id"], source_id),
             )
         ]
         if s["owner_id"]
         else []
     )
     cur = w.get(source_id)
-    claims = (
-        graph.select(db, "claims", f"report_id IN ({','.join('?' * len(ids))})", tuple(ids))
-        if ids
-        else []
-    )
+    claims = graph.select(db, "claims", "n.report_id IN ?", (list(ids),)) if ids else []
     return {
         "source": source_label(s, cur),
         "factors": cur["factors"] if cur else None,
@@ -548,8 +553,10 @@ def document_page(db: Db, doc_id: str) -> dict[str, Any] | None:
             "end": r["end_char"],
         }
         for r in db.execute(
-            "SELECT st.*, a.name, a.role FROM statements st JOIN actors a ON a.id=st.actor_id "
-            "WHERE st.document_id=? ORDER BY st.start_char",
+            "MATCH (st:Statement {document_id: ?}) MATCH (a:Actor {id: st.actor_id}) "
+            "RETURN st.id AS id, st.actor_id AS actor_id, a.name AS name, a.role AS role, "
+            "st.text AS text, st.start_char AS start_char, st.end_char AS end_char "
+            "ORDER BY st.start_char",
             (doc_id,),
         )
     ]
@@ -584,7 +591,7 @@ def document_page(db: Db, doc_id: str) -> dict[str, Any] | None:
 
 
 def actor_page(db: Db, actor_id: str) -> dict[str, Any] | None:
-    rows = db.execute("SELECT * FROM actors WHERE id=?", (actor_id,))
+    rows = store.nodes(db, "Actor", "MATCH (n:Actor {id: ?}) RETURN n", (actor_id,))
     if not rows:
         return None
     a = rows[0]
@@ -598,9 +605,10 @@ def actor_page(db: Db, actor_id: str) -> dict[str, Any] | None:
             "story_id": r["story_id"],
         }
         for r in db.execute(
-            "SELECT st.id, st.document_id, st.text, d.title, d.published_at, d.story_id "
-            "FROM statements st JOIN documents d ON d.id=st.document_id AND d.valid_to IS NULL "
-            "WHERE st.actor_id=? AND d.story_id IN (SELECT id FROM stories WHERE public=1) "
+            "MATCH (st:Statement {actor_id: ?}) MATCH (d:Document {id: st.document_id}) "
+            "WHERE d.valid_to IS NULL AND EXISTS { MATCH (:Story {id: d.story_id, public: 1}) } "
+            "RETURN st.id AS id, st.document_id AS document_id, st.text AS text, "
+            "d.title AS title, d.published_at AS published_at, d.story_id AS story_id "
             "ORDER BY d.published_at DESC",
             (actor_id,),
         )
@@ -612,9 +620,9 @@ def actor_page(db: Db, actor_id: str) -> dict[str, Any] | None:
         for f in graph.select(
             db,
             "figures",
-            "kind='quote' AND speaker IS NOT NULL AND LOWER(speaker)=LOWER(?) AND event_id IN "
-            "(SELECT e.id FROM events e WHERE e.valid_to IS NULL AND e.story_id IN "
-            "(SELECT id FROM stories WHERE public=1))",
+            "n.kind='quote' AND n.speaker IS NOT NULL AND toLower(n.speaker)=toLower(?) AND "
+            "EXISTS { MATCH (e:Event {id: n.event_id}) WHERE e.valid_to IS NULL AND "
+            "EXISTS { MATCH (:Story {id: e.story_id, public: 1}) } }",
             (a["name"],),
         )
     ]
@@ -632,12 +640,12 @@ def world(db: Db) -> dict[str, Any]:
     """Coverage by country for the Threads and Globe views. A gap is a party country to a story
     where we hold few reports; it describes our coverage, not the story."""
     items, gaps = [], []
-    for s in db.execute("SELECT * FROM stories WHERE public=1"):
+    for s in store.nodes(db, "Story", "MATCH (n:Story {public: 1}) RETURN n ORDER BY n.id"):
         card = story_card(db, s)
         counts = Counter(
-            r["perspective"] for r in graph.select(db, "reports", "story_id=?", (s["id"],))
+            r["perspective"] for r in graph.select(db, "reports", "n.story_id=?", (s["id"],))
         )
-        anomalies = anomalies_for(db, "story_id=?", (s["id"],))
+        anomalies = anomalies_for(db, "n.story_id=?", (s["id"],))
         for country, n in counts.items():
             if country != "unattributed":
                 items.append(
@@ -750,7 +758,8 @@ def method(db: Db) -> dict[str, Any]:
         "corrections": [
             dict(c)
             for c in db.execute(
-                "SELECT day, kind, what FROM corrections ORDER BY day DESC, rowid DESC"
+                "MATCH (n:Correction) RETURN n.day AS day, n.kind AS kind, n.what AS what "
+                "ORDER BY n.day DESC, n.created_at DESC"
             )
         ],
         "gdelt_citation": "GDELT Project (gdeltproject.org), used for discovery and coverage gaps only.",
@@ -762,9 +771,14 @@ def method(db: Db) -> dict[str, Any]:
 
 def today(db: Db, followed_beats: list[str] | None = None) -> dict[str, Any]:
     """Overnight changes (latest daily diff, public stories only), breaking now, blind spots."""
-    public = {s["id"]: s for s in db.execute("SELECT * FROM stories WHERE public=1")}
+    public = {
+        s["id"]: s
+        for s in store.nodes(db, "Story", "MATCH (n:Story {public: 1}) RETURN n ORDER BY n.id")
+    }
     cards = {sid: story_card(db, s) for sid, s in public.items()}
-    diff_rows = db.execute("SELECT day, payload FROM daily_diffs ORDER BY day DESC LIMIT 1")
+    diff_rows = db.execute(
+        "MATCH (n:DailyDiff) RETURN n.day AS day, n.payload AS payload ORDER BY n.day DESC LIMIT 1"
+    )
     diff = json.loads(diff_rows[0]["payload"]) if diff_rows else {}
     changes = []
     for key, label in (
@@ -777,7 +791,7 @@ def today(db: Db, followed_beats: list[str] | None = None) -> dict[str, Any]:
             changes.append({"kind": key, "label": label, "count": len(ids)})
     new_anoms = [
         a
-        for a in anomalies_for(db, "status='active'")
+        for a in anomalies_for(db, "n.status='active'")
         if a["story_id"] in public
         and a["since"] >= (datetime.now(UTC) - timedelta(days=1)).isoformat()
     ]
@@ -789,7 +803,7 @@ def today(db: Db, followed_beats: list[str] | None = None) -> dict[str, Any]:
     breaking.sort(key=lambda c: c["last_report_at"] or "", reverse=True)
     blind = []
     for sid in public:
-        for e in graph.select(db, "events", "story_id=?", (sid,)):
+        for e in graph.select(db, "events", "n.story_id=?", (sid,)):
             sv = graph.get(db, "short_versions", e["id"])
             if sv and sv["payload"].get("no_source_published"):
                 blind.append(
@@ -822,17 +836,25 @@ def add_problem(db: Db, kind: str, ref_id: str | None, message: str, email: str 
     message = message.strip()
     if not 3 <= len(message) <= 2000:
         raise ValueError("message must be 3 to 2000 characters")
-    db.execute(
-        "INSERT INTO reader_reports(kind,ref_id,message,email,created_at) VALUES(?,?,?,?,?)",
+    rows = db.execute(
+        "MERGE (c:Counter {name: 'reader_reports'}) SET c.n = coalesce(c.n, 0) + 1 "
+        "CREATE (n:ReaderReport {id: c.n, kind: ?, ref_id: ?, message: ?, email: ?, "
+        "created_at: ?, status: 'open'}) RETURN n.id AS id",
         (kind, ref_id, message, email, datetime.now(UTC).isoformat()),
     )
-    return int(db.execute("SELECT MAX(rowid) AS n FROM reader_reports")[0]["n"])
+    return int(rows[0]["id"])
 
 
 def add_correction(db: Db, kind: str, what: str, day: str | None = None) -> None:
-    db.execute(
-        "INSERT INTO corrections(day,kind,what) VALUES(?,?,?)",
-        (day or datetime.now(UTC).date().isoformat(), kind, what),
+    store.create(
+        db,
+        "Correction",
+        {
+            "day": day or datetime.now(UTC).date().isoformat(),
+            "kind": kind,
+            "what": what,
+            "created_at": datetime.now(UTC).isoformat(),
+        },
     )
 
 
@@ -841,7 +863,7 @@ def changes(db: Db, story_id: str, since: str) -> list[dict[str, Any]]:
     shortcut: read straight from the graph tables; replace with Pub/Sub -> Redis when many
     readers hold streams open."""
     out: list[dict[str, Any]] = []
-    for r in graph.select(db, "reports", "story_id=? AND valid_from > ?", (story_id, since)):
+    for r in graph.select(db, "reports", "n.story_id=? AND n.valid_from > ?", (story_id, since)):
         out.append(
             {
                 "type": "node.added",
@@ -849,7 +871,7 @@ def changes(db: Db, story_id: str, since: str) -> list[dict[str, Any]]:
                 "data": {"id": r["id"], "perspective": r["perspective"]},
             }
         )
-    for a in graph.select(db, "anomalies", "story_id=? AND valid_from > ?", (story_id, since)):
+    for a in graph.select(db, "anomalies", "n.story_id=? AND n.valid_from > ?", (story_id, since)):
         out.append(
             {
                 "type": "anomaly.updated",

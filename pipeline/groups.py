@@ -52,7 +52,7 @@ def cluster(
 def run_groups(ctx: Ctx) -> int:
     perspective = {r["id"]: r["perspective"] for r in ctx.recent_reports(2)}
     by_event: dict[str, list[dict[str, Any]]] = {}
-    for c in graph.select(ctx.db, "claims", "event_id IS NOT NULL"):
+    for c in graph.select(ctx.db, "claims", "n.event_id IS NOT NULL"):
         by_event.setdefault(c["event_id"], []).append(c)
     made = 0
     for event_id, claims in by_event.items():
@@ -112,13 +112,12 @@ def run_conflicts(ctx: Ctx) -> int:
 
 
 def _put_conflict(ctx: Ctx, a: str, b: str, event_id: str, p: float) -> None:
-    if not ctx.db.execute(
-        "SELECT 1 FROM conflicts WHERE group_a=? AND group_b=? AND valid_to IS NULL", (a, b)
-    ):
-        ctx.db.execute(
-            "INSERT INTO conflicts(group_a,group_b,event_id,nli_score,valid_from) VALUES(?,?,?,?,?)",
-            (a, b, event_id, p, ctx.now),
-        )
+    ctx.db.execute(
+        "OPTIONAL MATCH (c:Conflict {group_a: ?, group_b: ?}) WHERE c.valid_to IS NULL "
+        "WITH c WHERE c IS NULL "
+        "CREATE (:Conflict {group_a: ?, group_b: ?, event_id: ?, nli_score: ?, valid_from: ?})",
+        (a, b, a, b, event_id, p, ctx.now),
+    )
 
 
 def _row(r: dict[str, Any]) -> dict[str, Any]:

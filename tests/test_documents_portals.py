@@ -9,7 +9,7 @@ from services.stream_worker.worker import Deps, document_kind, process, process_
 from weft_core import config, discovery, graph, portals, store
 from weft_core.nlp import HashEmbedder, LexicalNli, Nlp, RegexEntities, StopwordLangId
 from weft_core.polite import PoliteClient
-from weft_core.store import SqliteDb
+from weft_core.store import Neo4jDb, local_db
 
 NLP = Nlp(HashEmbedder(), StopwordLangId(), RegexEntities(), LexicalNli())
 
@@ -28,7 +28,7 @@ def test_gov_detection_and_outbound_links() -> None:
 
 
 def test_portal_discovery_registers_crawlable_portal_and_rejects_empty() -> None:
-    db = SqliteDb()
+    db = local_db()
     store.init(db)
     portals.record_candidates(db, {"eci.gov.in", "empty.gov.xx"}, "https://paper.example/a")
     portals.record_candidates(
@@ -57,8 +57,8 @@ def test_portal_discovery_registers_crawlable_portal_and_rejects_empty() -> None
     assert {"eci.gov.in", "empty.gov.xx"} <= store.known_domains(db)  # rejected ones not re-probed
 
 
-def setup() -> tuple[SqliteDb, Deps]:
-    db = SqliteDb()
+def setup() -> tuple[Neo4jDb, Deps]:
+    db = local_db()
     graph.init(db)
     discovery.seed_beats(db)
     store.register_source(
@@ -139,7 +139,7 @@ def test_statements_from_transcript_turns() -> None:
     ctx = Ctx(db, d.cfg, NLP, lambda r: TRANSCRIPT, None, "2026-11-06T12:00:00+00:00")
     assert run_statements(ctx) == 3 and run_statements(ctx) == 0
     assert slug("Rahul Verma") == "rahul-verma"
-    row = db.execute("SELECT * FROM actors WHERE id='rahul-verma'")[0]
+    row = db.execute("MATCH (n:Actor {id: 'rahul-verma'}) RETURN n.role AS role")[0]
     assert row["role"] == "Opposition"
 
 
@@ -193,7 +193,7 @@ def test_refetch_schedule_and_version_collection() -> None:
         return httpx.Response(200, text=pages["text"], headers={"content-type": "text/html"})
 
     http = PoliteClient(httpx.Client(transport=httpx.MockTransport(handler)))
-    db = SqliteDb()
+    db = local_db()
     graph.init(db)
 
     class Files:
@@ -208,4 +208,7 @@ def test_refetch_schedule_and_version_collection() -> None:
     assert first == "unchanged"  # no earlier version recorded in this fixture
     pages["text"] = page.replace("Sentence 3 of", "Sentence three of")
     assert refetch.refetch({**task, "n": 2}, src, http, db, Files()) == "changed"
-    assert [r["n"] for r in db.execute("SELECT n FROM report_versions ORDER BY n")] == [1, 2]
+    assert [r["n"] for r in db.execute("MATCH (v:ReportVersion) RETURN v.n AS n ORDER BY v.n")] == [
+        1,
+        2,
+    ]

@@ -19,14 +19,14 @@ INSTRUCTIONS = (
 
 def translate(db: Db, model: ModelClient, text: str, dst: str) -> str:
     key = hashlib.sha256(f"{dst}\n{text}".encode()).hexdigest()
-    cached = db.execute("SELECT text FROM translations WHERE key=?", (key,))
+    cached = db.execute("MATCH (n:Translation {key: ?}) RETURN n.text AS text", (key,))
     if cached:
         return str(cached[0]["text"])
     out = model.complete(
         prompt_template="translate@1", instructions=INSTRUCTIONS.format(lang=dst), data=text
     ).strip()
     db.execute(
-        "INSERT OR IGNORE INTO translations(key,lang,text,created_at) VALUES(?,?,?,?)",
+        "MERGE (n:Translation {key: ?}) ON CREATE SET n.lang=?, n.text=?, n.created_at=?",
         (key, dst, out, datetime.now(UTC).isoformat()),
     )
     return out

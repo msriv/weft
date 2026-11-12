@@ -60,16 +60,18 @@ def run(ctx: Ctx) -> int:
     for story in {r["story_id"] for r in ctx.recent_reports(14)}:
         parties = {
             p["party"].upper()
-            for p in ctx.db.execute("SELECT party FROM story_parties WHERE story_id=?", (story,))
+            for p in ctx.db.execute(
+                "MATCH (n:StoryParty {story_id: ?}) RETURN n.party AS party", (story,)
+            )
             if re.fullmatch(r"[A-Za-z]{2}", p["party"])
         }
         story_sents: list[str] = []
-        for e in graph.select(ctx.db, "events", "story_id=?", (story,)):
+        for e in graph.select(ctx.db, "events", "n.story_id=?", (story,)):
             reports = graph.reports_of_event(ctx.db, e["id"])
-            groups = graph.select(ctx.db, "claim_groups", "event_id=?", (e["id"],))
+            groups = graph.select(ctx.db, "claim_groups", "n.event_id=?", (e["id"],))
             conf = [
                 (c["group_a"], c["group_b"])
-                for c in graph.select(ctx.db, "conflicts", "event_id=?", (e["id"],))
+                for c in graph.select(ctx.db, "conflicts", "n.event_id=?", (e["id"],))
             ]
             sv = short_version(groups, conf, {r["perspective"] for r in reports}, parties)
             graph.put(ctx.db, "short_versions", {"id": e["id"], "payload": sv})

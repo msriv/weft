@@ -63,7 +63,8 @@ def run(ctx: Ctx) -> int:
     made = 0
     for r in ctx.recent_reports(2):
         if ctx.db.execute(
-            "SELECT 1 FROM claims WHERE report_id=? AND valid_to IS NULL LIMIT 1", (r["id"],)
+            "MATCH (n:Claim {report_id: ?}) WHERE n.valid_to IS NULL RETURN 1 AS x LIMIT 1",
+            (r["id"],),
         ):
             continue  # already extracted; unchanged reports are never re-sent
         text = ctx.text_of(r)

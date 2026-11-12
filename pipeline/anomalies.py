@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from pipeline.ctx import Ctx
-from weft_core import config, graph, rules
+from weft_core import config, graph, rules, store
 from weft_core.rules import Anomaly, EventInput, Figure, Group, Rep
 
 
@@ -38,18 +38,18 @@ def load_event(
         for r in reps
         if r["source_id"] in sources
     ]
-    claims = graph.select(ctx.db, "claims", "event_id=?", (ev["id"],))
+    claims = graph.select(ctx.db, "claims", "n.event_id=?", (ev["id"],))
     by_group: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for c in claims:
         if c["group_id"]:
             by_group[c["group_id"]].append({"report_id": c["report_id"], "text": c["text"]})
     groups = [
         Group(g["id"], g["label"], {c["report_id"] for c in by_group[g["id"]]}, by_group[g["id"]])
-        for g in graph.select(ctx.db, "claim_groups", "event_id=?", (ev["id"],))
+        for g in graph.select(ctx.db, "claim_groups", "n.event_id=?", (ev["id"],))
     ]
     figs = [
         Figure(f["id"], f["report_id"], f["quantity"], f["value"], f["text"])
-        for f in graph.select(ctx.db, "figures", "event_id=? AND kind='number'", (ev["id"],))
+        for f in graph.select(ctx.db, "figures", "n.event_id=? AND n.kind='number'", (ev["id"],))
     ]
     return EventInput(ev["id"], ev["story_id"], _dt(ev["first_seen"]), rr, groups, figs)
 
@@ -60,9 +60,10 @@ def reconcile(ctx: Ctx, found: list[Anomaly]) -> int:
     changes = 0
 
     def log(a_id: str, change: str, rule: str, version: int, status: str) -> None:
-        ctx.db.execute(
-            "INSERT INTO anomalies_log(at,anomaly_id,change,rule,rule_version,status) "
-            "VALUES(?,?,?,?,?,?)",
+        ctx.db.execute(  # seq keeps log order within one run (same `at`)
+            "MERGE (c:Counter {name: 'anomalies_log'}) SET c.n = coalesce(c.n, 0) + 1 "
+            "CREATE (:AnomalyLog {seq: c.n, at: ?, anomaly_id: ?, change: ?, rule: ?, "
+            "rule_version: ?, status: ?})",
             (ctx.now, a_id, change, rule, version, status),
         )
 
@@ -113,12 +114,12 @@ def reconcile(ctx: Ctx, found: list[Anomaly]) -> int:
 def run(ctx: Ctx) -> int:
     cfg = ctx.rules
     now = _dt(ctx.now)
-    sources = {s["id"]: s for s in ctx.db.execute("SELECT * FROM sources")}
+    sources = {s["id"]: s for s in store.all_sources(ctx.db)}
     texts: dict[str, str] = {}
     found: list[Anomaly] = []
     cutoff = (now - timedelta(days=ctx.cfg["nightly"]["regroup_days"])).isoformat()
     stories: dict[str, list[Rep]] = defaultdict(list)
-    for ev in graph.select(ctx.db, "events", "first_seen >= ?", (cutoff,)):
+    for ev in graph.select(ctx.db, "events", "n.first_seen >= ?", (cutoff,)):
         e = load_event(ctx, ev, sources, texts)
         found += rules.evaluate_event(e, cfg, now)
         stories[ev["story_id"]] += e.reports

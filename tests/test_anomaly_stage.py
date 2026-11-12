@@ -5,13 +5,13 @@ from pipeline import anomalies, weights
 from pipeline.ctx import Ctx
 from weft_core import config, graph, store
 from weft_core.nlp import HashEmbedder, LexicalNli, Nlp, RegexEntities, StopwordLangId
-from weft_core.store import SqliteDb
+from weft_core.store import local_db
 
 NOW = datetime(2026, 11, 6, 12, tzinfo=UTC)
 
 
 def make() -> Ctx:
-    db = SqliteDb()
+    db = local_db()
     graph.init(db)
     for i in range(6):
         d = f"s{i}.{'il' if i % 2 else 'ir'}"
@@ -83,17 +83,23 @@ def test_reconcile_appears_changes_and_withdraws_with_log() -> None:
     }  # threshold raised: 75% no longer enough
     assert anomalies.run(c) == 1
     assert graph.get(c.db, "anomalies", a["id"])["status"] == "withdrawn"  # type: ignore[index]
-    log = c.db.execute("SELECT change, rule_version FROM anomalies_log ORDER BY rowid")
+    log = c.db.execute(
+        "MATCH (n:AnomalyLog) RETURN n.change AS change, n.rule_version AS rule_version "
+        "ORDER BY n.seq"
+    )
     assert [(r["change"], r["rule_version"]) for r in log] == [("appeared", 1), ("withdrawn", 2)]
-    assert c.db.execute("SELECT COUNT(*) AS n FROM anomalies")[0]["n"] == 2  # history kept
+    assert c.db.execute("MATCH (n:Anomaly) RETURN count(n) AS n")[0]["n"] == 2  # history kept
 
 
 def test_unhealthy_feed_marks_source_and_weights_stage_writes_rows() -> None:
     c = make()
     store.set_health(c.db, ["s0-ir"])
-    rows = {r["id"]: r["healthy"] for r in c.db.execute("SELECT id, healthy FROM sources")}
+    rows = {
+        r["id"]: r["healthy"]
+        for r in c.db.execute("MATCH (n:Source) RETURN n.id AS id, n.healthy AS healthy")
+    }
     assert rows["s0-ir"] == 0 and rows["s1-il"] == 1
     assert weights.run(c) == 6
-    w = c.db.execute("SELECT * FROM source_weights WHERE source_id='s1-il'")[0]
+    w = store.nodes(c.db, "SourceWeight", "MATCH (n:SourceWeight {source_id: 's1-il'}) RETURN n")[0]
     assert w["insufficient"] == 1 and w["weight"] == 0.5  # one report: neutral, not hidden
     assert "silent_edit_count" in json.loads(w["factors"])

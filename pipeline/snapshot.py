@@ -14,7 +14,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from pipeline.ctx import Ctx
-from weft_core import graph
+from weft_core import graph, store
 
 TABLES = [
     "reports",
@@ -52,28 +52,30 @@ def export(ctx: Ctx, sink: Sink, tables: list[str] = TABLES) -> int:
     day = ctx.now[:10]
     n = 0
     for t in tables:
-        rows = ctx.db.execute(*_valid_at(t, ctx.now))
+        rows = _valid_at(ctx, t, ctx.now)
         if rows:
             sink.write(f"{day}/{t}.parquet", _parquet(rows))
             n += len(rows)
     return n
 
 
-def _valid_at(table: str, at: str) -> tuple[str, tuple[Any, ...]]:
+def _valid_at(ctx: Ctx, table: str, at: str) -> list[dict[str, Any]]:
     clause, args = graph.asof(at)
-    return f"SELECT * FROM {table} WHERE {clause}", args
+    label = graph.LABELS[table]
+    return store.nodes(ctx.db, label, f"MATCH (n:{label}) WHERE {clause} RETURN n", args)
 
 
 def diff(ctx: Ctx, since: str) -> dict[str, list[str]]:
     """Ids that appeared or closed between `since` and now."""
 
-    def ids(sql: str, *args: Any) -> list[str]:
-        return sorted(r["id"] for r in ctx.db.execute(sql, args))
+    def ids(query: str, *args: Any) -> list[str]:
+        return sorted(r["id"] for r in ctx.db.execute(query, args))
 
     def new(table: str) -> list[str]:
+        label = graph.LABELS[table]
         return ids(
-            f"SELECT DISTINCT id FROM {table} t WHERE valid_from > ? AND NOT EXISTS "
-            f"(SELECT 1 FROM {table} o WHERE o.id=t.id AND o.valid_from <= ?)",
+            f"MATCH (n:{label}) WHERE n.valid_from > ? AND NOT EXISTS "
+            f"{{ MATCH (o:{label} {{id: n.id}}) WHERE o.valid_from <= ? }} RETURN DISTINCT n.id AS id",
             since,
             since,
         )
@@ -83,13 +85,14 @@ def diff(ctx: Ctx, since: str) -> dict[str, list[str]]:
         "new_events": new("events"),
         "new_claim_groups": new("claim_groups"),
         "merged_events": ids(
-            "SELECT id FROM events e WHERE valid_to > ? AND NOT EXISTS "
-            "(SELECT 1 FROM events c WHERE c.id=e.id AND c.valid_to IS NULL)",
+            "MATCH (e:Event) WHERE e.valid_to > ? AND NOT EXISTS "
+            "{ MATCH (c:Event {id: e.id}) WHERE c.valid_to IS NULL } RETURN e.id AS id",
             since,
         ),
         "moved_reports": ids(
-            "SELECT DISTINCT r.id FROM reports r JOIN reports o ON o.id=r.id AND o.valid_to=r.valid_from "
-            "WHERE r.valid_from > ? AND r.event_id IS NOT o.event_id",
+            "MATCH (r:Report) WHERE r.valid_from > ? MATCH (o:Report {id: r.id}) "
+            "WHERE o.valid_to = r.valid_from AND coalesce(r.event_id, '') <> coalesce(o.event_id, '') "
+            "RETURN DISTINCT r.id AS id",
             since,
         ),
     }
@@ -98,11 +101,7 @@ def diff(ctx: Ctx, since: str) -> dict[str, list[str]]:
 def run(ctx: Ctx, sink: Sink | None = None) -> int:
     since = (datetime.fromisoformat(ctx.now) - timedelta(days=1)).isoformat()
     d = diff(ctx, since)
-    ctx.db.execute(
-        "INSERT INTO daily_diffs(day,payload) VALUES(?,?) ON CONFLICT(day) DO UPDATE SET "
-        "payload=excluded.payload",
-        (ctx.now[:10], json.dumps(d)),
-    )
+    ctx.db.execute("MERGE (n:DailyDiff {day: ?}) SET n.payload=?", (ctx.now[:10], json.dumps(d)))
     if sink is not None:
         export(ctx, sink)
     return sum(len(v) for v in d.values())

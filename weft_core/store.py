@@ -1,107 +1,289 @@
-"""Operational store (D15/D16): beats, sources, stories. SQLite SQL, so the same statements run
-on Turso (libSQL) in production and on a local SQLite file in tests and dev.
+"""Neo4j access (spec: Neo4j holds the story graph; D19). Every node type the code stores is
+listed in `NODES` with its properties and defaults, so reads always return every property even
+though Neo4j does not store nulls.
 
-Product rules baked into the schema: `state_run` and `owner_id` are NULL (shown as "unverified")
-unless a citation URL is stored with them; `stories.public` defaults to 0 and only the admin
-toggle sets it; party status is per story (`story_parties`).
+Product rules baked in: `state_run` and `owner_id` are null (shown as "unverified") unless a
+citation URL is stored with them; `Story.public` defaults to 0 and only the admin toggle sets it;
+party status is per story (`StoryParty`).
+
+Queries are Cypher with `?` placeholders, numbered in order (`?` becomes `$p0`, `$p1`, ...), so
+call sites pass a plain tuple of arguments.
 """
 
 import json
-import sqlite3
+import os
+import re
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
-import httpx
+# label -> property -> default. `V` marks versioned nodes (valid_from / valid_to, see graph.py).
+V = {"valid_from": None, "valid_to": None}
+NODES: dict[str, dict[str, Any]] = {
+    "Beat": {"id": None, "name": None, "patterns": "[]", "languages": '["en"]', "parties": "[]"},
+    "Source": {
+        "id": None,
+        "name": None,
+        "homepage": None,
+        "domain": None,
+        "country": None,
+        "languages": '["en"]',
+        "type": "news",
+        "state_run": None,
+        "state_run_source": None,
+        "owner_id": None,
+        "ownership_source": None,
+        "crawl": None,
+        "feeds": "[]",
+        "sitemaps": "[]",
+        "healthy": 1,
+        "paywalled": 0,
+        "min_interval": 10.0,
+        "status": "active",
+        "discovered_via": None,
+        "discovered_at": None,
+        "verified_at": None,
+    },
+    "PortalCandidate": {"domain": None, "hits": 0, "example_url": None, "last_seen": None},
+    "Story": {"id": None, "beat_id": None, "title": None, "public": 0, "created_at": None},
+    "StoryParty": {"story_id": None, "party": None, "citation": None},
+    "Report": {
+        "id": None,
+        "url": None,
+        "source_id": None,
+        "perspective": None,
+        "story_id": None,
+        "event_id": None,
+        "published_at": None,
+        "fetched_at": None,
+        "type": None,
+        "lang": None,
+        "title": None,
+        "summary": None,
+        "text_hash": None,
+        "minhash": None,
+        "embedding": None,
+        "grouping_confidence": None,
+        **V,
+    },
+    "Event": {
+        "id": None,
+        "story_id": None,
+        "first_seen": None,
+        "centroid": None,
+        "entities": "[]",
+        "n_reports": 1,
+        "grouping_confidence": None,
+        **V,
+    },
+    "ReportEntity": {"report_id": None, "name": None, "kind": None, "wikidata_id": None},
+    "EntityLink": {"name": None, "wikidata_id": None},
+    "Copy": {"report_id": None, "copy_of": None, "jaccard": None},
+    "Claim": {
+        "id": None,
+        "report_id": None,
+        "event_id": None,
+        "group_id": None,
+        "text": None,
+        "lang": None,
+        "start_char": None,
+        "end_char": None,
+        "embedding": None,
+        **V,
+    },
+    "ClaimGroup": {
+        "id": None,
+        "event_id": None,
+        "label": None,
+        "perspectives": "[]",
+        "n_reports": 0,
+        **V,
+    },
+    "Conflict": {"group_a": None, "group_b": None, "event_id": None, "nli_score": None, **V},
+    "Figure": {
+        "id": None,
+        "report_id": None,
+        "event_id": None,
+        "kind": None,
+        "quantity": None,
+        "value": None,
+        "unit": None,
+        "speaker": None,
+        "text": None,
+        "start_char": None,
+        "end_char": None,
+        **V,
+    },
+    "ShortVersion": {"id": None, "payload": None, **V},
+    "Anomaly": {
+        "id": None,
+        "rule": None,
+        "rule_version": None,
+        "status": None,
+        "subject_kind": None,
+        "subject_id": None,
+        "story_id": None,
+        "event_id": None,
+        "summary": None,
+        "inputs": None,
+        "evidence_ids": None,
+        "detail": None,
+        **V,
+    },
+    "AnomalyLog": {
+        "seq": None,
+        "at": None,
+        "anomaly_id": None,
+        "change": None,
+        "rule": None,
+        "rule_version": None,
+        "status": None,
+    },
+    "SourceWeight": {
+        "source_id": None,
+        "day": None,
+        "weight": None,
+        "factors": None,
+        "n_reports": 0,
+        "insufficient": 0,
+    },
+    "ReportVersion": {"report_id": None, "n": None, "fetched_at": None, "text_hash": None},
+    "Document": {
+        "id": None,
+        "url": None,
+        "issuer_id": None,
+        "kind": None,
+        "story_id": None,
+        "event_id": None,
+        "published_at": None,
+        "lang": None,
+        "title": None,
+        "summary": None,
+        "text_hash": None,
+        **V,
+    },
+    "Actor": {"id": None, "name": None, "wikidata_id": None, "role": None},
+    "Statement": {
+        "id": None,
+        "actor_id": None,
+        "document_id": None,
+        "text": None,
+        "start_char": None,
+        "end_char": None,
+    },
+    "ReaderReport": {
+        "id": None,
+        "kind": None,
+        "ref_id": None,
+        "message": None,
+        "email": None,
+        "created_at": None,
+        "status": "open",
+        "resolution": None,
+    },
+    "Correction": {"day": None, "kind": None, "what": None, "created_at": None},
+    "Translation": {"key": None, "lang": None, "text": None, "created_at": None},
+    "ReviewItem": {
+        "id": None,
+        "kind": None,
+        "ref_id": None,
+        "payload": None,
+        "sampled_at": None,
+        "rating": None,
+        "reviewer": None,
+        "rated_at": None,
+    },
+    "Subscription": {
+        "email": None,
+        "frequency": None,
+        "follows": "[]",
+        "token": None,
+        "created_at": None,
+        "last_sent": None,
+    },
+    "DailyDiff": {"day": None, "payload": None},
+    "BatchRun": {
+        "run_id": None,
+        "stage": None,
+        "started_at": None,
+        "ended_at": None,
+        "rows_out": None,
+        "status": None,
+        "error": None,
+    },
+}
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS beats (
-  id TEXT PRIMARY KEY, name TEXT NOT NULL,
-  patterns TEXT NOT NULL,            -- JSON list of case-insensitive regexes over GDELT fields
-  languages TEXT NOT NULL DEFAULT '["en"]',
-  parties TEXT NOT NULL DEFAULT '[]');   -- proposed parties (JSON list), unverified
-CREATE TABLE IF NOT EXISTS sources (
-  id TEXT PRIMARY KEY, name TEXT NOT NULL, homepage TEXT NOT NULL, domain TEXT NOT NULL UNIQUE,
-  country TEXT, languages TEXT NOT NULL DEFAULT '["en"]', type TEXT NOT NULL DEFAULT 'news',
-  state_run INTEGER, state_run_source TEXT,   -- NULL = unverified
-  owner_id TEXT, ownership_source TEXT,
-  crawl TEXT,                                 -- JSON {start_urls, allow, max_depth} for portals
-  feeds TEXT NOT NULL DEFAULT '[]', sitemaps TEXT NOT NULL DEFAULT '[]',
-  healthy INTEGER NOT NULL DEFAULT 1,
-  paywalled INTEGER NOT NULL DEFAULT 0, min_interval REAL NOT NULL DEFAULT 10,
-  status TEXT NOT NULL DEFAULT 'active',      -- active | rejected (no live feed found)
-  discovered_via TEXT NOT NULL, discovered_at TEXT NOT NULL, verified_at TEXT);
-CREATE TABLE IF NOT EXISTS portal_candidates (
-  domain TEXT PRIMARY KEY, hits INTEGER NOT NULL, example_url TEXT NOT NULL, last_seen TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS stories (
-  id TEXT PRIMARY KEY, beat_id TEXT NOT NULL REFERENCES beats(id), title TEXT NOT NULL,
-  public INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS story_parties (
-  story_id TEXT NOT NULL REFERENCES stories(id), party TEXT NOT NULL, citation TEXT,
-  PRIMARY KEY (story_id, party));
-"""
+UNIQUE = {
+    "Beat": "id",
+    "Source": "id",
+    "PortalCandidate": "domain",
+    "Story": "id",
+    "Actor": "id",
+    "Statement": "id",
+    "Translation": "key",
+    "ReviewItem": "id",
+    "Subscription": "email",
+    "DailyDiff": "day",
+    "EntityLink": "name",
+    "ReaderReport": "id",
+}
+INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
 
 
 class Db(Protocol):
-    def execute(self, sql: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]: ...
+    def execute(self, query: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]: ...
 
 
-class SqliteDb:
-    def __init__(self, path: str = ":memory:") -> None:
-        self._c = sqlite3.connect(path, check_same_thread=False)
-        self._c.row_factory = sqlite3.Row
-
-    def execute(self, sql: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
-        cur = self._c.execute(sql, args)
-        self._c.commit()
-        return [dict(r) for r in cur.fetchall()]
+def _params(query: str, args: tuple[Any, ...]) -> tuple[str, dict[str, Any]]:
+    n = iter(range(len(args)))
+    return re.sub(r"\?", lambda _: f"$p{next(n)}", query), {f"p{i}": a for i, a in enumerate(args)}
 
 
-class TursoDb:
-    """Turso over its HTTP pipeline API (no extra dependency). One request per statement."""
+class Neo4jDb:
+    def __init__(self, uri: str, user: str, password: str, database: str | None = None) -> None:
+        from neo4j import GraphDatabase
 
-    def __init__(self, url: str, token: str, http: httpx.Client | None = None) -> None:
-        self._url = url.replace("libsql://", "https://", 1).rstrip("/") + "/v2/pipeline"
-        self._http = http or httpx.Client(timeout=30)
-        self._auth = {"Authorization": f"Bearer {token}"}
+        self._driver = GraphDatabase.driver(uri, auth=(user, password))
+        self._database = database
 
-    @staticmethod
-    def _arg(v: Any) -> dict[str, str]:
-        if v is None:
-            return {"type": "null"}
-        if isinstance(v, bool | int):
-            return {"type": "integer", "value": str(int(v))}
-        if isinstance(v, float):
-            return {"type": "float", "value": repr(v)}
-        return {"type": "text", "value": str(v)}
+    def execute(self, query: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        q, params = _params(query, args)
+        records, _, _ = self._driver.execute_query(q, params, database_=self._database)
+        return [r.data() for r in records]
 
-    def execute(self, sql: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
-        stmt = {"sql": sql, "args": [self._arg(a) for a in args]}
-        body = {"requests": [{"type": "execute", "stmt": stmt}, {"type": "close"}]}
-        r = self._http.post(self._url, json=body, headers=self._auth)
-        r.raise_for_status()
-        first = r.json()["results"][0]
-        if first["type"] == "error":
-            raise RuntimeError(f"turso: {first['error']['message']}")
-        res = first["response"]["result"]
-        cols = [c["name"] for c in res["cols"]]
-        return [{c: _cell(v) for c, v in zip(cols, row, strict=True)} for row in res["rows"]]
+    def close(self) -> None:
+        self._driver.close()
 
 
-def _cell(v: dict[str, Any]) -> Any:
-    t = v["type"]
-    return (
-        None
-        if t == "null"
-        else int(v["value"])
-        if t == "integer"
-        else (float(v["value"]) if t == "float" else v["value"])
-    )
+def fill(label: str, props: dict[str, Any] | None) -> dict[str, Any]:
+    """A node's properties with every declared property present (Neo4j drops nulls)."""
+    return {**NODES[label], **(props or {})}
+
+
+def nodes(db: Db, label: str, query: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+    """Run a query that returns `n` (a node of `label`) and get its filled properties."""
+    return [fill(label, r["n"]) for r in db.execute(query, args)]
+
+
+def create(db: Db, label: str, props: dict[str, Any]) -> None:
+    db.execute(f"CREATE (n:{label}) SET n = ?", (_clean(props),))
+
+
+def _clean(props: dict[str, Any]) -> dict[str, Any]:
+    out = {}
+    for k, v in props.items():
+        out[k] = (
+            json.dumps(v) if isinstance(v, list | dict) else int(v) if isinstance(v, bool) else v
+        )
+    return out
 
 
 def init(db: Db) -> None:
-    for stmt in SCHEMA.split(";"):
-        if stmt.strip():
-            db.execute(stmt)
+    for label, key in UNIQUE.items():
+        db.execute(f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{key} IS UNIQUE")
+    for label, props in NODES.items():
+        for p in INDEXED:
+            if p in props and UNIQUE.get(label) != p:
+                db.execute(f"CREATE INDEX IF NOT EXISTS FOR (n:{label}) ON (n.{p})")
 
 
 def _now() -> str:
@@ -117,9 +299,7 @@ def add_beat(
     parties: list[str] | None = None,
 ) -> None:
     db.execute(
-        "INSERT INTO beats(id,name,patterns,languages,parties) VALUES(?,?,?,?,?) "
-        "ON CONFLICT(id) DO UPDATE SET name=excluded.name, patterns=excluded.patterns, "
-        "languages=excluded.languages, parties=excluded.parties",
+        "MERGE (n:Beat {id: ?}) SET n.name=?, n.patterns=?, n.languages=?, n.parties=?",
         (
             id,
             name,
@@ -133,13 +313,13 @@ def add_beat(
 def beats(db: Db) -> list[dict[str, Any]]:
     return [
         {**r, "patterns": json.loads(r["patterns"]), "parties": json.loads(r["parties"])}
-        for r in db.execute("SELECT * FROM beats")
+        for r in nodes(db, "Beat", "MATCH (n:Beat) RETURN n")
     ]
 
 
 def known_domains(db: Db) -> set[str]:
     """Domains already decided on, including rejected ones, so they are not re-probed forever."""
-    return {r["domain"] for r in db.execute("SELECT domain FROM sources")}
+    return {r["domain"] for r in db.execute("MATCH (n:Source) RETURN n.domain AS domain")}
 
 
 def register_source(
@@ -154,37 +334,44 @@ def register_source(
     type: str = "news",
     crawl: dict[str, Any] | None = None,
 ) -> None:
-    """Insert a discovered source. Ownership and state_run stay NULL: nothing here cites them."""
-    db.execute(
-        "INSERT OR IGNORE INTO sources(id,name,homepage,domain,feeds,status,discovered_via,"
-        "discovered_at,verified_at,type,crawl) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-        (
-            domain.replace(".", "-"),
-            name,
-            homepage,
-            domain,
-            json.dumps(feeds),
-            "rejected" if rejected else "active",
-            via,
-            _now(),
-            None if rejected else _now(),
-            type,
-            json.dumps(crawl) if crawl else None,
-        ),
-    )
+    """Insert a discovered source. Ownership and state_run stay null: nothing here cites them."""
+    if db.execute(
+        "MATCH (n:Source) WHERE n.domain=? OR n.id=? RETURN 1 AS x LIMIT 1",
+        (domain, domain.replace(".", "-")),
+    ):
+        return
+    props = {
+        **{k: v for k, v in NODES["Source"].items() if v is not None},
+        "id": domain.replace(".", "-"),
+        "name": name,
+        "homepage": homepage,
+        "domain": domain,
+        "feeds": feeds,
+        "status": "rejected" if rejected else "active",
+        "discovered_via": via,
+        "discovered_at": _now(),
+        "verified_at": None if rejected else _now(),
+        "type": type,
+        "crawl": crawl or None,
+    }
+    create(db, "Source", props)
 
 
 def set_health(db: Db, unhealthy_ids: list[str]) -> None:
     """Mark feeds unhealthy (no success within the health window) or healthy again."""
-    db.execute("UPDATE sources SET healthy=1")
-    for sid in unhealthy_ids:
-        db.execute("UPDATE sources SET healthy=0 WHERE id=?", (sid,))
+    db.execute(
+        "MATCH (n:Source) SET n.healthy = CASE WHEN n.id IN ? THEN 0 ELSE 1 END", (unhealthy_ids,)
+    )
+
+
+def all_sources(db: Db, where: str = "true", args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+    return nodes(db, "Source", f"MATCH (n:Source) WHERE {where} RETURN n", args)
 
 
 def active_sources(db: Db) -> list[dict[str, Any]]:
     """Active sources in the shape of config/sources/schema.json, for the poller."""
     out = []
-    for r in db.execute("SELECT * FROM sources WHERE status='active'"):
+    for r in all_sources(db, "n.status='active'"):
         e: dict[str, Any] = {
             "id": r["id"],
             "name": r["name"],
@@ -206,32 +393,40 @@ def active_sources(db: Db) -> list[dict[str, Any]]:
 
 
 def create_story(db: Db, id: str, beat_id: str, title: str) -> None:
-    db.execute(
-        "INSERT INTO stories(id,beat_id,title,created_at) VALUES(?,?,?,?)",
-        (id, beat_id, title, _now()),
+    create(
+        db,
+        "Story",
+        {"id": id, "beat_id": beat_id, "title": title, "public": 0, "created_at": _now()},
     )
+
+
+def get_story(db: Db, story_id: str) -> dict[str, Any] | None:
+    rows = nodes(db, "Story", "MATCH (n:Story {id: ?}) RETURN n", (story_id,))
+    return rows[0] if rows else None
 
 
 def set_public(db: Db, story_id: str, public: bool) -> bool:
     """Admin toggle. False if the story does not exist."""
-    if not db.execute("SELECT 1 FROM stories WHERE id=?", (story_id,)):
-        return False
-    db.execute("UPDATE stories SET public=? WHERE id=?", (int(public), story_id))
-    return True
+    return bool(
+        db.execute("MATCH (n:Story {id: ?}) SET n.public=? RETURN 1 AS x", (story_id, int(public)))
+    )
 
 
 def stories(db: Db, *, public_only: bool) -> list[dict[str, Any]]:
-    where = " WHERE public=1" if public_only else ""
+    where = "WHERE n.public=1" if public_only else ""
     return [
-        {**r, "public": bool(r["public"])}
-        for r in db.execute(f"SELECT id,beat_id,title,public,created_at FROM stories{where}")
+        {k: r[k] for k in ("id", "beat_id", "title", "created_at")} | {"public": bool(r["public"])}
+        for r in nodes(db, "Story", f"MATCH (n:Story) {where} RETURN n ORDER BY n.created_at")
     ]
 
 
-def from_env() -> TursoDb:
-    import os
-
-    db = TursoDb(os.environ["TURSO_URL"], os.environ["TURSO_TOKEN"])
+def from_env() -> Neo4jDb:
+    db = Neo4jDb(
+        os.environ["NEO4J_URI"],
+        os.environ.get("NEO4J_USER", "neo4j"),
+        os.environ["NEO4J_PASSWORD"],
+        os.environ.get("NEO4J_DATABASE") or None,
+    )
     init(db)
     return db
 
@@ -248,3 +443,15 @@ class LiveSources(dict[str, dict[str, Any]]):
         self.clear()
         self.update({s["id"]: s for s in active_sources(self._db)})
         return self[key] if key in self else super().__getitem__(key)
+
+
+def local_db() -> Neo4jDb:
+    """An empty database for tests and evals: `NEO4J_URI` (default the local server), wiped."""
+    db = Neo4jDb(
+        os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
+        os.environ.get("NEO4J_USER", "neo4j"),
+        os.environ.get("NEO4J_PASSWORD", "weft-test-pw"),
+    )
+    db.execute("MATCH (n) DETACH DELETE n")
+    init(db)
+    return db

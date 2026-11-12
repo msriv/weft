@@ -1,9 +1,9 @@
 from weft_core import graph, store
-from weft_core.store import SqliteDb
+from weft_core.store import Neo4jDb, local_db
 
 
-def db() -> SqliteDb:
-    d = SqliteDb()
+def db() -> Neo4jDb:
+    d = local_db()
     graph.init(d)
     return d
 
@@ -24,7 +24,7 @@ def test_put_closes_previous_version_and_asof_replays() -> None:
     )
     assert graph.get(d, "events", "e")["centroid"] == [2.0]  # type: ignore[index]
     assert graph.get(d, "events", "e", "2026-01-01T12:00:00")["centroid"] == [1.0]  # type: ignore[index]
-    assert d.execute("SELECT COUNT(*) AS n FROM events")[0]["n"] == 2  # nothing deleted
+    assert d.execute("MATCH (n:Event) RETURN count(n) AS n")[0]["n"] == 2  # nothing deleted
 
 
 def test_init_is_idempotent() -> None:

@@ -42,21 +42,22 @@ def run(ctx: Ctx) -> int:
     since = (datetime.fromisoformat(ctx.now) - timedelta(days=3)).isoformat()
     made = 0
     for doc in graph.select(
-        ctx.db, "documents", "COALESCE(published_at, valid_from) >= ?", (since,)
+        ctx.db, "documents", "coalesce(n.published_at, n.valid_from) >= ?", (since,)
     ):
-        if ctx.db.execute("SELECT 1 FROM statements WHERE document_id=? LIMIT 1", (doc["id"],)):
+        if ctx.db.execute(
+            "MATCH (n:Statement {document_id: ?}) RETURN 1 AS x LIMIT 1", (doc["id"],)
+        ):
             continue
         for name, role, start, end, quote in turns(ctx.text_of(doc)):
             aid = slug(name)
             ctx.db.execute(
-                "INSERT INTO actors(id,name,role) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET "
-                "role=COALESCE(actors.role, excluded.role)",
+                "MERGE (n:Actor {id: ?}) ON CREATE SET n.name=? SET n.role=coalesce(n.role, ?)",
                 (aid, name, role),
             )
             sid = hashlib.sha256(f"{doc['id']}:{start}".encode()).hexdigest()[:32]
             ctx.db.execute(
-                "INSERT OR IGNORE INTO statements(id,actor_id,document_id,text,start_char,end_char) "
-                "VALUES(?,?,?,?,?,?)",
+                "MERGE (n:Statement {id: ?}) ON CREATE SET n.actor_id=?, n.document_id=?, "
+                "n.text=?, n.start_char=?, n.end_char=?",
                 (sid, aid, doc["id"], quote[:QUOTE_CHARS], start, end),
             )
             made += 1

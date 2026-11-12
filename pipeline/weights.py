@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 
 from pipeline.ctx import Ctx
-from weft_core import graph, rules, weights
+from weft_core import graph, rules, store, weights
 
 
 def run(ctx: Ctx) -> int:
@@ -13,26 +13,24 @@ def run(ctx: Ctx) -> int:
         datetime.fromisoformat(ctx.now) - timedelta(days=cfg["weights"]["window_days"])
     ).isoformat()
     copied = set()
-    for a in graph.select(ctx.db, "anomalies", "rule='copied_text' AND status!='withdrawn'"):
+    for a in graph.select(ctx.db, "anomalies", "n.rule='copied_text' AND n.status<>'withdrawn'"):
         copied.update(a["evidence_ids"])
     silent = {
         a["subject_id"]
-        for a in graph.select(ctx.db, "anomalies", "rule='silent_edit' AND status!='withdrawn'")
+        for a in graph.select(ctx.db, "anomalies", "n.rule='silent_edit' AND n.status<>'withdrawn'")
     }
     n = 0
-    for s in ctx.db.execute("SELECT id, type FROM sources WHERE status='active'"):
+    for s in store.all_sources(ctx.db, "n.status='active'"):
         reps = graph.select(
             ctx.db,
             "reports",
-            "source_id=? AND COALESCE(published_at, fetched_at) >= ?",
+            "n.source_id=? AND coalesce(n.published_at, n.fetched_at) >= ?",
             (s["id"], since),
         )
         if not reps:
             continue
         ids = {r["id"] for r in reps}
-        claims = graph.select(
-            ctx.db, "claims", f"report_id IN ({','.join('?' * len(ids))})", tuple(ids)
-        )
+        claims = graph.select(ctx.db, "claims", "n.report_id IN ?", (list(ids),))
         notes = sum(1 for r in reps if rules.CORRECTION.search(ctx.text_of(r)))
         n_silent = len(ids & silent)
         total = len(reps)
@@ -50,9 +48,8 @@ def run(ctx: Ctx) -> int:
         }
         w, insufficient = weights.compute(factors, s["type"], total, cfg)
         ctx.db.execute(
-            "INSERT INTO source_weights(source_id,day,weight,factors,n_reports,insufficient) "
-            "VALUES(?,?,?,?,?,?) ON CONFLICT(source_id,day) DO UPDATE SET weight=excluded.weight, "
-            "factors=excluded.factors, n_reports=excluded.n_reports, insufficient=excluded.insufficient",
+            "MERGE (n:SourceWeight {source_id: ?, day: ?}) "
+            "SET n.weight=?, n.factors=?, n.n_reports=?, n.insufficient=?",
             (
                 s["id"],
                 ctx.now[:10],

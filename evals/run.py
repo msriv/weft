@@ -18,7 +18,7 @@ from pipeline import claims, regroup
 from weft_core import ask, graph, translate
 from weft_core.models import ModelClient
 from weft_core.nlp import default_nlp
-from weft_core.store import SqliteDb
+from weft_core.store import local_db
 from weft_core.textutil import sentences
 
 HERE = Path(__file__).parent
@@ -126,7 +126,7 @@ def eval_nli() -> dict[str, float]:
 
 
 def eval_translation(live: bool) -> dict[str, float]:
-    db = SqliteDb()
+    db = local_db()
     graph.init(db)
     res, _ = _model_task(
         "translation", live, lambda m, c: translate.translate(db, m, c["source"], c["dst"])

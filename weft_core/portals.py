@@ -65,9 +65,9 @@ def record_candidates(db: store.Db, domains: set[str], example_url: str) -> None
     now = datetime.now(UTC).isoformat()
     for d in domains:
         db.execute(
-            "INSERT INTO portal_candidates(domain,hits,example_url,last_seen) VALUES(?,?,?,?) "
-            "ON CONFLICT(domain) DO UPDATE SET hits=hits+1, last_seen=excluded.last_seen",
-            (d, 1, example_url, now),
+            "MERGE (n:PortalCandidate {domain: ?}) ON CREATE SET n.hits=0, n.example_url=? "
+            "SET n.hits=n.hits+1, n.last_seen=?",
+            (d, example_url, now),
         )
 
 
@@ -87,7 +87,8 @@ def discover_portals(db: store.Db, http: PoliteClient, limit: int = 10) -> dict[
     """Probe frequently linked, unknown government domains. Returns {domain: start_urls}."""
     known = store.known_domains(db)
     rows = db.execute(
-        "SELECT domain, example_url FROM portal_candidates WHERE hits >= ? ORDER BY hits DESC",
+        "MATCH (n:PortalCandidate) WHERE n.hits >= ? "
+        "RETURN n.domain AS domain, n.example_url AS example_url ORDER BY n.hits DESC",
         (MIN_HITS,),
     )
     registered: dict[str, list[str]] = {}

@@ -41,7 +41,8 @@ def versions_of(raw_bucket: str, db: Db):  # type: ignore[no-untyped-def]
         out: list[tuple[datetime, str]] = []
         last = None
         for v in db.execute(
-            "SELECT n, fetched_at, text_hash FROM report_versions WHERE report_id=? ORDER BY n",
+            "MATCH (v:ReportVersion {report_id: ?}) "
+            "RETURN v.n AS n, v.fetched_at AS fetched_at, v.text_hash AS text_hash ORDER BY v.n",
             (report_id,),
         ):
             if v["text_hash"] == last:

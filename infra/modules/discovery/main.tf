@@ -11,7 +11,7 @@ variable "schedule" {
   default     = "7 * * * *"
 }
 
-# Turso is outside GCP (D16). Terraform creates the secret containers; the credential values are
+# Neo4j AuraDB is managed outside GCP (D19). Terraform creates the secret containers; the values are
 # added once with `gcloud secrets versions add` so they never enter Terraform state.
 resource "google_project_service" "apis" {
   for_each           = toset(["run.googleapis.com", "cloudscheduler.googleapis.com", "secretmanager.googleapis.com"])
@@ -20,8 +20,8 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
-resource "google_secret_manager_secret" "turso" {
-  for_each  = toset(["turso-url", "turso-token", "admin-token"])
+resource "google_secret_manager_secret" "neo4j" {
+  for_each  = toset(["neo4j-uri", "neo4j-password", "admin-token"])
   project   = var.project_id
   secret_id = "weft-${each.key}"
   replication {
@@ -31,7 +31,7 @@ resource "google_secret_manager_secret" "turso" {
 }
 
 resource "google_secret_manager_secret_iam_member" "read" {
-  for_each  = google_secret_manager_secret.turso
+  for_each  = google_secret_manager_secret.neo4j
   project   = var.project_id
   secret_id = each.value.secret_id
   role      = "roles/secretmanager.secretAccessor"
@@ -52,12 +52,12 @@ resource "google_cloud_run_v2_job" "discovery" {
       containers {
         image = var.image
         dynamic "env" {
-          for_each = { TURSO_URL = "turso-url", TURSO_TOKEN = "turso-token" }
+          for_each = { NEO4J_URI = "neo4j-uri", NEO4J_PASSWORD = "neo4j-password" }
           content {
             name = env.key
             value_source {
               secret_key_ref {
-                secret  = google_secret_manager_secret.turso[env.value].secret_id
+                secret  = google_secret_manager_secret.neo4j[env.value].secret_id
                 version = "latest"
               }
             }
@@ -102,11 +102,16 @@ resource "google_cloud_scheduler_job" "discovery" {
   depends_on = [google_project_service.apis]
 }
 
-output "turso_secret_ids" {
-  description = "Secret ids for TURSO_URL and TURSO_TOKEN, for services that read the source store."
-  value       = { TURSO_URL = google_secret_manager_secret.turso["turso-url"].secret_id, TURSO_TOKEN = google_secret_manager_secret.turso["turso-token"].secret_id }
+output "neo4j_secret_ids" {
+  description = "Secret ids for NEO4J_URI and NEO4J_PASSWORD, for every service that reads the graph."
+  value       = { NEO4J_URI = google_secret_manager_secret.neo4j["neo4j-uri"].secret_id, NEO4J_PASSWORD = google_secret_manager_secret.neo4j["neo4j-password"].secret_id }
 }
 
 output "admin_token_secret_id" {
-  value = google_secret_manager_secret.turso["admin-token"].secret_id
+  value = google_secret_manager_secret.neo4j["admin-token"].secret_id
+}
+
+moved {
+  from = google_secret_manager_secret.turso["admin-token"]
+  to   = google_secret_manager_secret.neo4j["admin-token"]
 }
