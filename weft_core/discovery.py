@@ -20,6 +20,7 @@ import feedparser
 import httpx
 
 from weft_core import store
+from weft_core.nlp import StopwordLangId
 from weft_core.polite import PoliteClient
 
 GDELT_LAST = "http://data.gdeltproject.org/gdeltv2/lastupdate.txt"
@@ -27,6 +28,9 @@ FALLBACK_PATHS = ("/feed", "/rss", "/rss.xml", "/feed.xml", "/atom.xml")
 MIN_URLS = 3  # a domain needs this many matching articles in the window to be probed
 MAX_AGE = timedelta(days=7)  # a feed with nothing newer than this is not live
 PROBE_INTERVAL = 10.0
+# Launch languages (owner, 2026-11-06: English only, more later). Beat patterns are English, so a
+# source in another language would be polled but never match a story.
+LANGUAGES = frozenset({"en"})
 
 
 def parse_gkg(text: str) -> Iterable[tuple[str, str, str]]:
@@ -87,18 +91,32 @@ def feed_is_live(resp: httpx.Response, now: datetime) -> bool:
     return bool(stamps) and now - max(stamps) <= MAX_AGE
 
 
-def verified_feeds(http: PoliteClient, domain: str, now: datetime) -> tuple[str, str, list[str]]:
-    """(name, homepage, live feeds) for one domain. Empty feed list = nothing verified."""
+def feed_language(resp: httpx.Response) -> str:
+    """The feed's declared language (RSS <language>, Atom xml:lang), else a stopword guess over
+    its headlines. ISO 639-1 code, or 'und'."""
+    parsed = feedparser.parse(resp.content)
+    declared = (parsed.feed.get("language") or "").strip().lower()
+    if declared:
+        return declared[:2]
+    text = " ".join(f"{e.get('title', '')}. {e.get('summary', '')}" for e in parsed.entries[:20])
+    return StopwordLangId().detect(text)
+
+
+def verified_feeds(
+    http: PoliteClient, domain: str, now: datetime
+) -> tuple[str, str, list[str], str]:
+    """(name, homepage, live feeds, feed language) for one domain. No feeds = nothing verified."""
     home = f"https://{domain}/"
     try:
         page = http.get(home, PROBE_INTERVAL, {})
     except httpx.HTTPError:
-        return domain, home, []
+        return domain, home, [], "und"
     if page is None:
-        return domain, home, []
+        return domain, home, [], "und"
     title = re.search(r"<title[^>]*>([^<]{1,120})", page.text, re.IGNORECASE)
     name = title.group(1).strip() if title else domain
     live: list[str] = []
+    lang = "und"
     for url in feed_urls(str(page.url), page.text)[:6]:
         try:
             resp = http.get(url, PROBE_INTERVAL, {})
@@ -106,8 +124,9 @@ def verified_feeds(http: PoliteClient, domain: str, now: datetime) -> tuple[str,
             continue
         if resp is not None and feed_is_live(resp, now):
             live.append(url)
+            lang = feed_language(resp)
             break  # one verified feed is enough to register
-    return name, home, live
+    return name, home, live, lang
 
 
 def discover(
@@ -122,7 +141,8 @@ def discover(
         hits = candidate_domains(rows, beat["patterns"], known)
         ranked = sorted(hits, key=lambda d: -len(hits[d]))
         for domain in [d for d in ranked if len(hits[d]) >= MIN_URLS][:limit]:
-            name, home, feeds = verified_feeds(http, domain, now)
+            name, home, feeds, lang = verified_feeds(http, domain, now)
+            ok = bool(feeds) and lang in LANGUAGES
             store.register_source(
                 db,
                 domain=domain,
@@ -130,9 +150,10 @@ def discover(
                 homepage=home,
                 feeds=feeds,
                 via=f"gdelt:{beat['id']}",
-                rejected=not feeds,
+                rejected=not ok,  # remembered either way, so it is not probed again
+                languages=[lang],
             )
-            if feeds:
+            if ok:
                 found[domain] = feeds
     return found
 
