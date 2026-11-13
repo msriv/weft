@@ -4,6 +4,7 @@ import { AnomalyCard, Empty, Kicker } from "@/components/bits";
 import DetectivePanel from "@/components/DetectivePanel";
 import FollowButton from "@/components/FollowButton";
 import LiveFeed from "@/components/LiveFeed";
+import OpenQuestions from "@/components/OpenQuestions";
 import StoryGraph from "@/components/StoryGraph";
 import { api } from "@/lib/api";
 import { day, perspectiveName } from "@/lib/format";
@@ -103,7 +104,10 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
       {g.anomalies.length ? g.anomalies.map((a) => <AnomalyCard key={a.id} a={a} />) : <Empty>No anomalies. Every flag comes from a written rule you can read on <Link href="/method">How we weigh</Link>.</Empty>}
       <p className="muted" style={{ fontSize: 13 }}>Weight changes the order sources appear in. No report is hidden.</p>
       </div>
-      <DetectivePanel storyId={id} />
+      <div style={{ display: "grid", gap: 16 }}>
+        <OpenQuestions storyId={id} />
+        <DetectivePanel storyId={id} />
+      </div>
       </div>
     </>
   );

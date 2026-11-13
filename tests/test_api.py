@@ -371,3 +371,22 @@ def test_domestic_beat_groups_outlets_instead_of_countries() -> None:
     ev = graph.get(ctx.db, "reports", "1")["event_id"]  # type: ignore[index]
     sv = graph.get(ctx.db, "short_versions", ev)["payload"]  # type: ignore[index]
     assert set(sv["no_source_published"]) <= {"Left", "Right"}  # sides are the groups now
+
+
+def test_open_questions_come_from_rules_and_leave_when_answered() -> None:
+    from datetime import UTC, date, datetime
+
+    from weft_core import questions
+
+    assert questions.future_dates(
+        "A vote on 20 November and talks March 3", date(2026, 11, 13)
+    ) == [date(2026, 11, 20)]  # March 3 has passed this year
+    c, ctx = build()
+    assert c.get("/v1/stories/iran-israel-war/questions").status_code == 404  # not public
+    store.set_public(ctx.db, "iran-israel-war", True)
+    qs = c.get("/v1/stories/iran-israel-war/questions").json()
+    assert any(q["kind"] == "conflict" for q in qs)  # the fixture has a conflict
+    assert all(q["groups"] and q["would_change"] for q in qs)
+    ctx.db.execute("MATCH (n:Conflict) DETACH DELETE n")
+    later = questions.open_questions(ctx.db, "iran-israel-war", datetime(2026, 11, 6, tzinfo=UTC))
+    assert not any(q["kind"] == "conflict" for q in later)
