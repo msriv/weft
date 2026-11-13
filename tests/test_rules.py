@@ -31,14 +31,21 @@ def event(
 
 
 def test_omission_fires_when_a_whole_perspective_lacks_a_common_claim() -> None:
-    reps = [rep("1"), rep("2"), rep("3", "IL"), rep("4", "IR"), rep("5", "IR")]
-    g = Group("g", "claim", {"1", "2", "3", "4"})
-    assert rules.omission(event(reps, [g]), CFG) == [], "carried by 4 of 5 but IR has report 4"
-    g2 = Group("g", "claim", {"1", "2", "3"})  # 3 of 5 = 60%, none from IR
-    (a,) = rules.omission(event(reps, [g2]), CFG)
+    il = [rep(str(i)) for i in range(9)]
+    ir = [rep("a", "IR", "x"), rep("b", "IR", "y"), rep("c", "IR", "y")]
+    g = Group("g", "claim", {r.id for r in il})
+    (a,) = rules.omission(event(il + ir, [g]), CFG)  # 9 of 12 origins; none of IR's 3
     assert a.rule == "omission" and a.rule_version == CFG["version"]
-    assert a.inputs["perspective"] == "IR" and set(a.evidence_ids) >= {"1", "2", "3", "4", "5"}
+    assert a.inputs["perspective"] == "IR" and a.inputs["p"] < 0.05
+    assert (a.inputs["N"], a.inputs["K"], a.inputs["n_p"]) == (12, 9, 3)
+    assert set(a.evidence_ids) >= {"0", "a", "b", "c"}
     assert "true" not in a.summary.lower()  # coverage language only
+    assert rules.omission(event(il + ir[:2], [g]), CFG) == [], "2 IR texts: too few to mean much"
+    unread = [rep("a", "IR", "x"), rep("b", "IR", "y"), rep("c", "IR", "y", claims_extracted=False)]
+    assert rules.omission(event(il + unread, [g]), CFG) == [], "an unread report is not silence"
+    wire = [rep(str(i), origin_id="0") for i in range(9)]  # one text republished 9 times
+    assert rules.omission(event(wire + ir, [Group("g", "c", {r.id for r in wire})]), CFG) == []
+    assert rules.hypergeom_zero(12, 9, 3) == 1 / 220
 
 
 def test_omission_below_share_or_present_in_every_perspective_does_not_fire() -> None:

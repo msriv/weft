@@ -361,6 +361,7 @@ def event_row(db: Db, e: dict[str, Any], at: str | None = None) -> dict[str, Any
         "first_seen": e["first_seen"],
         "reports": len(reps),
         "outlets": len({r["source_id"] for r in reps}),
+        "origins": len({r.get("origin_id") or r["id"] for r in reps}),
         "perspectives": sorted({r["perspective"] for r in reps}),
         "grouping_confidence": e["grouping_confidence"],
     }

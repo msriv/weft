@@ -217,3 +217,28 @@ def test_stages_have_separate_budgets() -> None:
     ctx, _ = setup([])
     ctx.budget("s", "regroup").take("x" * 10_000_000)
     assert ctx.budget("s", "claims").take("hello")
+
+
+def test_origins_cluster_copies_and_claims_read_every_cell_first() -> None:
+    from pipeline import origins
+
+    ctx, _ = setup(['{"claims":[0]}'] * 3)
+    ctx.text_of = lambda r: (
+        "Aldoria closed the Kessar Strait to shipping on Monday, officials said."
+    )
+    assert origins.run(ctx) >= 2  # three identical texts: one origin, the earliest report
+    assert {r["origin_id"] for r in graph.select(ctx.db, "reports")} == {"1"}
+    claims.run(ctx)
+    rows = graph.select(ctx.db, "claims")
+    assert {c["report_id"] for c in rows} == {"1", "2", "3"}  # copies reuse the origin's claims
+    assert all(r["claims_extracted"] == 1 for r in graph.select(ctx.db, "reports"))
+    cells = [
+        {"id": i, "event_id": e, "perspective": p, "source_id": i}
+        for i, e, p in (
+            ("a", "big", "IL"),
+            ("b", "big", "IL"),
+            ("c", "big", "IR"),
+            ("d", "small", "IL"),
+        )
+    ]
+    assert [r["id"] for r in claims.order(cells, {})] == ["a", "c", "d", "b"]

@@ -76,6 +76,9 @@ NODES: dict[str, dict[str, Any]] = {
         "minhash": None,
         "embedding": None,
         "grouping_confidence": None,
+        "correction_note": None,
+        "origin_id": None,  # the earliest report of its independent-text cluster (#98)
+        "claims_extracted": None,  # 1 once claim extraction has read it (#106)
         **V,
     },
     "Event": {

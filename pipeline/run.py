@@ -14,6 +14,7 @@ from pipeline import (
     figures,
     groups,
     notify,
+    origins,
     regroup,
     review_sample,
     short_version,
@@ -26,6 +27,7 @@ from weft_core import graph
 
 STAGES: dict[str, Callable[[Ctx], int]] = {
     "regroup": regroup.run,
+    "origins": origins.run,
     "claims": claims.run,
     "figures": figures.run,
     "claim_groups": groups.run_groups,

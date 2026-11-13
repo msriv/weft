@@ -22,6 +22,8 @@ def load_event(
     ctx: Ctx, ev: dict[str, Any], sources: dict[str, dict[str, Any]], texts: dict[str, str]
 ) -> EventInput:
     reps = graph.reports_of_event(ctx.db, ev["id"])
+    claims = graph.select(ctx.db, "claims", "n.event_id=?", (ev["id"],))
+    claimed = {c["report_id"] for c in claims}
     rr = [
         Rep(
             id=r["id"],
@@ -34,11 +36,13 @@ def load_event(
             healthy=bool(sources[r["source_id"]]["healthy"]),
             type=r["type"],
             text=texts.setdefault(r["id"], ctx.text_of(r)),
+            origin_id=r.get("origin_id") or "",
+            # reports from before the flag count as read when they have claims
+            claims_extracted=bool(r.get("claims_extracted")) or r["id"] in claimed,
         )
         for r in reps
         if r["source_id"] in sources
     ]
-    claims = graph.select(ctx.db, "claims", "n.event_id=?", (ev["id"],))
     by_group: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for c in claims:
         if c["group_id"]:

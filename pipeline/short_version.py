@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from pipeline.ctx import Ctx
-from weft_core import graph, store
+from weft_core import graph, readmodel, store
 from weft_core.textutil import jaccard, words
 
 
@@ -69,14 +69,17 @@ def run(ctx: Ctx) -> int:
             if re.fullmatch(r"[A-Za-z]{2}", p["party"])
         }
         story_sents: list[str] = []
+        share = _origin_shares(ctx, story)
+        tracked, _ = readmodel.untracked(ctx.db, sorted(parties))
         for e in graph.select(ctx.db, "events", "n.story_id=?", (story,)):
             reports = graph.reports_of_event(ctx.db, e["id"])
+            expected = _expected(ctx, e, reports, parties, set(tracked), share)
             groups = graph.select(ctx.db, "claim_groups", "n.event_id=?", (e["id"],))
             conf = [
                 (c["group_a"], c["group_b"])
                 for c in graph.select(ctx.db, "conflicts", "n.event_id=?", (e["id"],))
             ]
-            sv = short_version(groups, conf, {r["perspective"] for r in reports}, parties)
+            sv = short_version(groups, conf, {r["perspective"] for r in reports}, expected)
             graph.put(ctx.db, "short_versions", {"id": e["id"], "payload": sv})
             if e["first_seen"] >= recent:  # the story summary covers the last week only
                 story_sents += [r["summary"].split(". ")[0] for r in reports[:3] if r["summary"]]
@@ -88,3 +91,54 @@ def run(ctx: Ctx) -> int:
             {"id": f"story:{story}", "payload": {"summary": [story_sents[i] for i in top]}},
         )
     return n
+
+
+def _origin_shares(ctx: Ctx, story: str) -> dict[str, float]:
+    """q_p: each perspective's share of the story's independent texts over 30 days."""
+    rows = graph.select(
+        ctx.db,
+        "reports",
+        "n.story_id=? AND coalesce(n.published_at, n.fetched_at) >= ?",
+        (story, (datetime.fromisoformat(ctx.now) - timedelta(days=30)).isoformat()),
+    )
+    origins: dict[str, str] = {}
+    for r in rows:
+        origins.setdefault(r.get("origin_id") or r["id"], r["perspective"])
+    total = len(origins) or 1
+    out: dict[str, float] = {}
+    for p in origins.values():
+        out[p] = out.get(p, 0.0) + 1 / total
+    return out
+
+
+def _expected(
+    ctx: Ctx,
+    e: dict[str, Any],
+    reports: list[dict[str, Any]],
+    parties: set[str],
+    tracked: set[str],
+    share: dict[str, float],
+) -> set[str]:
+    """Parties whose silence on this event means something (#100): Weft tracks no source there
+    (shown as untracked), or the event is big enough that p would be expected to have published
+    (N * q_p >= 3, a Poisson P(0) <= 0.05) and a healthy source from p published something
+    within 48 h of the event."""
+    n = len({r.get("origin_id") or r["id"] for r in reports})
+    end = (datetime.fromisoformat(e["first_seen"]) + timedelta(hours=48)).isoformat()
+    out = set()
+    for p in parties:
+        if p not in tracked:
+            out.add(p)
+            continue
+        if n * share.get(p, 0.0) < 3:
+            continue
+        if ctx.db.execute(
+            "MATCH (r:Report {perspective: ?}) WHERE r.valid_to IS NULL "
+            "AND coalesce(r.published_at, r.fetched_at) >= ? "
+            "AND coalesce(r.published_at, r.fetched_at) <= ? "
+            "MATCH (s:Source {id: r.source_id}) WHERE coalesce(s.healthy, 1) = 1 "
+            "RETURN 1 AS x LIMIT 1",
+            (p, e["first_seen"], end),
+        ):
+            out.add(p)
+    return out
