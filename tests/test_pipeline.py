@@ -387,3 +387,65 @@ def test_links_cite_documents_and_measure_quotes_against_statements() -> None:
     [row] = ctx.db.execute("MATCH (n:Quotes) RETURN n.edit_ratio AS e")
     assert 0 < row["e"] < 0.5
     assert links.edit_ratio("a b c d", "x a b c d y") == 0.0
+
+
+def test_story_summary_ranks_groups_by_origins_and_perspectives_with_mmr() -> None:
+    def g(i: str, persp: list[str], origins: int, vec: list[float]) -> dict[str, Any]:
+        return {
+            "id": i,
+            "label": f"claim {i}",
+            "perspectives": persp,
+            "origins": origins,
+            "vec": vec,
+        }
+
+    gs = [
+        g("a", ["IL", "IR"], 6, [1.0, 0.0]),
+        g("b", ["IL", "IR"], 3, [1.0, 0.01]),  # near duplicate of a: MMR passes over it
+        g("c", ["IL", "IR"], 2, [0.0, 1.0]),
+        g("d", ["IR"], 3, [0.7, 0.7]),
+        g("x", ["IL"], 4, [0.5, 0.5]),
+        g("y", ["IR"], 4, [0.5, 0.6]),
+    ]
+    items = short_version.story_summary(gs, [("x", "y")], {"IL", "IR"}, k=4)
+    kinds = [i["kind"] for i in items]
+    assert kinds[0] == "conflict" and kinds[-1] == "one_perspective"
+    claims_picked = [i["groups"][0] for i in items if i["kind"] == "claim"]
+    assert claims_picked == ["a", "c"]
+    assert items[1]["coverage"] == "Reported by all perspectives"
+    assert items[-1]["coverage"] == "One perspective only: IR"
+
+
+def test_whats_new_and_burst_rank_today() -> None:
+    from datetime import UTC, datetime
+
+    from weft_core import readmodel
+
+    ctx, _ = setup([])
+    ev = ctx_event(ctx)
+    story = graph.get(ctx.db, "events", ev)["story_id"]  # type: ignore[index]
+    t0, t1 = "2026-11-05T00:00:00+00:00", "2026-11-06T06:00:00+00:00"
+    old = {"id": "g1", "event_id": ev, "label": "old claim", "perspectives": ["IL"],
+           "n_reports": 1, "embedding": [1.0, 0.0]}  # fmt: skip
+    graph.put(ctx.db, "claim_groups", old, t0)
+    graph.put(ctx.db, "claim_groups", old | {"perspectives": ["IL", "IR"]}, t1)  # gained IR
+    graph.put(
+        ctx.db,
+        "claim_groups",
+        {
+            "id": "g2",
+            "event_id": ev,
+            "label": "fresh claim",
+            "perspectives": ["IR"],
+            "n_reports": 1,
+            "embedding": [0.0, 1.0],
+        },
+        t1,
+    )
+    news = readmodel.whats_new(ctx.db, [story], "2026-11-06T00:00:00+00:00")
+    assert {(n["kind"], n["group"]) for n in news} == {
+        ("gained_perspective", "g1"),
+        ("new_claim", "g2"),
+    }
+    # three reports inside the last 6 hours of a quiet story: a burst
+    assert readmodel.burst_z(ctx.db, story, datetime(2026, 11, 6, 6, tzinfo=UTC)) > 2

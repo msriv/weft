@@ -92,6 +92,7 @@ NODES: dict[str, dict[str, Any]] = {
         "n_reports": 1,
         "grouping_confidence": None,
         "follows": None,
+        "label_report_id": None,  # medoid headline among news reports (#112)
         "thread_id": None,
         "thread_label": None,
         **V,
@@ -125,6 +126,7 @@ NODES: dict[str, dict[str, Any]] = {
         "label": None,
         "perspectives": "[]",
         "n_reports": 0,
+        "embedding": None,  # mean of member contents: what's new compares groups by it (#112)
         **V,
     },
     "Conflict": {"group_a": None, "group_b": None, "event_id": None, "nli_score": None, **V},

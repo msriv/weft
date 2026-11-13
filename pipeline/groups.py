@@ -46,6 +46,11 @@ def cluster(
     return [[claims[i] for i in c] for c in average_link(n, score, 0.5, [])]
 
 
+def mean_vec(vecs: list[list[float]]) -> list[float]:
+    dim = len(vecs[0])
+    return [sum(v[k] for v in vecs) / len(vecs) for k in range(dim)]
+
+
 def medoid(members: list[dict[str, Any]]) -> dict[str, Any]:
     """The member closest to all others; ties go to the lowest id, so it is stable."""
     vec = [m.get("content_embedding") or m["embedding"] for m in members]
@@ -103,10 +108,13 @@ def run_groups(ctx: Ctx) -> int:
                 "label": medoid(members)["text"][:300],
                 "perspectives": persp,
                 "n_reports": len({c["report_id"] for c in members}),
+                "embedding": mean_vec([c["content_embedding"] for c in members]),
             }
             prev = old.get(gid)
-            if prev is None or any(
-                prev[k] != row[k] for k in ("label", "perspectives", "n_reports")
+            if (
+                prev is None
+                or not prev.get("embedding")
+                or any(prev[k] != row[k] for k in ("label", "perspectives", "n_reports"))
             ):
                 graph.put(ctx.db, "claim_groups", row)
                 made += 1
