@@ -92,7 +92,7 @@ services:
   api:
     build: { context: ., dockerfile: services/api/Dockerfile }
     restart: unless-stopped  # like Cloud Run: a crashed service comes back
-    environment: { <<: *env, WEFT_NLP: light }
+    environment: *env  # WEFT_NLP=real comes from the image, as in the pipeline
     depends_on: { <<: *deps, firebase: { condition: service_started } }
     ports: ["8080:8080"]
   fetcher:

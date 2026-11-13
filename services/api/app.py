@@ -417,7 +417,7 @@ def _asker(db: store.Db) -> Callable[[str], dict[str, Any]] | None:
     from pipeline.gcp import bq_sink
     from weft_core import ask
     from weft_core.models import ModelClient
-    from weft_core.nlp import default_nlp
+    from weft_core.nlp import default_embedder
 
     model = ModelClient(
         base_url=os.environ["MODEL_BASE_URL"],
@@ -426,5 +426,5 @@ def _asker(db: store.Db) -> Callable[[str], dict[str, Any]] | None:
         revision=os.environ["MODEL_REVISION"],
         log=bq_sink(os.environ["PROJECT_ID"]),
     )
-    embedder = default_nlp().embedder
+    embedder = default_embedder()
     return lambda q: ask.answer(db, embedder, model, q)
