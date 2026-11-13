@@ -242,3 +242,79 @@ def test_origins_cluster_copies_and_claims_read_every_cell_first() -> None:
         )
     ]
     assert [r["id"] for r in claims.order(cells, {})] == ["a", "c", "d", "b"]
+
+
+def test_average_link_keeps_chains_apart_and_honours_must_links_and_checks() -> None:
+    # 0-1 and 1-2 close, 0-2 far: single-link would chain all three, average-link does not
+    score = {(0, 1): 0.9, (1, 2): 0.6, (0, 2): 0.1, (2, 3): 0.0}
+    assert regroup.average_link(4, score, 0.55, []) == [[0, 1], [2], [3]]
+    assert sorted(regroup.average_link(4, score, 0.55, [(2, 3)])) == [[0, 1], [2, 3]]
+    # a merge inside the band goes to the check; a refusal keeps the clusters apart
+    asked: list[tuple[list[int], list[int]]] = []
+
+    def refuse(a: list[int], b: list[int]) -> bool:
+        asked.append((a, b))
+        return False
+
+    out = regroup.average_link(3, {(0, 1): 0.57}, 0.55, [], refuse, 0.05)
+    assert asked == [([0], [1])] and out == [[0], [1], [2]]
+    # and a yes merges a pair just below the cut
+    assert regroup.average_link(2, {(0, 1): 0.52}, 0.55, [], lambda a, b: True, 0.05) == [[0, 1]]
+
+
+def test_split_maps_clusters_to_existing_ids_and_freezes_older_events() -> None:
+    assert regroup.assign(["e1", "e1", "e1", "e2"], [[0, 1], [2], [3]]) == ["e1", None, "e2"]
+    ctx, _ = setup([])
+    [e] = graph.select(ctx.db, "events")
+    # make report 3 unlike the others: the split moves it out, the event id stays with 1 and 2
+    r3 = graph.get(ctx.db, "reports", "3")
+    assert r3
+    graph.put(ctx.db, "reports", {**regroup._row(r3), "embedding": [-x for x in r3["embedding"]]})
+    ctx.db.execute("MATCH (n:ReportEntity {report_id: '3'}) DELETE n")
+    ctx.cfg["nightly"]["merge_min_score"] = 1.1  # no merges: only the split acts
+    ctx.model = None
+    assert regroup.split(ctx) == 1
+    events = {x["id"]: x for x in graph.select(ctx.db, "events")}
+    assert e["id"] in events and len(events) == 2
+    assert {r["id"] for r in graph.reports_of_event(ctx.db, e["id"])} == {"1", "2"}
+    assert events[e["id"]]["n_reports"] == 2
+    assert regroup.split(ctx) == 0  # stable on a second night
+    # an event that began before the window is frozen
+    ctx.now = "2026-11-12T12:00:00+00:00"
+    moved = graph.get(ctx.db, "reports", "3")
+    assert moved
+    graph.put(ctx.db, "reports", {**regroup._row(moved), "event_id": e["id"]})
+    assert regroup.split(ctx) == 0
+
+
+def test_threads_link_related_events_below_the_attach_cut() -> None:
+    from pipeline import threads
+
+    ctx, _ = setup([])
+    [e] = graph.select(ctx.db, "events")
+    base = {k: e[k] for k in ("story_id", "n_reports", "grouping_confidence")}
+    v1 = [1.0, 0.0, 0.0]
+    v2 = [0.45, (1 - 0.45**2) ** 0.5, 0.0]  # cosine 0.45 to v1: related, not the same event
+    v3 = [0.0, 0.0, 1.0]
+    for eid, vec, ents, day in (
+        ("a", v1, {"Aldoria": 3, "Kessar": 2}, "01"),
+        ("b", v2, {"Aldoria": 1, "Kessar": 1}, "04"),
+        ("c", v3, {"Veymar": 1}, "05"),
+    ):
+        graph.put(
+            ctx.db,
+            "events",
+            {
+                **base,
+                "id": eid,
+                "centroid": vec,
+                "entities": list(ents),
+                "entity_counts": ents,
+                "first_seen": f"2026-11-{day}T00:00:00+00:00",
+            },
+        )
+    assert threads.run(ctx) == 1
+    got = {x["id"]: x for x in graph.select(ctx.db, "events")}
+    assert got["b"]["follows"] == "a" and got["b"]["thread_id"] == "a"
+    assert got["a"]["thread_label"] == "Aldoria · Kessar"
+    assert got["c"]["follows"] is None and got["c"]["thread_label"] is None

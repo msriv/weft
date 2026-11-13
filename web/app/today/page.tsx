@@ -25,7 +25,7 @@ export default async function TodayPage() {
           <h3>{evs[0].title}</h3>
           {evs.map((e) => (
             <Link key={e.id} href={`/s/${e.story_id}/e/${e.id}`} className="card" style={{ display: "block" }}>
-              <div>{e.label ?? "Untitled event"}</div>
+              <div>{e.thread_label && e.follows ? <span className="muted">Thread {e.thread_label} advanced: </span> : null}{e.label ?? "Untitled event"}</div>
               <div className="muted" style={{ fontSize: 13 }}>
                 {e.label_source && `Headline from ${e.label_source} · `}{e.outlets} outlets · {e.perspectives.map(perspectiveName).join(", ")}
                 {e.new_documents > 0 && ` · ${e.new_documents} new documents`} · first seen {ago(e.first_seen)}

@@ -364,6 +364,9 @@ def event_row(db: Db, e: dict[str, Any], at: str | None = None) -> dict[str, Any
         "origins": len({r.get("origin_id") or r["id"] for r in reps}),
         "perspectives": sorted({r["perspective"] for r in reps}),
         "grouping_confidence": e["grouping_confidence"],
+        "follows": e.get("follows"),
+        "thread_id": e.get("thread_id") or e["id"],
+        "thread_label": e.get("thread_label"),
     }
 
 

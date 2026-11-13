@@ -79,10 +79,10 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
         <section aria-label="Events">
           {g.events.map((e) => (
             <div className="card" id={`event-${e.id}`} key={e.id}>
-              <Kicker>{day(e.first_seen)} · {e.perspectives.map(perspectiveName).join(", ")}</Kicker>
+              <Kicker>{day(e.first_seen)} · {e.perspectives.map(perspectiveName).join(", ")}{e.thread_label ? ` · Thread: ${e.thread_label}` : ""}</Kicker>
               <h3><Link href={`/s/${id}/e/${e.id}`}>{e.label ?? "Event"}</Link></h3>
               {e.label_source && <p className="muted" style={{ fontSize: 12 }}>Headline from {e.label_source}</p>}
-              <p className="muted">{e.reports} reports</p>
+              <p className="muted">{e.reports} reports{e.follows && <> · follows <a href={`#event-${e.follows}`}>an earlier event</a></>}</p>
             </div>
           ))}
         </section>
@@ -93,7 +93,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
             <Kicker>Events</Kicker>
             {g.events.map((e) => (
               <div className="row" id={`event-${e.id}`} key={e.id}>
-                <Link href={`/s/${id}/e/${e.id}`}>{e.label ?? "Event"}</Link><span className="muted">{e.reports} reports</span>
+                <Link href={`/s/${id}/e/${e.id}`}>{e.label ?? "Event"}</Link><span className="muted">{e.thread_label ? `${e.thread_label} · ` : ""}{e.reports} reports</span>
               </div>
             ))}
           </section>

@@ -14,6 +14,12 @@ stream:
 
 nightly:
   regroup_days: 14
+  split_days: 3                  # re-cluster this many days from scratch; older events frozen (#105)
+  split_max_gap_hours: 48        # two reports further apart never share an event in the split
+  split_check_band: 0.05         # average-link merges this close to the cut go to merge_check
+  thread_entity_cosine: 0.50     # FOLLOWS: entity overlap at least this (#109)
+  thread_centroid_band: [0.35, 0.55]  # and text similarity in this band (below attach)
+  thread_max_gap_days: 14
   merge_min_score: 0.45          # below this a pair is never a candidate
   merge_auto_score: 0.80         # at or above this, merge without asking the model
   claim_group_cosine: 0.82       # claims of one event closer than this say the same thing

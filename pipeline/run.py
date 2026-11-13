@@ -20,6 +20,7 @@ from pipeline import (
     short_version,
     snapshot,
     statements,
+    threads,
     weights,
 )
 from pipeline.ctx import Ctx
@@ -27,6 +28,7 @@ from weft_core import graph
 
 STAGES: dict[str, Callable[[Ctx], int]] = {
     "regroup": regroup.run,
+    "threads": threads.run,
     "origins": origins.run,
     "claims": claims.run,
     "figures": figures.run,

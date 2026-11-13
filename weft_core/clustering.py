@@ -50,7 +50,7 @@ def vetoed(ents: set[str], counts: dict[str, int], idf: dict[str, float]) -> boo
     return not any(idf.get(e, cut + 1) > cut for e in ents & set(counts))
 
 
-def _hours(a: str, b: str) -> float:
+def hours(a: str, b: str) -> float:
     return abs((datetime.fromisoformat(a) - datetime.fromisoformat(b)).total_seconds()) / 3600
 
 
@@ -74,7 +74,7 @@ def score(
         top = sorted((cosine(vec, m) for m in members), reverse=True)[: cfg.get("member_top_k", 3)]
         cos = max(cos, sum(top) / len(top))
     last = event.get("last_seen") or event["first_seen"]
-    t = math.exp(-_hours(when, last) / cfg["time_decay_hours"])
+    t = math.exp(-hours(when, last) / cfg["time_decay_hours"])
     return float(
         w["cosine"] * cos + w["entities"] * entity_cosine(ents, counts, idf or {}) + w["time"] * t
     )
