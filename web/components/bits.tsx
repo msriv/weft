@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AnomalyFeedback from "@/components/AnomalyFeedback";
 import { RULE_NAMES, STATE_LABEL, ago, perspectiveName } from "@/lib/format";
 import type { Anomaly, Issuer, SourceLabel, StoryCard } from "@/lib/types";
 
@@ -38,6 +39,7 @@ export function AnomalyCard({ a }: { a: Anomaly }) {
         Rule {a.rule} version {a.rule_version} · {a.evidence_ids.length} pieces of evidence ·{" "}
         <Link href={`/nodes/${a.id}`}>See the rule and evidence</Link>
       </div>
+      <AnomalyFeedback id={a.id} />
     </div>
   );
 }

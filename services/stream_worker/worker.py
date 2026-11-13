@@ -5,17 +5,17 @@ raw copy. Reports that match no beat are still written, with no story or event.
 """
 
 import hashlib
-import math
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from weft_core import beats as beats_mod
-from weft_core import graph, portals, store
+from weft_core import clustering, graph, portals, store
 from weft_core.models import ModelClient
 from weft_core.nlp import Nlp
-from weft_core.textutil import cosine, jaccard, minhash, minhash_similarity, shingles
+from weft_core.textutil import minhash, minhash_similarity, shingles
 
 OPINION = ("/opinion/", "/op-ed/", "/oped/", "/comment/", "/commentisfree/", "/views/", "/column")
 ANALYSIS = ("/analysis/", "/explainer/", "/explained/", "/long-read/", "/feature/")
@@ -53,27 +53,40 @@ def classify_type(url: str, section: str, title: str, lede: str, model: ModelCli
     return out if out in ("news", "op-ed", "analysis") else "news"
 
 
-def _hours(a: str, b: str) -> float:
-    return abs((datetime.fromisoformat(a) - datetime.fromisoformat(b)).total_seconds()) / 3600
+IDF_WINDOW = timedelta(days=30)
 
 
 def attach_score(
-    vec: list[float], ents: set[str], when: str, event: dict[str, Any], cfg: dict[str, Any]
+    vec: list[float],
+    ents: set[str],
+    when: str,
+    event: dict[str, Any],
+    cfg: dict[str, Any],
+    idf: dict[str, float] | None = None,
+    members: list[list[float]] | None = None,
+    veto: bool = False,
 ) -> float:
-    w = cfg["weights"]
-    ev_ents = set(event["entities"])
-    t = math.exp(-_hours(when, event["first_seen"]) / cfg["time_decay_hours"])
-    return float(
-        w["cosine"] * cosine(vec, event["centroid"])
-        + w["entities"] * jaccard(ents, ev_ents)
-        + w["time"] * t
+    return clustering.score(vec, ents, when, event, cfg, idf, members, veto)
+
+
+def story_idf(db: store.Db, story_id: str, since: str) -> tuple[dict[str, float], int]:
+    """IDF of entities over the story's reports since `since` (ReportEntity, #104)."""
+    rows = db.execute(
+        "MATCH (r:Report {story_id: ?}) WHERE r.valid_to IS NULL "
+        "AND coalesce(r.published_at, r.fetched_at) >= ? "
+        "OPTIONAL MATCH (e:ReportEntity {report_id: r.id}) "
+        "RETURN r.id AS r, collect(DISTINCT e.name) AS names",
+        (story_id, since),
     )
+    df: Counter[str] = Counter()
+    for row in rows:
+        df.update(set(row["names"]))
+    return clustering.idf_table(df, len(rows)), len(rows)
 
 
-def _mean(centroid: list[float], n: int, vec: list[float]) -> list[float]:
-    m = [(c * n + v) / (n + 1) for c, v in zip(centroid, vec, strict=True)]
-    norm = math.sqrt(sum(x * x for x in m)) or 1.0
-    return [x / norm for x in m]
+def _members(db: store.Db, event_id: str) -> list[list[float]]:
+    # shortcut: reads every member's embedding; cap or cache per event past ~200 reports
+    return [r["embedding"] for r in graph.reports_of_event(db, event_id) if r.get("embedding")]
 
 
 def place(
@@ -84,9 +97,12 @@ def place(
     vec: list[float],
     published: str,
     document: bool = False,
+    must_link: list[str] | None = None,
 ) -> tuple[str | None, str | None, float | None, str]:
-    """Match a beat, then attach to the nearest open event of its story or open a new one."""
+    """Match a beat, then attach to the nearest open event of its story or open a new one.
+    `must_link`: events holding a near-identical copy of this report (attached to directly)."""
     cfg = d.cfg["stream"]
+    must_link = must_link or []
     story_id = event_id = None
     confidence = None
     matched = beats_mod.matching(store.beats(d.db), f"{text} {' '.join(ent_names)}")
@@ -97,10 +113,28 @@ def place(
             datetime.fromisoformat(published) - timedelta(hours=cfg["candidate_window_hours"])
         ).isoformat()
         cands = graph.open_events(d.db, story_id, window)
-        scored = sorted(
-            ((attach_score(vec, ent_names, published, e, cfg), e) for e in cands),
-            key=lambda x: -x[0],
-        )[: cfg["candidate_limit"]]
+        idf, n_docs = story_idf(
+            d.db, story_id, (datetime.fromisoformat(published) - IDF_WINDOW).isoformat()
+        )
+        veto = n_docs >= cfg.get("veto_min_reports", 20)
+        by_id = {e["id"]: e for e in cands}
+        linked = next((by_id[e] for e in must_link if e in by_id), None)
+        scored = (
+            [(1.0, linked)]  # a near-identical copy of a member: must-link
+            if linked
+            else sorted(
+                (
+                    (
+                        attach_score(
+                            vec, ent_names, published, e, cfg, idf, _members(d.db, e["id"]), veto
+                        ),
+                        e,
+                    )
+                    for e in cands
+                ),
+                key=lambda x: -x[0],
+            )[: cfg["candidate_limit"]]
+        )
         if scored and scored[0][0] >= cfg["attach_threshold"]:
             confidence, ev = scored[0]
             event_id = ev["id"]
@@ -111,9 +145,7 @@ def place(
                 "events",
                 {
                     **{k: ev[k] for k in ("id", "story_id", "first_seen")},
-                    "centroid": _mean(ev["centroid"], ev["n_reports"], vec),
-                    "entities": sorted(set(ev["entities"]) | ent_names)[:60],
-                    "n_reports": ev["n_reports"] + 1,
+                    **clustering.absorb(ev, vec, ent_names, published),
                     "grouping_confidence": confidence,
                 },
             )
@@ -132,6 +164,8 @@ def place(
                     "first_seen": published,
                     "centroid": vec,
                     "entities": sorted(ent_names)[:60],
+                    "entity_counts": dict.fromkeys(ent_names, 1),
+                    "last_seen": published,
                     "n_reports": 1,
                     "grouping_confidence": confidence,
                 },
@@ -167,6 +201,7 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
         datetime.fromisoformat(published) - timedelta(hours=cfg["near_dup_window_hours"])
     ).isoformat()
     copies = []
+    copy_events: list[str] = []
     for r in graph.select(
         d.db,
         "reports",
@@ -176,8 +211,12 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
         j = minhash_similarity(sig, r["minhash"])
         if j >= cfg["near_dup_jaccard"]:
             copies.append((r["id"], j))
+            if r.get("event_id"):
+                copy_events.append(r["event_id"])
 
-    story_id, event_id, confidence, status = place(d, rid, text, ent_names, vec, published)
+    story_id, event_id, confidence, status = place(
+        d, rid, text, ent_names, vec, published, must_link=copy_events
+    )
 
     graph.put(
         d.db,

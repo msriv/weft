@@ -84,6 +84,8 @@ NODES: dict[str, dict[str, Any]] = {
         "first_seen": None,
         "centroid": None,
         "entities": "[]",
+        "entity_counts": "{}",
+        "last_seen": None,
         "n_reports": 1,
         "grouping_confidence": None,
         **V,
@@ -141,6 +143,14 @@ NODES: dict[str, dict[str, Any]] = {
         "evidence_ids": None,
         "detail": None,
         **V,
+    },
+    "AnomalyFeedback": {
+        "anomaly_id": None,
+        "rule": None,
+        "rule_version": None,
+        "inputs": None,
+        "label": None,
+        "at": None,
     },
     "AnomalyLog": {
         "seq": None,

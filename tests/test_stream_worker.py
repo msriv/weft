@@ -235,3 +235,26 @@ def test_only_on_beat_reports_suggest_portals() -> None:
     process({**on, "gov_domains": ["mfa.gov.il"]}, d)
     got = {r["domain"] for r in db.execute("MATCH (n:PortalCandidate) RETURN n.domain AS domain")}
     assert got == {"mfa.gov.il"}
+
+
+def test_attach_score_weighs_rare_entities_and_vetoes_beat_wide_ones() -> None:
+    from collections import Counter
+
+    from weft_core import clustering
+
+    df = Counter({"Aldoria": 30, "Veymar": 30, "Kessar": 2, "Port Halen": 1})
+    idf = clustering.idf_table(df, 30)
+    ev = {"centroid": [1.0, 0.0], "first_seen": "2026-11-06T00:00:00+00:00", "n_reports": 2,
+          "entity_counts": {"Aldoria": 2, "Kessar": 2}}  # fmt: skip
+    cfg = config.pipeline()["stream"]
+    rare = clustering.score(
+        [1.0, 0.0], {"Aldoria", "Kessar"}, "2026-11-06T01:00:00+00:00", ev, cfg, idf, veto=True
+    )
+    common = clustering.score(
+        [1.0, 0.0], {"Aldoria", "Veymar"}, "2026-11-06T01:00:00+00:00", ev, cfg, idf, veto=True
+    )
+    assert rare > 0.5 and common == 0.0  # only beat-wide entities shared: vetoed
+    later = clustering.absorb(ev, [0.0, 1.0], {"Kessar"}, "2026-11-06T05:00:00+00:00")
+    assert (
+        later["entity_counts"]["Kessar"] == 3 and later["last_seen"] == "2026-11-06T05:00:00+00:00"
+    )

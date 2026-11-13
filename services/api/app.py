@@ -18,7 +18,17 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from weft_core import accounts, detective, digest, graph, questions, readmodel, review, store
+from weft_core import (
+    accounts,
+    detective,
+    digest,
+    feedback,
+    graph,
+    questions,
+    readmodel,
+    review,
+    store,
+)
 
 STREAM_POLL_SECONDS = 5
 
@@ -53,6 +63,10 @@ class BeatTerms(BaseModel):
     patterns: list[str]
     exclude: list[str] = []
     groups: dict[str, str] | None = None  # source id -> outlet group (D21); None leaves as is
+
+
+class Feedback(BaseModel):
+    label: str
 
 
 class Subscription(BaseModel):
@@ -330,6 +344,20 @@ def create_app(
             "r.fetched_at AS fetched_at ORDER BY r.fetched_at DESC LIMIT ?",
             (min(limit, 500),),
         )
+
+    @adm.post("/anomalies/{anomaly_id}/feedback")
+    def anomaly_feedback(anomaly_id: str, body: Feedback) -> dict[str, Any]:
+        """Owner label for the anomaly eval set (#114). Tunes rules, never decides this one."""
+        try:
+            return feedback.label(db, anomaly_id, body.label)
+        except KeyError as exc:
+            raise HTTPException(404, "no such anomaly") from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @adm.get("/anomaly-precision")
+    def anomaly_precision() -> list[dict[str, Any]]:
+        return feedback.precision(db)
 
     @adm.get("/runs")
     def runs(limit: int = 200) -> list[dict[str, Any]]:
