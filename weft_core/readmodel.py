@@ -12,7 +12,7 @@ from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from weft_core import config, graph, store
+from weft_core import config, feedback, graph, store
 from weft_core.perspectives import perspective_of
 from weft_core.rules import log_odds
 from weft_core.store import Db
@@ -875,6 +875,7 @@ def method(db: Db) -> dict[str, Any]:
             ],
         },
         "models": models(),
+        "rule_precision": feedback.precision(db),
         "model_calls_note": "Every model input and output is logged with the pinned model revision.",
         "corrections": [
             dict(c)

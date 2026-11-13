@@ -115,10 +115,13 @@ class Anomaly:
     evidence_ids: list[str]
     detail: dict[str, Any] = field(default_factory=dict)
     status: str = "active"
+    key: str = ""  # tells apart anomalies on one subject: omission's perspective, an edit's time
 
     @property
     def id(self) -> str:
         key = f"{self.rule}:{self.subject_kind}:{self.subject_id}:{self.event_id}"
+        if self.key:
+            key += f":{self.key}"
         return hashlib.sha256(key.encode()).hexdigest()[:32]
 
 
@@ -162,6 +165,7 @@ def omission(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
                             "perspective": p,
                         },
                         evidence_ids=sorted(have) + [r.id for r in prs],
+                        key=p,
                         detail={
                             "label": g.label,
                             "carrying": sorted(have),
@@ -363,6 +367,7 @@ def silent_edit(edits: list[Edit], cfg: dict[str, Any]) -> list[Anomaly]:
                     f"{t1:%Y-%m-%d %H:%M}, with no correction note on the page.",
                     inputs={"refetch_after": c["refetch_after"]},
                     evidence_ids=[e.report.id],
+                    key=t1.isoformat(),
                     detail={"from": t0.isoformat(), "to": t1.isoformat(), "diff": d[:40]},
                 )
             )

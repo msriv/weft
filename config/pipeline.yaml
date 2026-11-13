@@ -6,7 +6,9 @@ stream:
   candidate_limit: 20
   attach_threshold: 0.55         # score = w_cos*cos + w_ent*entity_jaccard + w_time*time_proximity
   weights: {cosine: 0.60, entities: 0.25, time: 0.15}
-  time_decay_hours: 24
+  time_decay_hours: 24           # from the event's last report (#104)
+  member_top_k: 3                # also score against the 3 nearest member reports
+  veto_min_reports: 20           # entity veto once the story has this many reports in 30 days
   near_dup_jaccard: 0.80
   near_dup_window_hours: 72
 

@@ -4,6 +4,7 @@ run `python -m evals.run --live`, check the scores, then update evals/baseline.j
 """
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -38,7 +39,13 @@ def check(
     return errors
 
 
-def main(path: Path = HERE / "baseline.json") -> int:
+def main(path: Path = HERE / "baseline.json", argv: list[str] | None = None) -> int:
+    """`--real` (the model-change path, run where the models are installed) refuses to pass on
+    the lexical NLI stand-in, so mDeBERTa itself is gated (#113)."""
+    args = sys.argv[1:] if argv is None else argv
+    if "--real" in args and os.environ.get("WEFT_NLP") != "real":
+        print("EVAL GATE: --real needs WEFT_NLP=real (the real NLI model)", file=sys.stderr)
+        return 1
     errors = check(json.loads(path.read_text()), run_all(), prompt_versions())
     for e in errors:
         print("EVAL GATE:", e, file=sys.stderr)

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from pipeline.ctx import Ctx
-from weft_core import config, graph, rules, store
+from weft_core import config, feedback, graph, rules, store
 from weft_core.rules import Anomaly, EventInput, Figure, Group, Rep
 
 
@@ -169,6 +169,11 @@ def run(ctx: Ctx) -> int:
         for a in rules.silent_edit(edits, cfg):
             a.story_id = report_story.get(a.subject_id, "")
             found.append(a)
+    # a rule notifies only once owner labels show it is useful (#114); until then provisional
+    ok = feedback.promoted(ctx.db, cfg)
+    for a in found:
+        if a.status == "active" and a.rule not in ok:
+            a.status = "provisional"
     return reconcile(ctx, found, evaluated, set(stories))
 
 

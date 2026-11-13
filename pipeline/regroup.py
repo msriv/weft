@@ -6,6 +6,7 @@ closes the smaller event and moves its reports (nothing is deleted).
 """
 
 import json
+from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -13,7 +14,7 @@ from jsonschema import ValidationError, validate
 
 from pipeline.ctx import Ctx
 from services.stream_worker.worker import attach_score
-from weft_core import graph
+from weft_core import clustering, graph
 from weft_core.models import ModelClient
 
 SCHEMA = {
@@ -119,6 +120,13 @@ def _merge(ctx: Ctx, keep: dict[str, Any], drop: dict[str, Any], score: float) -
             **{k: keep[k] for k in ("id", "story_id", "first_seen")},
             "centroid": centroid,
             "entities": sorted(set(keep["entities"]) | set(drop["entities"]))[:60],
+            "entity_counts": dict(
+                Counter(clustering.entity_counts(keep)) + Counter(clustering.entity_counts(drop))
+            ),
+            "last_seen": max(
+                keep.get("last_seen") or keep["first_seen"],
+                drop.get("last_seen") or drop["first_seen"],
+            ),
             "n_reports": n,
             "grouping_confidence": score,
         },

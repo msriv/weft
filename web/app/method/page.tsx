@@ -7,6 +7,7 @@ type Method = {
   rules_version: number; provisional: Record<string, number>; rules: Record<string, Record<string, unknown>>;
   weights: { factors: { id: string; name: string; how: string; direction: string }[] };
   models: { job: string; model: string; how: string }[]; model_calls_note: string;
+  rule_precision?: { rule: string; rule_version: number; labelled: number; useful: number; precision: number }[];
   corrections: { day: string; kind: string; what: string }[]; gdelt_citation: string;
 };
 
@@ -39,6 +40,11 @@ export default async function MethodPage() {
       <hr />
       <Kicker>Where we use AI models</Kicker>
       <p>{m.model_calls_note} Never used for: flagging anomalies, scoring sources, or deciding what a story is about.</p>
+      <Kicker>How often each rule's flags were useful</Kicker>
+      <p className="muted" style={{ fontSize: 13 }}>The owner labels flags as useful or not. A rule only notifies once at least 20 labels say it is useful 70% of the time; until then its flags are provisional.</p>
+      {m.rule_precision?.length ? m.rule_precision.map((p) => (
+        <div className="row" key={`${p.rule}:${p.rule_version}`}><b>{p.rule}</b><span className="muted">version {p.rule_version}</span><span>{p.useful} of {p.labelled} useful ({Math.round(p.precision * 100)}%)</span></div>
+      )) : <p className="muted">No labels yet.</p>}
       {m.models.map((x) => <div className="row" key={x.job}><b>{x.job}</b><span className="muted">{x.model}</span><span>{x.how}</span></div>)}
       <hr />
       <Kicker>Who pays for Weft</Kicker>

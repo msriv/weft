@@ -42,6 +42,7 @@ JSON_COLS = {
     "centroid",
     "minhash",
     "entities",
+    "entity_counts",
     "perspectives",
     "evidence_ids",
     "payload",

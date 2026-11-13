@@ -1,6 +1,8 @@
 import json
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from pipeline import anomalies, weights
 from pipeline.ctx import Ctx
 from weft_core import config, graph, store
@@ -82,15 +84,16 @@ def make() -> Ctx:
 
 def test_reconcile_appears_changes_and_withdraws_with_log() -> None:
     c = make()
+    c.rules = {**c.rules, "promotion": {"enabled": False}}
     assert anomalies.run(c) == 1
     (a,) = graph.select(c.db, "anomalies")
-    assert a["rule"] == "numbers_differ" and a["status"] == "active" and a["rule_version"] == 2
+    assert a["rule"] == "numbers_differ" and a["status"] == "active" and a["rule_version"] == 3
     assert a["evidence_ids"] and a["inputs"]["threshold"] == 0.2
     assert anomalies.run(c) == 0  # nothing changed: no new version, no log line
     c.now = (NOW + timedelta(days=1)).isoformat()
     c.rules = {
         **c.rules,
-        "version": 3,
+        "version": 4,
         "rules": {
             **c.rules["rules"],
             "numbers_differ": {"enabled": True, "min_relative_difference": 0.9},
@@ -102,8 +105,39 @@ def test_reconcile_appears_changes_and_withdraws_with_log() -> None:
         "MATCH (n:AnomalyLog) RETURN n.change AS change, n.rule_version AS rule_version "
         "ORDER BY n.seq"
     )
-    assert [(r["change"], r["rule_version"]) for r in log] == [("appeared", 2), ("withdrawn", 3)]
+    assert [(r["change"], r["rule_version"]) for r in log] == [("appeared", 3), ("withdrawn", 4)]
     assert c.db.execute("MATCH (n:Anomaly) RETURN count(n) AS n")[0]["n"] == 2  # history kept
+
+
+def test_rule_stays_provisional_until_owner_labels_show_it_is_useful() -> None:
+    from weft_core import feedback
+
+    c = make()
+    anomalies.run(c)
+    (a,) = graph.select(c.db, "anomalies")
+    assert a["status"] == "provisional"  # no labels yet
+    with pytest.raises(ValueError):
+        feedback.label(c.db, a["id"], "true")
+    for i in range(20):  # the eval set: 20 labelled anomalies of this rule
+        c.db.execute(
+            "CREATE (:AnomalyFeedback {anomaly_id: ?, rule: 'numbers_differ', rule_version: 3, "
+            "label: ?})",
+            (f"x{i}", "useful" if i < 14 else "not_useful"),
+        )
+    assert feedback.precision(c.db)[0]["precision"] == 0.7
+    anomalies.run(c)
+    assert graph.get(c.db, "anomalies", a["id"])["status"] == "active"  # type: ignore[index]
+    feedback.label(c.db, a["id"], "wrong_grouping")
+    assert feedback.precision(c.db)[0]["labelled"] == 21
+
+
+def test_omission_ids_differ_per_perspective() -> None:
+    from weft_core.rules import Anomaly
+
+    def omit(p: str) -> Anomaly:
+        return Anomaly("omission", 3, "claim_group", "g", "s", "e", "", {}, [], key=p)
+
+    assert omit("IL").id != omit("IR").id
 
 
 def test_unhealthy_feed_marks_source_and_weights_stage_writes_rows() -> None:
@@ -122,6 +156,7 @@ def test_unhealthy_feed_marks_source_and_weights_stage_writes_rows() -> None:
 
 def test_anomaly_on_an_aged_out_event_is_kept_not_withdrawn() -> None:
     c = make()
+    c.rules = {**c.rules, "promotion": {"enabled": False}}
     assert anomalies.run(c) == 1
     (a,) = graph.select(c.db, "anomalies")
     c.now = (NOW + timedelta(days=60)).isoformat()  # event far outside the regroup window

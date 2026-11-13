@@ -92,7 +92,7 @@ def test_story_event_node_document_actor_world_method() -> None:
     assert {i["country"] for i in w["stories"]} >= {"IL", "IR"}
     assert any(g["country"] == "IR" and g["reports"] < 3 for g in w["gaps"])  # coverage gap wording
     m = c.get("/v1/method").json()
-    assert m["rules_version"] == 2 and len(m["weights"]["factors"]) == 6
+    assert m["rules_version"] == 3 and len(m["weights"]["factors"]) == 6
     assert c.get("/v1/today").json()["day"] is None or True
 
 
@@ -117,7 +117,7 @@ def test_admin_cannot_assert_state_run_without_citation_and_problems_flow() -> N
         headers=H,
     )
     assert ok.status_code == 200
-    assert store.active_sources(ctx.db)[0]["state_run"] is True
+    assert next(s for s in store.active_sources(ctx.db) if s["id"] == "a-il")["state_run"] is True
     assert (
         c.post("/v1/reports-problem", json={"kind": "bogus", "message": "hello there"}).status_code
         == 422

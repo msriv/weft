@@ -1,7 +1,14 @@
 # Anomaly rule thresholds. Published on How we weigh.
 # Bump `version` on any change; every anomaly records the version that fired it.
 # These are starting points, to tune against an editor-labelled set before launch.
-version: 2  # 2026-11-12: numbers within claim group, silence floor, narrower silent edit
+version: 3  # 2026-11-13: anomaly ids per perspective/edit; promotion gate from owner labels
+
+# A rule fires as active (and may notify) only after owner labels on its anomalies reach these;
+# until then everything it finds is provisional (#114). Labels never decide a single anomaly.
+promotion:
+  enabled: true
+  min_labels: 20
+  min_useful_share: 0.70
 
 provisional:
   min_sources: 5
