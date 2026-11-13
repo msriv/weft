@@ -415,12 +415,18 @@ def known_domains(db: Db, retry_before: str | None = None) -> set[str]:
     }
 
 
-def add_candidate_hits(db: Db, domain: str, beat_id: str, n: int, now: str) -> None:
-    """Add beat-matching article URLs seen for an unknown domain. Counts add up across runs."""
+def add_candidate_hits(
+    db: Db, domain: str, beat_id: str, n: int, now: str, relevance_sum: float | None = None
+) -> None:
+    """Add beat-matching article URLs seen for an unknown domain. Counts, summed relevance and
+    the distinct days seen add up across runs (#107)."""
+    day = now[:10]
     db.execute(
         "MERGE (n:DomainCandidate {domain: ?, beat_id: ?}) ON CREATE SET n.hits=0, n.first_seen=? "
-        "SET n.hits=n.hits+?, n.last_seen=?",
-        (domain, beat_id, now, n, now),
+        "SET n.hits=n.hits+?, n.last_seen=?, n.rel_sum=coalesce(n.rel_sum, 0.0)+?, "
+        "n.days = CASE WHEN ? IN coalesce(n.days, []) THEN n.days "
+        "ELSE coalesce(n.days, []) + ? END",
+        (domain, beat_id, now, n, now, float(n if relevance_sum is None else relevance_sum), day, day),
     )
 
 
@@ -429,7 +435,11 @@ def candidates(db: Db, beat_id: str, min_hits: int, limit: int) -> list[str]:
         r["domain"]
         for r in db.execute(
             "MATCH (n:DomainCandidate {beat_id: ?}) WHERE n.hits >= ? "
-            "RETURN n.domain AS domain ORDER BY n.hits DESC LIMIT ?",
+            "RETURN n.domain AS domain ORDER BY "
+            # mean relevance x distinct days seen (#107); hits break ties
+            "CASE WHEN n.hits > 0 THEN coalesce(n.rel_sum, toFloat(n.hits)) / n.hits "
+            "* size(coalesce(n.days, [1])) ELSE 0.0 END DESC, "
+            "n.hits DESC LIMIT ?",
             (beat_id, min_hits, limit),
         )
     ]

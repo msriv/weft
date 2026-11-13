@@ -15,6 +15,7 @@ from pipeline import (
     groups,
     notify,
     origins,
+    profiles,
     regroup,
     review_sample,
     short_version,
@@ -40,6 +41,7 @@ STAGES: dict[str, Callable[[Ctx], int]] = {
     "weights": weights.run,
     "detective": detective.run,
     "snapshot": lambda ctx: snapshot.run(ctx, _sink()),
+    "profiles": profiles.run,
     "review_sample": review_sample.run,
     "notify": notify.run,
 }

@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from weft_core import beats as beats_mod
-from weft_core import clustering, graph, portals, store
+from weft_core import clustering, graph, portals, relevance, store
 from weft_core.models import ModelClient
 from weft_core.nlp import Nlp
 from weft_core.textutil import minhash, minhash_similarity, shingles
@@ -105,10 +105,18 @@ def place(
     must_link = must_link or []
     story_id = event_id = None
     confidence = None
-    matched = beats_mod.matching(store.beats(d.db), f"{text} {' '.join(ent_names)}")
+    blob = f"{text} {' '.join(ent_names)}"
+    beat, rel = relevance.best(store.beats(d.db), relevance.load(d.db), blob, vec, ent_names)
+    if beat is not None and relevance.MAYBE <= rel < relevance.ACCEPT:
+        # held for the owner to label (#107); placed only when the beat's terms match
+        relevance.record_maybe(d.db, rid, beat["id"], rel, published)
+        if not beats_mod.matches(beat, blob):
+            beat = None
+    elif rel < relevance.MAYBE:
+        beat = None
     status = "no_beat"
-    if matched:
-        story_id = beats_mod.ensure_story(d.db, matched[0])
+    if beat is not None:
+        story_id = beats_mod.ensure_story(d.db, beat)
         window = (
             datetime.fromisoformat(published) - timedelta(hours=cfg["candidate_window_hours"])
         ).isoformat()
