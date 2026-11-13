@@ -163,6 +163,7 @@ def ingest(
             "gov_domains": sorted(portals.outbound_gov_domains(html, canonical))
             if ext == "html"
             else [],
+            "gov_links": portals.outbound_gov_links(html, canonical) if ext == "html" else [],
         },
     )
 

@@ -263,6 +263,8 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
         d.db.execute(
             "MERGE (c:Copy {report_id: ?, copy_of: ?}) ON CREATE SET c.jaccard=?", (rid, other, j)
         )
+    for key in msg.get("gov_links") or []:  # resolved to documents by the nightly links stage
+        d.db.execute("MERGE (:Cites {report_id: ?, url_key: ?})", (rid, key))
     if story_id and msg.get("gov_domains"):  # only on-beat reports suggest portals worth crawling
         portals.record_candidates(d.db, set(msg["gov_domains"]), msg["url"])
     d.publish({"report_id": rid, "event_id": event_id, "story_id": story_id, "status": status})

@@ -1,7 +1,8 @@
 # Anomaly rule thresholds. Published on How we weigh.
 # Bump `version` on any change; every anomaly records the version that fired it.
 # These are starting points, to tune against an editor-labelled set before launch.
-version: 5  # 2026-11-13: figure intervals, figure_revised, anonymous_sourcing, single_origin,
+version: 6  # 2026-11-13: quote_differs (#108)
+# version 5: figure intervals, figure_revised, anonymous_sourcing, single_origin,
 # conflicting_accounts (#99, #101, #102, #103)
 # version 4: origins and a hypergeometric baseline for omission (#98, #100)
 # version 3: anomaly ids per perspective/edit; promotion gate from owner labels
@@ -43,6 +44,10 @@ rules:
   conflicting_accounts:
     enabled: true                      # provisional until owner labels pass the promotion gate
     min_origins_per_side: 2
+  quote_differs:
+    enabled: true                      # a report's quote against the issued text of the same speaker
+    min_edit_ratio: 0.10
+    max_edit_ratio: 0.50
   silence:
     enabled: true
     outlet_quiet_hours: 48

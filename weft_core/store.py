@@ -426,7 +426,16 @@ def add_candidate_hits(
         "SET n.hits=n.hits+?, n.last_seen=?, n.rel_sum=coalesce(n.rel_sum, 0.0)+?, "
         "n.days = CASE WHEN ? IN coalesce(n.days, []) THEN n.days "
         "ELSE coalesce(n.days, []) + ? END",
-        (domain, beat_id, now, n, now, float(n if relevance_sum is None else relevance_sum), day, day),
+        (
+            domain,
+            beat_id,
+            now,
+            n,
+            now,
+            float(n if relevance_sum is None else relevance_sum),
+            day,
+            day,
+        ),
     )
 
 

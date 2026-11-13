@@ -95,7 +95,27 @@ def load_event(
         figs,
         conflicts,
         party_names(ctx, ev["story_id"]),
+        load_quotes(ctx, ev["id"], sources),
     )
+
+
+def load_quotes(
+    ctx: Ctx, event_id: str, sources: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    rows = ctx.db.execute(
+        "MATCH (f:Figure {event_id: ?, kind: 'quote'}) WHERE f.valid_to IS NULL "
+        "MATCH (q:Quotes {figure_id: f.id}) MATCH (s:Statement {id: q.statement_id}) "
+        "MATCH (d:Document {id: s.document_id}) WHERE d.valid_to IS NULL "
+        "OPTIONAL MATCH (a:Actor {id: s.actor_id}) "
+        "RETURN f.id AS figure_id, f.report_id AS report_id, f.text AS text, f.speaker AS speaker, "
+        "s.id AS statement_id, s.text AS statement, a.name AS actor, d.issuer_id AS issuer_id, "
+        "q.edit_ratio AS edit_ratio",
+        (event_id,),
+    )
+    return [
+        {**r, "issuer": (sources.get(r["issuer_id"]) or {}).get("name") or r["issuer_id"]}
+        for r in rows
+    ]
 
 
 def party_names(ctx: Ctx, story_id: str) -> list[str]:

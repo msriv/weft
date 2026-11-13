@@ -125,6 +125,9 @@ class EventInput:
     figures: list[Figure]
     conflicts: list[tuple[str, str, float]] = field(default_factory=list)  # group a, b, NLI
     parties: list[str] = field(default_factory=list)  # names of the story's parties (rule 7)
+    # quote / official statement pairs (#108): figure_id, report_id, text, speaker, statement_id,
+    # statement, actor, issuer, edit_ratio
+    quotes: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -727,6 +730,44 @@ def conflicting_accounts(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
     return out
 
 
+def _same_person(a: str | None, b: str | None) -> bool:
+    """Speaker names match when one's last word appears in the other ("Voss", "Arlen Voss")."""
+    x, y = normalise(a).split(), normalise(b).split()
+    return bool(x and y) and (x[-1] in y or y[-1] in x)
+
+
+def quote_differs(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
+    """A report quotes a speaker, an official document of the story records the same speaker,
+    and the quote's words differ from the issued text by a share inside the band (#108). Below
+    the band is a faithful quote; above it is probably another passage. The summary names the
+    issuer of the text (rule 7) and says nothing about which wording is right (rule 1)."""
+    c = cfg["rules"]["quote_differs"]
+    lo, hi = c["min_edit_ratio"], c["max_edit_ratio"]
+    out = []
+    for q in ev.quotes:
+        if not _same_person(q.get("speaker"), q.get("actor")):
+            continue
+        if not lo <= q["edit_ratio"] <= hi:
+            continue
+        out.append(
+            _a(
+                "quote_differs",
+                cfg,
+                subject_kind="quote",
+                subject_id=q["figure_id"],
+                story_id=ev.story_id,
+                event_id=ev.id,
+                summary=f"This quote of {q['actor']} differs from the text issued by "
+                f"{q['issuer']} ({q['edit_ratio']:.0%} of words differ).",
+                inputs={"min_edit_ratio": lo, "max_edit_ratio": hi, "edit_ratio": q["edit_ratio"]},
+                evidence_ids=[q["report_id"], q["statement_id"]],
+                detail={"quote": q["text"], "statement": q["statement"], "issuer": q["issuer"]},
+                key=q["statement_id"],
+            )
+        )
+    return out
+
+
 def unattributed(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
     c = cfg["rules"]["unattributed"]
     out = []
@@ -762,6 +803,7 @@ EVENT_RULES = {
     "anonymous_sourcing": anonymous_sourcing,
     "single_origin": single_origin,
     "conflicting_accounts": conflicting_accounts,
+    "quote_differs": quote_differs,
 }
 
 

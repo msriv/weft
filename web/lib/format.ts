@@ -25,7 +25,7 @@ export const RULE_NAMES: Record<string, string> = {
   omission: "Omission", numbers_differ: "Numbers differ", silence: "Silence",
   copied_text: "Copied text", silent_edit: "Silent edit", loaded_wording: "Loaded wording",
   unattributed: "Unattributed", figure_revised: "Figure revised", anonymous_sourcing: "Anonymous sourcing",
-  single_origin: "One speaker behind it", conflicting_accounts: "Conflicting accounts",
+  single_origin: "One speaker behind it", conflicting_accounts: "Conflicting accounts", quote_differs: "Quote differs from issued text",
 };
 
 export const STATE_LABEL: Record<string, string> = {

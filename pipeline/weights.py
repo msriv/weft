@@ -20,6 +20,12 @@ def run(ctx: Ctx) -> int:
         a["subject_id"]
         for a in graph.select(ctx.db, "anomalies", "n.rule='silent_edit' AND n.status<>'withdrawn'")
     }
+    citing = {
+        r["r"]
+        for r in ctx.db.execute(
+            "MATCH (c:Cites) WHERE c.document_id IS NOT NULL RETURN DISTINCT c.report_id AS r"
+        )
+    }
     n = 0
     for s in store.all_sources(ctx.db, "n.status='active'"):
         reps = graph.select(
@@ -43,7 +49,8 @@ def run(ctx: Ctx) -> int:
                 if claims
                 else None
             ),
-            "links_documents": None,  # needs outbound links from the fetcher; not collected yet
+            # share of reports linking a stored official document (#108)
+            "links_documents": len(ids & citing) / total,
             "corrects_openly": notes / (notes + n_silent) if notes + n_silent else None,
             "silent_edits": min(1.0, n_silent / total),
             "copied_wording": len(ids & copied) / total,

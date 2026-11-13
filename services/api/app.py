@@ -368,7 +368,9 @@ def create_app(
 
     @adm.post("/beat-maybes/{report_id}")
     def beat_maybe_label(report_id: str, body: BeatLabel) -> dict[str, Any]:
-        relevance.label_maybe(db, report_id, body.beat_id, body.on_beat, datetime.now(UTC).isoformat())
+        relevance.label_maybe(
+            db, report_id, body.beat_id, body.on_beat, datetime.now(UTC).isoformat()
+        )
         return {"ok": True}
 
     @adm.get("/anomaly-precision")

@@ -353,3 +353,37 @@ def test_claim_groups_link_by_mutual_entailment_and_keep_medoid_ids() -> None:
         groups.medoid([a, b, e])["id"]
         == groups.medoid([a, b, e, c("f", "5", [0.7, 0.7], "x")])["id"]
     )
+
+
+def test_links_cite_documents_and_measure_quotes_against_statements() -> None:
+    from pipeline import links
+    from weft_core import portals
+
+    ctx, _ = setup([])
+    story = graph.get(ctx.db, "reports", "1")["story_id"]  # type: ignore[index]
+    graph.put(
+        ctx.db,
+        "documents",
+        {"id": "d1", "url": "https://www.gov.example/release/1/", "story_id": story,
+         "issuer_id": "gov-example", "published_at": NOW},
+    )  # fmt: skip
+    ctx.db.execute(
+        "MERGE (:Cites {report_id: '1', url_key: ?})",
+        (portals.url_key("https://gov.example/release/1"),),
+    )
+    assert links.cites(ctx) == 1
+    assert graph.get(ctx.db, "documents", "d1")["event_id"] == ctx_event(ctx)  # type: ignore[index]
+    ctx.db.execute(
+        "CREATE (:Statement {id: 's1', document_id: 'd1', actor_id: 'voss', "
+        "text: 'we targeted military bases only and nothing else'})"
+    )
+    graph.put(
+        ctx.db,
+        "figures",
+        {"id": "q1", "report_id": "1", "event_id": ctx_event(ctx), "kind": "quote",
+         "text": "we targeted military bases only and nothing more", "speaker": "Tehran"},
+    )  # fmt: skip
+    assert links.quotes(ctx) == 1
+    [row] = ctx.db.execute("MATCH (n:Quotes) RETURN n.edit_ratio AS e")
+    assert 0 < row["e"] < 0.5
+    assert links.edit_ratio("a b c d", "x a b c d y") == 0.0

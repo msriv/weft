@@ -87,13 +87,13 @@ def test_reconcile_appears_changes_and_withdraws_with_log() -> None:
     c.rules = {**c.rules, "promotion": {"enabled": False}}
     assert anomalies.run(c) == 1
     (a,) = graph.select(c.db, "anomalies")
-    assert a["rule"] == "numbers_differ" and a["status"] == "active" and a["rule_version"] == 5
+    assert a["rule"] == "numbers_differ" and a["status"] == "active" and a["rule_version"] == 6
     assert a["evidence_ids"] and a["inputs"]["min_log_ratio"] == 0.22
     assert anomalies.run(c) == 0  # nothing changed: no new version, no log line
     c.now = (NOW + timedelta(days=1)).isoformat()
     c.rules = {
         **c.rules,
-        "version": 6,
+        "version": 7,
         "rules": {
             **c.rules["rules"],
             "numbers_differ": {"enabled": True, "min_log_ratio": 2.3},
@@ -105,7 +105,7 @@ def test_reconcile_appears_changes_and_withdraws_with_log() -> None:
         "MATCH (n:AnomalyLog) RETURN n.change AS change, n.rule_version AS rule_version "
         "ORDER BY n.seq"
     )
-    assert [(r["change"], r["rule_version"]) for r in log] == [("appeared", 5), ("withdrawn", 6)]
+    assert [(r["change"], r["rule_version"]) for r in log] == [("appeared", 6), ("withdrawn", 7)]
     assert c.db.execute("MATCH (n:Anomaly) RETURN count(n) AS n")[0]["n"] == 2  # history kept
 
 
