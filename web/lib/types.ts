@@ -48,8 +48,9 @@ export type EventPage = {
   event: { id: string; story_id: string; label: string | null; label_source?: string | null; first_seen: string; reports: number; perspectives: string[] };
   voices: Record<string, { headline: string | null; headline_source: string | null; words: string[]; reports: number }>;
   perspectives: Record<string, ReportView[]>;
-  claim_groups: { id: string; label: string; perspectives: string[]; n_reports: number }[];
+  claim_groups: { id: string; label: string; perspectives: string[]; n_reports: number; claims: { report_id: string; text: string; start: number; end: number }[] }[];
   conflicts: { groups: string[]; nli_score: number }[];
+  figures: { id: string; report_id: string; kind: "number" | "quote"; quantity: string | null; value: number | null; unit: string | null; speaker: string | null; text: string }[];
   documents: { id: string; title: string; kind: string; url: string; published_at: string | null; issuer: Issuer | null }[];
   anomalies: Anomaly[];
   short_version: { reported_by_all: string[]; reports_conflict_on: string[][]; one_perspective_only: { group: string; perspective: string }[]; no_source_published: string[]; untracked?: string[] } | null;
