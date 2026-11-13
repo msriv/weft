@@ -178,6 +178,8 @@ def test_live_changes_and_stream_is_hidden_until_public() -> None:
     assert c.get("/v1/stories/iran-israel-war/stream").status_code == 404
     got = readmodel.changes(ctx.db, "iran-israel-war", "2000-01-01")
     assert {m["type"] for m in got} >= {"node.added"}
+    added = next(m for m in got if m["type"] == "node.added")["data"]
+    assert added["title"] and added["source"] and added["url"].startswith("https://")
     assert readmodel.changes(ctx.db, "iran-israel-war", "2999-01-01") == []
 
 

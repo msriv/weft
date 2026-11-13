@@ -30,6 +30,11 @@ export default function LiveFeed({ storyId }: { storyId: string }) {
       {items.map((m, i) => (
         <div key={i} className="fade-in">
           {LABEL[m.type]} {m.data.status === "provisional" ? <span className="pill">provisional</span> : null}
+          {m.type === "node.added" && typeof m.data.title === "string" && (
+            <>: <a href={`/nodes/${m.data.id}`}>{m.data.title}</a>{typeof m.data.source === "string" && <span className="muted"> · {m.data.source}</span>}
+              {typeof m.data.url === "string" && <> · <a href={m.data.url} rel="noopener noreferrer">Original ↗</a></>}</>
+          )}
+          {m.type === "anomaly.updated" && typeof m.data.summary === "string" && <>: <a href={`/nodes/${m.data.id}`}>{m.data.summary}</a></>}
           <span className="muted"> {m.at.slice(11, 19)}</span>
         </div>
       ))}

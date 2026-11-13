@@ -990,12 +990,20 @@ def changes(db: Db, story_id: str, since: str) -> list[dict[str, Any]]:
     shortcut: read straight from the graph tables; replace with Pub/Sub -> Redis when many
     readers hold streams open."""
     out: list[dict[str, Any]] = []
-    for r in graph.select(db, "reports", "n.story_id=? AND n.valid_from > ?", (story_id, since)):
+    reps = graph.select(db, "reports", "n.story_id=? AND n.valid_from > ?", (story_id, since))
+    src = sources_by_id(db) if reps else {}
+    for r in reps:
         out.append(
             {
                 "type": "node.added",
                 "at": r["valid_from"],
-                "data": {"id": r["id"], "perspective": r["perspective"]},
+                "data": {
+                    "id": r["id"],
+                    "perspective": r["perspective"],
+                    "title": r["title"],
+                    "source": src.get(r["source_id"], {}).get("name", r["source_id"]),
+                    "url": r["url"],
+                },
             }
         )
     for a in graph.select(db, "anomalies", "n.story_id=? AND n.valid_from > ?", (story_id, since)):
@@ -1003,7 +1011,7 @@ def changes(db: Db, story_id: str, since: str) -> list[dict[str, Any]]:
             {
                 "type": "anomaly.updated",
                 "at": a["valid_from"],
-                "data": {"id": a["id"], "status": a["status"]},
+                "data": {"id": a["id"], "status": a["status"], "summary": a["summary"]},
             }
         )
     return sorted(out, key=lambda m: m["at"])
