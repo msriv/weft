@@ -6,6 +6,7 @@ real sentence from a report.
 """
 
 import re
+from datetime import datetime, timedelta
 from typing import Any
 
 from pipeline.ctx import Ctx
@@ -57,6 +58,7 @@ def textrank(sents: list[str], k: int = 3, iters: int = 30) -> list[int]:
 
 def run(ctx: Ctx) -> int:
     n = 0
+    recent = (datetime.fromisoformat(ctx.now) - timedelta(days=7)).isoformat()
     for story in {r["story_id"] for r in ctx.recent_reports(14)}:
         parties = {
             p["party"].upper()
@@ -75,7 +77,8 @@ def run(ctx: Ctx) -> int:
             ]
             sv = short_version(groups, conf, {r["perspective"] for r in reports}, parties)
             graph.put(ctx.db, "short_versions", {"id": e["id"], "payload": sv})
-            story_sents += [r["summary"].split(". ")[0] for r in reports[:3] if r["summary"]]
+            if e["first_seen"] >= recent:  # the story summary covers the last week only
+                story_sents += [r["summary"].split(". ")[0] for r in reports[:3] if r["summary"]]
             n += 1
         top = textrank(story_sents)
         graph.put(

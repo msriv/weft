@@ -175,27 +175,47 @@ def list_stories(
     return sorted(cards, key=key, reverse=True)
 
 
-def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] | None:
+WINDOW_DAYS = 7
+
+
+def story_graph(
+    db: Db,
+    story_id: str,
+    at: str | None = None,
+    days: int = WINDOW_DAYS,
+    until: str | None = None,
+) -> dict[str, Any] | None:
     """Nodes and edges for the story view, as of `at` (Replay). Layout is computed by the client:
-    x = day, one band per perspective, official documents on the spine."""
+    x = day, one band per perspective, official documents on the spine. Only the `days` days
+    ending at `until` (default: `at`, else now) are shown; `days=0` shows the whole story."""
     s = public_story(db, story_id)
     if s is None:
         return None
     src = sources_by_id(db)
     plist = parties(db, story_id)
-    reps = graph.select(db, "reports", "n.story_id=?", (story_id,), at)
+    end = until or at or datetime.now(UTC).isoformat()
+    start = (datetime.fromisoformat(end) - timedelta(days=days)).isoformat() if days else ""
+    every = graph.select(db, "reports", "n.story_id=?", (story_id,), at)
+    when = {r["id"]: r["published_at"] or r["fetched_at"] or "" for r in every}
+    reps = [r for r in every if start <= when[r["id"]] <= end]
+    rep_ids = {r["id"] for r in reps}
+    in_window = {r["event_id"] for r in reps if r["event_id"]}
     groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for r in reps:
         if r["event_id"]:
             groups[(r["event_id"], r["perspective"])].append(r)
-    anomalies = anomalies_for(db, "n.story_id=?", (story_id,), at)
+    anomalies = [
+        a
+        for a in anomalies_for(db, "n.story_id=?", (story_id,), at)
+        if a["event_id"] in in_window or rep_ids & set(a["evidence_ids"])
+    ]
     flagged = defaultdict(list)
     for a in anomalies:
         for rid in a["evidence_ids"]:
             flagged[rid].append(a["id"])
     nodes: list[dict[str, Any]] = []
     for (eid, persp), rs in sorted(groups.items()):
-        days = sorted((r["published_at"] or r["fetched_at"] or "") for r in rs)
+        stamps = sorted(when[r["id"]] for r in rs)
         nodes.append(
             {
                 "id": f"{eid}:{persp}",
@@ -203,7 +223,7 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
                 "event_id": eid,
                 "perspective": persp,
                 "count": len(rs),
-                "at": days[0],
+                "at": stamps[0],
                 "sources": sorted(
                     {src[r["source_id"]]["name"] for r in rs if r["source_id"] in src}
                 ),
@@ -212,6 +232,8 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
             }
         )
     for d in graph.select(db, "documents", "n.story_id=?", (story_id,), at):
+        if not start <= (d["published_at"] or "") <= end:
+            continue
         issuer = src.get(d["issuer_id"])
         nodes.append(
             {
@@ -237,7 +259,7 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
     }
     edges = []
     for c in graph.select(db, "conflicts", "true", (), at):
-        if c["group_a"] in gid_persp and c["group_b"] in gid_persp:
+        if c["event_id"] in in_window and c["group_a"] in gid_persp and c["group_b"] in gid_persp:
             edges.append(
                 {
                     "kind": "conflict",
@@ -258,14 +280,25 @@ def story_graph(db: Db, story_id: str, at: str | None = None) -> dict[str, Any] 
         "anomalies": anomalies,
         "events": [
             event_row(db, e, at)
-            for e in graph.select(db, "events", "n.story_id=?", (story_id,), at)
+            for e in graph.select(
+                db, "events", "n.story_id=?", (story_id,), at, "ORDER BY n.first_seen DESC"
+            )
+            if e["id"] in in_window
         ],
-        "short_version": _split_sv(db, _event_short_versions(db, story_id, at)),
+        "window": {
+            "from": start or None,
+            "to": end,
+            "days": days,
+            "older": any(t < start for t in when.values()) if start else False,
+        },
+        "short_version": _split_sv(db, _event_short_versions(db, story_id, at, in_window)),
         "weights_note": "Source weight changes ordering only. No report is hidden.",
     }
 
 
-def _event_short_versions(db: Db, story_id: str, at: str | None) -> dict[str, Any]:
+def _event_short_versions(
+    db: Db, story_id: str, at: str | None, events: set[str] | None = None
+) -> dict[str, Any]:
     """Story-level short version: the event-level set logic with claim-group labels resolved,
     so the page can say what is reported by all, what conflicts, and what no source has published."""
     label = {
@@ -285,7 +318,11 @@ def _event_short_versions(db: Db, story_id: str, at: str | None) -> dict[str, An
         "no_source_published": [],
     }
     for e in graph.select(db, "events", "n.story_id=?", (story_id,), at):
-        sv = graph.get(db, "short_versions", e["id"], at)
+        sv = (
+            graph.get(db, "short_versions", e["id"], at)
+            if events is None or e["id"] in events
+            else None
+        )
         if not sv:
             continue
         p = sv["payload"]
