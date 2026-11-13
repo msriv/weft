@@ -22,7 +22,9 @@ nightly:
   thread_max_gap_days: 14
   merge_min_score: 0.45          # below this a pair is never a candidate
   merge_auto_score: 0.80         # at or above this, merge without asking the model
-  claim_group_cosine: 0.82       # claims of one event closer than this say the same thing
+  claim_group_cosine: 0.90       # claim contents this close say the same thing (#110)
+  claim_candidate_cosine: 0.65   # closer than this: same thing if they entail each other both ways
+  claim_entailment: 0.70         # NLI entailment needed in each direction
   conflict_min_cosine: 0.50      # only topically close claim groups go to NLI
   nli_contradiction: 0.80        # NLI probability to record a conflict
   token_budget_per_beat: 400000  # stages degrade (fewer merge checks) rather than overspend

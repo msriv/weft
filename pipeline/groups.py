@@ -16,44 +16,59 @@ from weft_core.textutil import cosine
 
 def cluster(
     claims: list[dict[str, Any]],
-    threshold: float,
+    link_cosine: float,
     contradicts: Callable[[str, str], bool] = lambda a, b: False,
+    entails: Callable[[str, str], bool] = lambda a, b: False,
+    candidate_cosine: float = 0.65,
 ) -> list[list[dict[str, Any]]]:
-    """Single-link clustering by cosine, closest pairs first. Claims of one report never cluster
-    together (a group means several reports say the same thing), and two clusters never join if
-    any pair across them contradicts: opposite claims are close in vector space but are not the
-    same claim."""
-    pairs = sorted(
-        (
-            (cosine(claims[i]["embedding"], claims[j]["embedding"]), i, j)
-            for i, j in combinations(range(len(claims)), 2)
-            if claims[i]["report_id"] != claims[j]["report_id"]
-        ),
-        reverse=True,
-    )
-    clusters: dict[int, list[int]] = {i: [i] for i in range(len(claims))}
-    owner = list(range(len(claims)))
-    for sim, i, j in pairs:
-        if sim < threshold:
-            break
-        a, b = owner[i], owner[j]
-        if a == b or any(
-            contradicts(claims[x]["text"], claims[y]["text"])
-            for x in clusters[a]
-            for y in clusters[b]
-        ):
+    """Average-link clustering of one event's claims (#110). Two claims link when their content
+    (attribution stripped) is at least `link_cosine` close, or when they are `candidate_cosine`
+    close and entail each other both ways. Clusters join while at least half of the pairs across
+    them link. Claims of one report never group together (a group means several reports say the
+    same thing), and a contradicting pair across two clusters keeps them apart."""
+    from pipeline.regroup import average_link
+
+    n = len(claims)
+    vec = [c.get("content_embedding") or c["embedding"] for c in claims]
+    txt = [content(c) for c in claims]
+    score: dict[tuple[int, int], float] = {}
+    for i, j in combinations(range(n), 2):
+        if claims[i]["report_id"] == claims[j]["report_id"]:
+            score[(i, j)] = -float(n * n)  # never together: no average can recover
             continue
-        for x in clusters[b]:
-            owner[x] = a
-        clusters[a] += clusters.pop(b)
-    return [[claims[i] for i in members] for members in clusters.values()]
+        sim = cosine(vec[i], vec[j])
+        if sim < min(candidate_cosine, link_cosine):
+            continue
+        if contradicts(txt[i], txt[j]) or contradicts(txt[j], txt[i]):
+            score[(i, j)] = -float(n * n)
+        elif sim >= link_cosine or (entails(txt[i], txt[j]) and entails(txt[j], txt[i])):
+            score[(i, j)] = 1.0
+    return [[claims[i] for i in c] for c in average_link(n, score, 0.5, [])]
+
+
+def medoid(members: list[dict[str, Any]]) -> dict[str, Any]:
+    """The member closest to all others; ties go to the lowest id, so it is stable."""
+    vec = [m.get("content_embedding") or m["embedding"] for m in members]
+    order = sorted(
+        range(len(members)),
+        key=lambda i: (-round(sum(cosine(vec[i], v) for v in vec), 9), members[i]["id"]),
+    )
+    return members[order[0]]
 
 
 def run_groups(ctx: Ctx) -> int:
     """Re-cluster claims of events that got reports inside the regroup window. A group is
     written only when it is new or changed, and groups that no longer exist are closed, so
     `valid_from` means "first seen in this form" and stale groups never stay current."""
-    days = ctx.cfg["nightly"]["regroup_days"]
+    cfg = ctx.cfg["nightly"]
+    days = cfg["regroup_days"]
+    embedded: dict[str, list[float]] = {}
+
+    def embed(t: str) -> list[float]:
+        if t not in embedded:
+            embedded[t] = ctx.nlp.embedder.embed(t)
+        return embedded[t]
+
     touched = {r["event_id"] for r in ctx.recent_reports(days) if r["event_id"]}
     by_event: dict[str, list[dict[str, Any]]] = {e: [] for e in touched}
     for c in graph.select(ctx.db, "claims", "n.event_id IS NOT NULL"):
@@ -66,13 +81,18 @@ def run_groups(ctx: Ctx) -> int:
             g["id"]: g for g in graph.select(ctx.db, "claim_groups", "n.event_id=?", (event_id,))
         }
         keep: set[str] = set()
+        for c in claims:
+            c["content_embedding"] = embed(content(c))
         for members in cluster(
-            claims, ctx.cfg["nightly"]["claim_group_cosine"], lambda a, b: _contradict(ctx, a, b)
+            claims,
+            cfg["claim_group_cosine"],
+            lambda a, b: _contradict(ctx, a, b),
+            lambda a, b: nli_scores(ctx, a, b)[1] >= cfg["claim_entailment"],
+            cfg["claim_candidate_cosine"],
         ):
             members.sort(key=lambda c: (c["report_id"], c["start_char"]))
-            gid = hashlib.sha256(
-                f"{event_id}:{'|'.join(sorted(c['id'] for c in members))}".encode()
-            ).hexdigest()[:32]  # id = membership: a changed group is a new group
+            # id = the medoid claim: a group keeps its id while members come and go (#110)
+            gid = hashlib.sha256(f"{event_id}:{medoid(members)['id']}".encode()).hexdigest()[:32]
             keep.add(gid)
             persp = sorted(
                 {perspective[c["report_id"]] for c in members if c["report_id"] in perspective}
@@ -80,7 +100,7 @@ def run_groups(ctx: Ctx) -> int:
             row = {
                 "id": gid,
                 "event_id": event_id,
-                "label": min(members, key=lambda c: len(c["text"]))["text"][:300],
+                "label": medoid(members)["text"][:300],
                 "perspectives": persp,
                 "n_reports": len({c["report_id"] for c in members}),
             }
@@ -203,4 +223,4 @@ def _put_conflict(ctx: Ctx, a: str, b: str, event_id: str, p: float) -> None:
 
 
 def _row(r: dict[str, Any]) -> dict[str, Any]:
-    return {k: v for k, v in r.items() if k not in ("valid_from", "valid_to")}
+    return {k: v for k, v in r.items() if k not in ("valid_from", "valid_to", "content_embedding")}

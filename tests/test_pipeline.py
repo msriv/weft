@@ -329,3 +329,27 @@ def test_threads_link_related_events_below_the_attach_cut() -> None:
     assert got["b"]["follows"] == "a" and got["b"]["thread_id"] == "a"
     assert got["a"]["thread_label"] == "Aldoria · Kessar"
     assert got["c"]["follows"] is None and got["c"]["thread_label"] is None
+
+
+def test_claim_groups_link_by_mutual_entailment_and_keep_medoid_ids() -> None:
+    def c(i: str, r: str, vec: list[float], text: str) -> dict[str, Any]:
+        return {"id": i, "report_id": r, "embedding": vec, "text": text}
+
+    a = c("a", "1", [1.0, 0.0], "The Kessar port was closed.")
+    b = c("b", "2", [0.8, 0.6], "The port at Kessar was shut.")  # cosine 0.8: needs entailment
+    d = c("d", "3", [0.0, 1.0], "Aldoria recalled its envoy.")
+    same = {("The Kessar port was closed.", "The port at Kessar was shut.")}
+
+    def entails(x: str, y: str) -> bool:
+        return (x, y) in same or (y, x) in same
+
+    out = groups.cluster([a, b, d], 0.9, entails=entails)
+    assert sorted(sorted(m["id"] for m in g) for g in out) == [["a", "b"], ["d"]]
+    # one-way entailment is not enough
+    assert len(groups.cluster([a, b], 0.9, entails=lambda x, y: x == a["text"])) == 2
+    # the group id follows its medoid, so adding a far member does not change it
+    e = c("e", "4", [0.95, 0.31], "Kessar's port closed.")
+    assert (
+        groups.medoid([a, b, e])["id"]
+        == groups.medoid([a, b, e, c("f", "5", [0.7, 0.7], "x")])["id"]
+    )
