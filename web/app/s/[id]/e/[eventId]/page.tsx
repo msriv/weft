@@ -16,7 +16,7 @@ export default async function Event({ params }: { params: Promise<{ id: string; 
   return (
     <>
       <Link href={`/s/${id}`} className="muted">← Back to the story</Link>
-      <Kicker>Event · {day(e.event.first_seen)} · {e.event.perspectives.length} perspectives · {e.event.reports} reports</Kicker>
+      <Kicker>Event · {day(e.event.first_seen)} · {e.event.perspectives.length} perspectives · {e.event.reports} reports{e.event.outlets != null && e.event.origins != null ? ` · ${e.event.outlets} outlets, ${e.event.origins} independent texts` : ""}</Kicker>
       <h1>{e.event.label ?? "Event"}</h1>
       {e.event.label_source && <p className="muted">Headline from {e.event.label_source}</p>}
       {sv && (

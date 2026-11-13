@@ -66,6 +66,20 @@ class Rep:
     healthy: bool = True
     type: str = "news"
     text: str = ""
+    origin_id: str = ""  # independent-text cluster (#98); empty means its own origin
+    claims_extracted: bool = True  # False: claim extraction never read it (#106)
+
+    @property
+    def origin(self) -> str:
+        return self.origin_id or self.id
+
+
+def hypergeom_zero(n_total: int, k_carriers: int, n_draw: int) -> float:
+    """P(no carrier among n_draw drawn from n_total holding k_carriers): how surprising it is
+    that a perspective with n_draw origins carries none of a group K origins carry."""
+    if n_draw > n_total - k_carriers:
+        return 0.0
+    return math.comb(n_total - k_carriers, n_draw) / math.comb(n_total, n_draw)
 
 
 @dataclass
@@ -134,45 +148,67 @@ def _eligible(reps: list[Rep], skip_paywalled: bool) -> list[Rep]:
 
 
 def omission(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
+    """A claim group most independent texts carry, absent from every origin of one perspective,
+    where that absence would be unlikely by chance (#100). Counts origins, not reports (#98);
+    only reports claim extraction read, with full text, published once the group existed."""
     c = cfg["rules"]["omission"]
-    reps = _eligible(ev.reports, c["exclude_paywalled_sources"])
-    ids = {r.id for r in reps}
-    persp: dict[str, list[Rep]] = defaultdict(list)
-    for r in reps:
-        if r.perspective != "unattributed":
-            persp[r.perspective].append(r)
+    base = [r for r in _eligible(ev.reports, c["exclude_paywalled_sources"]) if r.claims_extracted]
     out = []
     for g in ev.groups:
-        have = g.report_ids & ids
-        share = len(have) / len(ids) if ids else 0.0
+        carriers = [r for r in base if r.id in g.report_ids]
+        if not carriers:
+            continue
+        since = min(r.published_at for r in carriers)
+        reps = [r for r in base if r.published_at >= since]
+        origins = {r.origin for r in reps}
+        have = {r.origin for r in carriers}
+        n, k = len(origins), len(have)
+        share = k / n if n else 0.0
         if share < c["min_share_of_event_reports"]:
             continue
+        persp: dict[str, list[Rep]] = defaultdict(list)
+        for r in reps:
+            if r.perspective != "unattributed":
+                persp[r.perspective].append(r)
         for p, prs in sorted(persp.items()):
-            if c["absent_from_whole_perspective"] and not any(r.id in have for r in prs):
-                out.append(
-                    _a(
-                        "omission",
-                        cfg,
-                        subject_kind="claim_group",
-                        subject_id=g.id,
-                        story_id=ev.story_id,
-                        event_id=ev.id,
-                        summary=f"{len(have)} of {len(ids)} reports ({share:.0%}) carry this claim "
-                        f"group; none of the {len(prs)} reports from {p} do.",
-                        inputs={
-                            "threshold": c["min_share_of_event_reports"],
-                            "share": share,
-                            "perspective": p,
-                        },
-                        evidence_ids=sorted(have) + [r.id for r in prs],
-                        key=p,
-                        detail={
-                            "label": g.label,
-                            "carrying": sorted(have),
-                            "perspective_reports": [r.id for r in prs],
-                        },
-                    )
+            if any(r.id in g.report_ids for r in prs):
+                continue
+            n_p = len({r.origin for r in prs})
+            n_src = len({r.source_id for r in prs})
+            pval = hypergeom_zero(n, k, n_p)
+            if n_p < c["min_perspective_origins"] or n_src < c["min_perspective_sources"]:
+                continue
+            if pval > c["max_p_value"]:
+                continue
+            out.append(
+                _a(
+                    "omission",
+                    cfg,
+                    subject_kind="claim_group",
+                    subject_id=g.id,
+                    story_id=ev.story_id,
+                    event_id=ev.id,
+                    summary=f"{k} of {n} independent texts ({share:.0%}) carry this claim group; "
+                    f"none of the {n_p} from {p} do.",
+                    inputs={
+                        "threshold": c["min_share_of_event_reports"],
+                        "share": share,
+                        "perspective": p,
+                        "N": n,
+                        "K": k,
+                        "n_p": n_p,
+                        "p": pval,
+                        "origins": sorted(have),
+                    },
+                    evidence_ids=sorted(r.id for r in carriers) + [r.id for r in prs],
+                    key=p,
+                    detail={
+                        "label": g.label,
+                        "carrying": sorted(r.id for r in carriers),
+                        "perspective_reports": [r.id for r in prs],
+                    },
                 )
+            )
     return out
 
 

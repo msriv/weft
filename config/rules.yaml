@@ -1,7 +1,8 @@
 # Anomaly rule thresholds. Published on How we weigh.
 # Bump `version` on any change; every anomaly records the version that fired it.
 # These are starting points, to tune against an editor-labelled set before launch.
-version: 3  # 2026-11-13: anomaly ids per perspective/edit; promotion gate from owner labels
+version: 4  # 2026-11-13: origins and a hypergeometric baseline for omission (#98, #100)
+# version 3: anomaly ids per perspective/edit; promotion gate from owner labels
 
 # A rule fires as active (and may notify) only after owner labels on its anomalies reach these;
 # until then everything it finds is provisional (#114). Labels never decide a single anomaly.
@@ -18,8 +19,10 @@ provisional:
 rules:
   omission:
     enabled: true
-    min_share_of_event_reports: 0.60   # claim group present in >= 60% of reports
-    absent_from_whole_perspective: true
+    min_share_of_event_reports: 0.60   # claim group in >= 60% of independent texts (origins)
+    min_perspective_origins: 3         # the silent perspective has >= 3 independent texts
+    min_perspective_sources: 2         # from >= 2 outlets
+    max_p_value: 0.05                  # hypergeometric P(none of them carry it by chance)
     exclude_paywalled_sources: true
   numbers_differ:
     enabled: true

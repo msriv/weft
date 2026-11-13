@@ -45,7 +45,7 @@ export type ReportView = {
   published_at: string | null; source: SourceLabel; copy_of: string[];
 };
 export type EventPage = {
-  event: { id: string; story_id: string; label: string | null; label_source?: string | null; first_seen: string; reports: number; perspectives: string[] };
+  event: { id: string; story_id: string; label: string | null; label_source?: string | null; first_seen: string; reports: number; outlets?: number; origins?: number; perspectives: string[] };
   voices: Record<string, { headline: string | null; headline_source: string | null; words: string[]; reports: number }>;
   perspectives: Record<string, ReportView[]>;
   claim_groups: { id: string; label: string; perspectives: string[]; n_reports: number; claims: { report_id: string; text: string; start: number; end: number }[] }[];
