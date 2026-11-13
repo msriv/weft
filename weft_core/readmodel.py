@@ -7,6 +7,7 @@ their issuer and whether the issuer is a party to this story (rule 7).
 """
 
 import json
+import os
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -812,34 +813,46 @@ DESCRIPTIONS = {
     "opinion_share": ("Opinion share", "Share of output that is op-ed or commentary", "lowers"),
 }
 
-MODELS = [
-    {
-        "job": "Claim extraction",
-        "model": "Qwen/Qwen3-14B",
-        "how": "Picks sentences that state checkable claims; offsets come from our own splitter",
-    },
-    {
-        "job": "Merge check",
-        "model": "Qwen/Qwen3-8B",
-        "how": "Yes or no on borderline pairs of events",
-    },
-    {
-        "job": "Translation",
-        "model": "google/madlad400-3b-mt",
-        "how": "Shown with a label and a Show original toggle",
-    },
-    {"job": "Embeddings", "model": "BAAI/bge-m3", "how": "Groups similar reports and claims"},
-    {
-        "job": "Conflict check (NLI)",
-        "model": "mDeBERTa-v3-base-xnli",
-        "how": "Finds claims that contradict each other",
-    },
-    {
-        "job": "Ask Weft",
-        "model": "openai/gpt-oss-20b",
-        "how": "Answers questions from the graph with read-only tools; cites nodes",
-    },
-]
+
+def models() -> list[dict[str, str]]:
+    """What runs where, read from the deployment: one hosted model (MODEL_NAME at MODEL_REVISION)
+    does every hosted job; embeddings and NLI run on our own CPUs."""
+    hosted = os.environ.get("MODEL_NAME") or "no hosted model configured"
+    if os.environ.get("MODEL_REVISION"):
+        hosted += f" (revision {os.environ['MODEL_REVISION']})"
+    real = os.environ.get("WEFT_NLP") == "real"
+    out = [
+        {
+            "job": "Claim extraction",
+            "model": hosted,
+            "how": "Picks sentences that state checkable claims; offsets come from our own splitter",
+        },
+        {"job": "Merge check", "model": hosted, "how": "Yes or no on borderline pairs of events"},
+        {
+            "job": "Ask Weft",
+            "model": hosted,
+            "how": "Paraphrases retrieved passages as attributed statements; cites them",
+        },
+        {
+            "job": "Embeddings",
+            "model": "BAAI/bge-m3" if real else "feature hashing (no model)",
+            "how": "Groups similar reports and claims",
+        },
+        {
+            "job": "Conflict check (NLI)",
+            "model": "mDeBERTa-v3-base-xnli" if real else "word overlap (no model)",
+            "how": "Finds claims that contradict each other",
+        },
+    ]
+    if os.environ.get("DETECTIVE") == "on":
+        out.append(
+            {
+                "job": "Detective mode",
+                "model": hosted,
+                "how": "Speculative guesses, labelled as such; checked later by a fixed rule",
+            }
+        )
+    return out
 
 
 def method(db: Db) -> dict[str, Any]:
@@ -860,7 +873,7 @@ def method(db: Db) -> dict[str, Any]:
                 for f in FACTORS
             ],
         },
-        "models": MODELS,
+        "models": models(),
         "model_calls_note": "Every model input and output is logged with the pinned model revision.",
         "corrections": [
             dict(c)

@@ -1,5 +1,6 @@
 """API tests over a graph built by the real stream worker and nightly stages."""
 
+import pytest
 from fastapi.testclient import TestClient
 
 from pipeline import anomalies, claims, figures, groups, short_version, statements, weights
@@ -335,3 +336,13 @@ def test_today_lists_only_what_is_new() -> None:
     assert all(e["first_seen"] >= t["since"] for e in t["new_events"])
     later = readmodel.today(ctx.db, now=datetime(2026, 11, 20, tzinfo=UTC))
     assert later["new_events"] == [] and later["breaking"] == [] and later["blind_spots"] == []
+
+
+def test_method_page_names_the_configured_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    from weft_core import readmodel
+
+    monkeypatch.setenv("MODEL_NAME", "org/some-model")
+    monkeypatch.setenv("MODEL_REVISION", "abc")
+    jobs = {m["job"]: m["model"] for m in readmodel.models()}
+    assert jobs["Claim extraction"] == "org/some-model (revision abc)"
+    assert "Translation" not in jobs
