@@ -21,7 +21,7 @@ from urllib.parse import urljoin, urlsplit
 import feedparser
 import httpx
 
-from weft_core import beats, outlets, store
+from weft_core import beats, outlets, relevance, store
 from weft_core.nlp import STOP_EN, StopwordLangId
 from weft_core.polite import PoliteClient
 from weft_core.textutil import words
@@ -39,22 +39,32 @@ PROBE_INTERVAL = 10.0
 LANGUAGES = frozenset({"en"})
 
 
-def parse_gkg(text: str) -> Iterable[tuple[str, str, str]]:
-    """Yield (domain, url, searchable text) per GKG 2.1 row: URL, V1 themes/locations/persons/orgs."""
+def parse_gkg(text: str) -> Iterable[tuple[str, str, str, set[str]]]:
+    """Yield (domain, url, searchable text, persons and orgs) per GKG 2.1 row. The text is the
+    URL plus V1 themes/locations/persons/orgs. GDELT fields are internal features only, never
+    shown to readers (D11)."""
     for line in text.splitlines():
         f = line.split("\t")
         if len(f) > 13 and f[3] and f[4].startswith("http"):
-            yield f[3].lower(), f[4], " ".join((f[4], f[7], f[9], f[11], f[13]))
+            ents = {p.strip().lower() for p in f"{f[11]};{f[13]}".split(";") if len(p.strip()) > 2}
+            yield f[3].lower(), f[4], " ".join((f[4], f[7], f[9], f[11], f[13])), ents
 
 
 def candidate_domains(
-    rows: Iterable[tuple[str, str, str]], beat: dict[str, Any], known: set[str]
-) -> dict[str, set[str]]:
-    """Unknown domains with the URLs of articles matching the beat."""
-    hits: dict[str, set[str]] = defaultdict(set)
-    for domain, url, blob in rows:
-        if domain not in known and beats.matches(beat, blob):
-            hits[domain].add(url)
+    rows: Iterable[tuple[str, str, str, set[str]]],
+    beat: dict[str, Any],
+    known: set[str],
+    prof: dict[str, Any] | None = None,
+) -> dict[str, dict[str, float]]:
+    """Unknown domains with the URLs of relevant articles and each one's relevance (#107):
+    the regex alone until the beat has a profile, then entities and regex together."""
+    hits: dict[str, dict[str, float]] = defaultdict(dict)
+    for domain, url, blob, ents in rows:
+        if domain in known:
+            continue
+        rel = relevance.score(beat, prof, blob, None, ents)
+        if rel >= relevance.ACCEPT:
+            hits[domain][url] = rel
     return hits
 
 
@@ -181,10 +191,13 @@ def discover(
     rows = list(parse_gkg(gkg_text))
     found: dict[str, list[str]] = {}
     store.prune_candidates(db, (now - CANDIDATE_TTL).isoformat())
+    profiles = relevance.load(db)
     for beat in store.beats(db):
         known = store.known_domains(db, retry_before=(now - RETRY_AFTER).isoformat())
-        for domain, urls in candidate_domains(rows, beat, known).items():
-            store.add_candidate_hits(db, domain, beat["id"], len(urls), now.isoformat())
+        for domain, urls in candidate_domains(rows, beat, known, profiles.get(beat["id"])).items():
+            store.add_candidate_hits(
+                db, domain, beat["id"], len(urls), now.isoformat(), sum(urls.values())
+            )
         for domain in store.candidates(db, beat["id"], MIN_URLS, limit):
             if (feeds := _probe(db, http, domain, beat, now)) is not None:
                 found[domain] = feeds

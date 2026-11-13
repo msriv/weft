@@ -329,3 +329,123 @@ def test_threads_link_related_events_below_the_attach_cut() -> None:
     assert got["b"]["follows"] == "a" and got["b"]["thread_id"] == "a"
     assert got["a"]["thread_label"] == "Aldoria · Kessar"
     assert got["c"]["follows"] is None and got["c"]["thread_label"] is None
+
+
+def test_claim_groups_link_by_mutual_entailment_and_keep_medoid_ids() -> None:
+    def c(i: str, r: str, vec: list[float], text: str) -> dict[str, Any]:
+        return {"id": i, "report_id": r, "embedding": vec, "text": text}
+
+    a = c("a", "1", [1.0, 0.0], "The Kessar port was closed.")
+    b = c("b", "2", [0.8, 0.6], "The port at Kessar was shut.")  # cosine 0.8: needs entailment
+    d = c("d", "3", [0.0, 1.0], "Aldoria recalled its envoy.")
+    same = {("The Kessar port was closed.", "The port at Kessar was shut.")}
+
+    def entails(x: str, y: str) -> bool:
+        return (x, y) in same or (y, x) in same
+
+    out = groups.cluster([a, b, d], 0.9, entails=entails)
+    assert sorted(sorted(m["id"] for m in g) for g in out) == [["a", "b"], ["d"]]
+    # one-way entailment is not enough
+    assert len(groups.cluster([a, b], 0.9, entails=lambda x, y: x == a["text"])) == 2
+    # the group id follows its medoid, so adding a far member does not change it
+    e = c("e", "4", [0.95, 0.31], "Kessar's port closed.")
+    assert (
+        groups.medoid([a, b, e])["id"]
+        == groups.medoid([a, b, e, c("f", "5", [0.7, 0.7], "x")])["id"]
+    )
+
+
+def test_links_cite_documents_and_measure_quotes_against_statements() -> None:
+    from pipeline import links
+    from weft_core import portals
+
+    ctx, _ = setup([])
+    story = graph.get(ctx.db, "reports", "1")["story_id"]  # type: ignore[index]
+    graph.put(
+        ctx.db,
+        "documents",
+        {"id": "d1", "url": "https://www.gov.example/release/1/", "story_id": story,
+         "issuer_id": "gov-example", "published_at": NOW},
+    )  # fmt: skip
+    ctx.db.execute(
+        "MERGE (:Cites {report_id: '1', url_key: ?})",
+        (portals.url_key("https://gov.example/release/1"),),
+    )
+    assert links.cites(ctx) == 1
+    assert graph.get(ctx.db, "documents", "d1")["event_id"] == ctx_event(ctx)  # type: ignore[index]
+    ctx.db.execute(
+        "CREATE (:Statement {id: 's1', document_id: 'd1', actor_id: 'voss', "
+        "text: 'we targeted military bases only and nothing else'})"
+    )
+    graph.put(
+        ctx.db,
+        "figures",
+        {"id": "q1", "report_id": "1", "event_id": ctx_event(ctx), "kind": "quote",
+         "text": "we targeted military bases only and nothing more", "speaker": "Tehran"},
+    )  # fmt: skip
+    assert links.quotes(ctx) == 1
+    [row] = ctx.db.execute("MATCH (n:Quotes) RETURN n.edit_ratio AS e")
+    assert 0 < row["e"] < 0.5
+    assert links.edit_ratio("a b c d", "x a b c d y") == 0.0
+
+
+def test_story_summary_ranks_groups_by_origins_and_perspectives_with_mmr() -> None:
+    def g(i: str, persp: list[str], origins: int, vec: list[float]) -> dict[str, Any]:
+        return {
+            "id": i,
+            "label": f"claim {i}",
+            "perspectives": persp,
+            "origins": origins,
+            "vec": vec,
+        }
+
+    gs = [
+        g("a", ["IL", "IR"], 6, [1.0, 0.0]),
+        g("b", ["IL", "IR"], 3, [1.0, 0.01]),  # near duplicate of a: MMR passes over it
+        g("c", ["IL", "IR"], 2, [0.0, 1.0]),
+        g("d", ["IR"], 3, [0.7, 0.7]),
+        g("x", ["IL"], 4, [0.5, 0.5]),
+        g("y", ["IR"], 4, [0.5, 0.6]),
+    ]
+    items = short_version.story_summary(gs, [("x", "y")], {"IL", "IR"}, k=4)
+    kinds = [i["kind"] for i in items]
+    assert kinds[0] == "conflict" and kinds[-1] == "one_perspective"
+    claims_picked = [i["groups"][0] for i in items if i["kind"] == "claim"]
+    assert claims_picked == ["a", "c"]
+    assert items[1]["coverage"] == "Reported by all perspectives"
+    assert items[-1]["coverage"] == "One perspective only: IR"
+
+
+def test_whats_new_and_burst_rank_today() -> None:
+    from datetime import UTC, datetime
+
+    from weft_core import readmodel
+
+    ctx, _ = setup([])
+    ev = ctx_event(ctx)
+    story = graph.get(ctx.db, "events", ev)["story_id"]  # type: ignore[index]
+    t0, t1 = "2026-11-05T00:00:00+00:00", "2026-11-06T06:00:00+00:00"
+    old = {"id": "g1", "event_id": ev, "label": "old claim", "perspectives": ["IL"],
+           "n_reports": 1, "embedding": [1.0, 0.0]}  # fmt: skip
+    graph.put(ctx.db, "claim_groups", old, t0)
+    graph.put(ctx.db, "claim_groups", old | {"perspectives": ["IL", "IR"]}, t1)  # gained IR
+    graph.put(
+        ctx.db,
+        "claim_groups",
+        {
+            "id": "g2",
+            "event_id": ev,
+            "label": "fresh claim",
+            "perspectives": ["IR"],
+            "n_reports": 1,
+            "embedding": [0.0, 1.0],
+        },
+        t1,
+    )
+    news = readmodel.whats_new(ctx.db, [story], "2026-11-06T00:00:00+00:00")
+    assert {(n["kind"], n["group"]) for n in news} == {
+        ("gained_perspective", "g1"),
+        ("new_claim", "g2"),
+    }
+    # three reports inside the last 6 hours of a quiet story: a burst
+    assert readmodel.burst_z(ctx.db, story, datetime(2026, 11, 6, 6, tzinfo=UTC)) > 2

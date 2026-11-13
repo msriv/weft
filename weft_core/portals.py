@@ -61,6 +61,26 @@ def outbound_gov_domains(html: str, base_url: str) -> set[str]:
     return out
 
 
+def url_key(url: str) -> str:
+    """Comparable form of a link: lower-case host without www, no query, fragment or trailing
+    slash. Used to match a report's outbound link to a stored document (#108)."""
+    p = urlsplit(url)
+    host = p.netloc.lower().split(":")[0].removeprefix("www.")
+    return f"{host}{p.path.rstrip('/')}"
+
+
+def outbound_gov_links(html: str, base_url: str, limit: int = 50) -> list[str]:
+    """Links to government-looking pages on other domains, as url keys (#108)."""
+    own = urlsplit(base_url).netloc.lower()
+    out: set[str] = set()
+    for h in hrefs(html, base_url):
+        p = urlsplit(h)
+        host = p.netloc.lower().split(":")[0]
+        if p.scheme in ("http", "https") and host and host != own and is_gov(host):
+            out.add(url_key(h))
+    return sorted(out)[:limit]
+
+
 def record_candidates(db: store.Db, domains: set[str], example_url: str) -> None:
     now = datetime.now(UTC).isoformat()
     for d in domains:

@@ -26,6 +26,7 @@ from weft_core import (
     graph,
     questions,
     readmodel,
+    relevance,
     review,
     store,
 )
@@ -63,6 +64,11 @@ class BeatTerms(BaseModel):
     patterns: list[str]
     exclude: list[str] = []
     groups: dict[str, str] | None = None  # source id -> outlet group (D21); None leaves as is
+
+
+class BeatLabel(BaseModel):
+    beat_id: str
+    on_beat: bool
 
 
 class Feedback(BaseModel):
@@ -354,6 +360,18 @@ def create_app(
             raise HTTPException(404, "no such anomaly") from exc
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
+
+    @adm.get("/beat-maybes")
+    def beat_maybes(limit: int = 50) -> list[dict[str, Any]]:
+        """Reports whose beat relevance fell in the "maybe" band (#107), for owner labels."""
+        return relevance.maybes(db, min(limit, 500))
+
+    @adm.post("/beat-maybes/{report_id}")
+    def beat_maybe_label(report_id: str, body: BeatLabel) -> dict[str, Any]:
+        relevance.label_maybe(
+            db, report_id, body.beat_id, body.on_beat, datetime.now(UTC).isoformat()
+        )
+        return {"ok": True}
 
     @adm.get("/anomaly-precision")
     def anomaly_precision() -> list[dict[str, Any]]:

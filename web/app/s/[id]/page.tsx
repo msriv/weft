@@ -53,9 +53,19 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
           {sv.reported_by_all.length ? sv.reported_by_all.slice(0, 6).map((x) => <p key={x.label}>{x.label}</p>) : <p className="muted">No claim is carried by every perspective yet.</p>}
         </div>
         <div className="card">
-          <Kicker>Opening lines from the latest week's reports</Kicker>
-          {g.summary.length ? g.summary.map((x, i) => <p key={i} className="muted" style={{ fontSize: 13 }}>{x}</p>) : <p className="muted">None yet.</p>}
-          <p className="muted" style={{ fontSize: 12 }}>Taken from single outlets. Not carried by every perspective.</p>
+          {g.summary_items?.length ? (
+            <>
+              <Kicker>Most carried claims of the last 48 hours</Kicker>
+              {g.summary_items.map((x, i) => <p key={i} style={{ fontSize: 13 }}>{x.text} <span className="muted">· {x.coverage}</span></p>)}
+              <p className="muted" style={{ fontSize: 12 }}>Ranked by how many independent texts and perspectives carry each claim.</p>
+            </>
+          ) : (
+            <>
+              <Kicker>Opening lines from the latest week's reports</Kicker>
+              {g.summary.length ? g.summary.map((x, i) => <p key={i} className="muted" style={{ fontSize: 13 }}>{x}</p>) : <p className="muted">None yet.</p>}
+              <p className="muted" style={{ fontSize: 12 }}>Taken from single outlets. Not carried by every perspective.</p>
+            </>
+          )}
         </div>
         <div className="card">
           <Kicker anomaly>Reports conflict on</Kicker>

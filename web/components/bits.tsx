@@ -49,6 +49,14 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 /** What the rule looked at, shown per rule: the claim, the two figures, or the changed lines. */
 export function AnomalyDetail({ a, max = 6 }: { a: Pick<Anomaly, "rule" | "detail">; max?: number }) {
   const d = a.detail ?? {};
+  if (a.rule === "quote_differs" && str(d.quote)) {
+    return (
+      <div className="row" style={{ gap: 12, alignItems: "stretch", margin: "6px 0" }}>
+        <blockquote style={{ flex: 1, margin: 0 }}>Quoted: {str(d.quote)}</blockquote>
+        <blockquote style={{ flex: 1, margin: 0 }}>Issued by {str(d.issuer)}: {str(d.statement)}</blockquote>
+      </div>
+    );
+  }
   if (a.rule === "conflicting_accounts" && Array.isArray(d.sides)) {
     const sides = d.sides as { label: string; perspectives: string[] }[];
     return (

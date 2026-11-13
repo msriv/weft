@@ -7,6 +7,7 @@ type Item = { id: string; kind: string; payload: Record<string, unknown> };
 type Problem = { id: number; kind: string; ref_id: string | null; message: string };
 type Src = { id: string; name: string; domain: string; country: string | null; country_source: string | null; paywalled: number; status: string; rejected_reason: string | null; last_report_at: string | null };
 type Beat = { id: string; name: string; patterns: string[]; exclude: string[]; groups: Record<string, string>; edited: number | null };
+type Maybe = { report_id: string; beat_id: string; score: number; title: string | null; url: string | null };
 type Unplaced = { id: string; title: string | null; url: string | null; source_id: string; fetched_at: string };
 type Run = { run_id: string; stage: string; started_at: string; ended_at: string | null; rows_out: number | null; status: string; error: string | null };
 
@@ -19,6 +20,7 @@ export default function Admin() {
   const [sources, setSources] = useState<Src[]>([]);
   const [beats, setBeats] = useState<Beat[]>([]);
   const [unplaced, setUnplaced] = useState<Unplaced[]>([]);
+  const [maybes, setMaybes] = useState<Maybe[]>([]);
   const [err, setErr] = useState("");
   const call = useCallback(async (path: string, init: RequestInit = {}) => {
     const r = await fetch(`/api/admin${path}`, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
@@ -28,7 +30,7 @@ export default function Admin() {
   const load = useCallback(async () => {
     try {
       setErr("");
-      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs")); setSources(await call("/sources")); setBeats(await call("/beats")); setUnplaced(await call("/unplaced"));
+      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs")); setSources(await call("/sources")); setBeats(await call("/beats")); setUnplaced(await call("/unplaced")); setMaybes(await call("/beat-maybes"));
     } catch { setErr("Could not load. Check the token."); }
   }, [call]);
   useEffect(() => { setToken(sessionStorage.getItem("weft:admin") ?? ""); }, []);
@@ -114,6 +116,14 @@ export default function Admin() {
         <div className="row" key={r.id}>
           {r.url ? <a href={r.url} target="_blank" rel="noreferrer">{r.title ?? r.url}</a> : <span>{r.title ?? r.id}</span>}
           <span className="muted">{r.source_id}</span>
+        </div>
+      ))}
+      <hr /><Kicker>Maybe on a beat ({maybes.length}). Your answers tune beat relevance; they never move a report.</Kicker>
+      {maybes.map((m) => (
+        <div className="row" key={`${m.report_id}:${m.beat_id}`}>
+          {m.url ? <a href={m.url} target="_blank" rel="noreferrer">{m.title ?? m.url}</a> : <span>{m.title ?? m.report_id}</span>}
+          <span className="muted">{m.beat_id} · {m.score.toFixed(2)}</span>
+          {[true, false].map((on) => <button key={String(on)} onClick={() => act(`/beat-maybes/${encodeURIComponent(m.report_id)}`, { beat_id: m.beat_id, on_beat: on })}>{on ? "On beat" : "Off beat"}</button>)}
         </div>
       ))}
       <hr /><Kicker>Review sample (optional, never blocks publishing)</Kicker>

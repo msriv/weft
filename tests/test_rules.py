@@ -356,3 +356,25 @@ def test_attribution_spans_split_speaker_cue_and_content() -> None:
     assert attribution.extract("Veymar denied losing any jets.")["stance"] == "deny"
     assert attribution.extract("Missiles struck the port overnight.")["speaker_kind"] == "none"
     assert attribution.normalise("The Aldoria defence ministry") == "aldoria defence ministry"
+
+
+def test_quote_differs_fires_between_faithful_and_unrelated() -> None:
+    q = {
+        "figure_id": "f",
+        "report_id": "1",
+        "text": "we will reopen the Kessar port next week",
+        "speaker": "Arlen Voss",
+        "statement_id": "s",
+        "statement": "We will reopen the Kessar port soon.",
+        "actor": "Minister Voss",
+        "issuer": "Aldoria ministry",
+        "edit_ratio": 0.25,
+    }
+    ev = event([rep("1")])
+    ev.quotes = [q]
+    (a,) = rules.quote_differs(ev, CFG)
+    assert "issued by Aldoria ministry" in a.summary and a.evidence_ids == ["1", "s"]
+    ev.quotes = [q | {"edit_ratio": 0.05}]  # word for word: nothing to flag
+    assert rules.quote_differs(ev, CFG) == []
+    ev.quotes = [q | {"speaker": "Kessar Times"}]  # another speaker
+    assert rules.quote_differs(ev, CFG) == []

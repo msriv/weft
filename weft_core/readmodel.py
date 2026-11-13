@@ -7,6 +7,7 @@ their issuer and whether the issuer is a party to this story (rule 7).
 """
 
 import json
+import math
 import os
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
@@ -16,7 +17,7 @@ from weft_core import config, feedback, graph, store
 from weft_core.perspectives import perspective_of
 from weft_core.rules import log_odds
 from weft_core.store import Db
-from weft_core.textutil import words
+from weft_core.textutil import cosine, words
 from weft_core.weights import FACTORS
 
 QUIET_AFTER = timedelta(hours=48)
@@ -276,6 +277,7 @@ def story_graph(
         "story": story_card(db, s, at),
         "as_of": at,
         "summary": (sv or {}).get("payload", {}).get("summary", []),
+        "summary_items": (sv or {}).get("payload", {}).get("items", []),
         "perspectives": sorted({n["perspective"] for n in nodes if "perspective" in n}),
         "nodes": nodes,
         "edges": edges,
@@ -352,7 +354,10 @@ def _event_short_versions(
 
 def event_row(db: Db, e: dict[str, Any], at: str | None = None) -> dict[str, Any]:
     reps = graph.reports_of_event(db, e["id"], at)
-    first = reps[0] if reps else None
+    # the medoid headline among news reports (#112), else the earliest report's
+    first = next(
+        (r for r in reps if r["id"] == e.get("label_report_id")), reps[0] if reps else None
+    )
     return {
         "id": e["id"],
         "story_id": e["story_id"],
@@ -895,6 +900,76 @@ def method(db: Db) -> dict[str, Any]:
 # --- today ------------------------------------------------------------------------------------
 
 
+NOVEL_COSINE = 0.75
+
+
+def whats_new(db: Db, story_ids: list[str], since: str) -> list[dict[str, Any]]:
+    """What changed in claim terms since `since` (#112): claim groups unlike any group before
+    (max cosine under NOVEL_COSINE), groups that gained a perspective, and new conflicts.
+    Coverage language only (rule 1)."""
+    if not story_ids:
+        return []
+    events = {
+        e["id"]: e["story_id"] for e in graph.select(db, "events", "n.story_id IN ?", (story_ids,))
+    }
+    if not events:
+        return []
+    ev_ids = list(events)
+    now_groups = graph.select(db, "claim_groups", "n.event_id IN ?", (ev_ids,))
+    before = {
+        g["id"]: g for g in graph.select(db, "claim_groups", "n.event_id IN ?", (ev_ids,), since)
+    }
+    old_vecs: dict[str, list[list[float]]] = defaultdict(list)
+    for g in before.values():
+        if g.get("embedding"):
+            old_vecs[events[g["event_id"]]].append(g["embedding"])
+    out: list[dict[str, Any]] = []
+    for g in now_groups:
+        if (g["valid_from"] or "") < since:
+            continue
+        story = events[g["event_id"]]
+        base = {"story_id": story, "event_id": g["event_id"], "text": g["label"], "group": g["id"]}
+        prev = before.get(g["id"])
+        if prev is not None:
+            gained = sorted(set(g["perspectives"]) - set(prev["perspectives"]) - {"unattributed"})
+            if gained:
+                out.append(base | {"kind": "gained_perspective", "perspectives": gained})
+            continue
+        vec = g.get("embedding")
+        if vec and max((cosine(vec, v) for v in old_vecs[story]), default=0.0) < NOVEL_COSINE:
+            out.append(base | {"kind": "new_claim", "perspectives": g["perspectives"]})
+    groups = {g["id"]: g for g in now_groups}
+    for c in graph.select(db, "conflicts", "n.event_id IN ?", (ev_ids,)):
+        if (c["valid_from"] or "") >= since and c["group_a"] in groups and c["group_b"] in groups:
+            out.append(
+                {
+                    "kind": "new_conflict",
+                    "story_id": events[c["event_id"]],
+                    "event_id": c["event_id"],
+                    "text": f"{groups[c['group_a']]['label']} — versus — {groups[c['group_b']]['label']}",
+                    "group": c["group_a"],
+                    "perspectives": [],
+                }
+            )
+    order = {"new_conflict": 0, "new_claim": 1, "gained_perspective": 2}
+    return sorted(out, key=lambda x: order[x["kind"]])
+
+
+def burst_z(db: Db, story_id: str, now: datetime) -> float:
+    """How unusual the last 6 hours are for a story: independent texts in the window against a
+    14-day Poisson baseline, as a z-score (#112)."""
+    rows = db.execute(
+        "MATCH (r:Report {story_id: ?}) WHERE r.valid_to IS NULL "
+        "AND coalesce(r.published_at, r.fetched_at) >= ? "
+        "RETURN coalesce(r.origin_id, r.id) AS o, min(coalesce(r.published_at, r.fetched_at)) AS at",
+        (story_id, (now - timedelta(days=14)).isoformat()),
+    )
+    cut = (now - timedelta(hours=6)).isoformat()
+    recent = sum(1 for r in rows if r["at"] >= cut)
+    lam = max((len(rows) - recent) / (14 * 4 - 1), 0.5)  # per 6 h; floor keeps quiet stories sane
+    return (recent - lam) / math.sqrt(lam)
+
+
 def today(
     db: Db,
     followed_beats: list[str] | None = None,
@@ -953,10 +1028,21 @@ def today(
                     }
                 )
     new_events.sort(key=lambda e: e["first_seen"], reverse=True)
-    active = {e["story_id"] for e in new_events} | {a["story_id"] for a in new_anoms}
+    news = whats_new(db, list(public), since)
+    active = (
+        {e["story_id"] for e in new_events}
+        | {a["story_id"] for a in new_anoms}
+        | {n["story_id"] for n in news}
+    )
     cards = {sid: story_card(db, s) for sid, s in public.items()}
+    docs_new = Counter(e["story_id"] for e in new_events for _ in range(e["new_documents"]))
+    novelty = Counter(n["story_id"] for n in news)
+    rank = {
+        sid: burst_z(db, sid, now) + novelty[sid] + docs_new[sid] for sid in active
+    }  # burst, plus what is new, plus new documents (#112)
     breaking = sorted(
-        (cards[sid] for sid in active), key=lambda c: c["last_report_at"] or "", reverse=True
+        (cards[sid] | {"rank": round(rank[sid], 2)} for sid in active),
+        key=lambda c: (-c["rank"], c["last_report_at"] or ""),
     )
     followed = [c for c in cards.values() if followed_beats and c["beat"] in followed_beats]
     return {
@@ -964,6 +1050,7 @@ def today(
         "since": since,
         "changes": changes,
         "new_events": new_events,
+        "whats_new": news[:30],
         "new_anomalies": new_anoms,  # provisional ones are excluded: they never notify
         "breaking": breaking[:10],
         "blind_spots": blind,

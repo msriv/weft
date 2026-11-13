@@ -34,6 +34,13 @@ export default async function TodayPage() {
           ))}
         </section>
       )) : <Empty>No new events since then.</Empty>}
+      {t?.whats_new && t.whats_new.length > 0 && <><hr /><Kicker>New in the coverage</Kicker></>}
+      {t?.whats_new?.map((n, i) => (
+        <Link key={i} href={`/s/${n.story_id}/e/${n.event_id}`} className="row" style={{ display: "flex" }}>
+          <span className="muted">{n.kind === "new_conflict" ? "Reports conflict on" : n.kind === "gained_perspective" ? `Now also reported from ${n.perspectives.map(perspectiveName).join(", ")}` : "New claim"}</span>
+          <span>{n.text}</span>
+        </Link>
+      ))}
       {t && t.new_anomalies.length > 0 && <><hr /><Kicker>New anomalies</Kicker></>}
       {t && t.new_anomalies.map((a) => <AnomalyCard key={a.id} a={a} />)}
       {t && t.changes.length > 0 && (
