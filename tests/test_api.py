@@ -68,8 +68,11 @@ def test_nothing_is_readable_until_the_admin_toggle() -> None:
 def test_story_event_node_document_actor_world_method() -> None:
     c, _ = build()
     c.put("/admin/stories/iran-israel-war/public", json={"public": True}, headers=H)
-    story = c.get("/v1/stories/iran-israel-war").json()
+    story = c.get("/v1/stories/iran-israel-war?until=2026-11-06").json()
     assert {n["kind"] for n in story["nodes"]} == {"report_group", "document"}
+    later = c.get("/v1/stories/iran-israel-war?until=2026-11-20").json()  # a week with no reports
+    assert later["nodes"] == [] and later["events"] == [] and later["window"]["older"] is True
+    assert c.get("/v1/stories/iran-israel-war?until=2026-11-20&days=0").json()["nodes"]
     assert story["story"]["reports"] == 3 and story["perspectives"]
     assert any(e["kind"] == "conflict" for e in story["edges"])
     ev = story["events"][0]["id"]

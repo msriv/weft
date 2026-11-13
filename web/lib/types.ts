@@ -38,6 +38,7 @@ export type StoryGraph = {
   nodes: GraphNode[]; edges: GraphEdge[]; anomalies: Anomaly[];
   events: { id: string; label: string | null; label_source?: string | null; first_seen: string; reports: number; perspectives: string[] }[];
   short_version: ShortVersion;
+  window: { from: string | null; to: string; days: number; older: boolean };
 };
 export type ReportView = {
   id: string; url: string; title: string; summary: string; type: string; lang: string | null;

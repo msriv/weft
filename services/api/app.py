@@ -133,11 +133,16 @@ def create_app(
 
     @v1.get("/stories/{story_id}")
     def story(
-        story_id: str, at: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}-\d{2}.*$")] = None
+        story_id: str,
+        at: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}-\d{2}.*$")] = None,
+        until: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}-\d{2}$")] = None,
+        days: Annotated[int, Query(ge=0, le=366)] = readmodel.WINDOW_DAYS,
     ) -> Any:
-        # `at=YYYY-MM-DD` replays the story as it was at the end of that day
+        # `at=YYYY-MM-DD` replays the story as it was at the end of that day; `until` and `days`
+        # pick the window of reports shown (days=0: the whole story)
         when = f"{at[:10]}T23:59:59+00:00" if at else None
-        return found(readmodel.story_graph(db, story_id, when))
+        end = f"{until}T23:59:59+00:00" if until else None
+        return found(readmodel.story_graph(db, story_id, when, days, end))
 
     @v1.get("/stories/{story_id}/detective")
     def story_detective(story_id: str) -> dict[str, Any]:
