@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime, timedelta
+from typing import Any
 
 from pipeline.ctx import Ctx
 from weft_core import graph, rules, store, weights
@@ -24,19 +25,21 @@ def run(ctx: Ctx) -> int:
         reps = graph.select(
             ctx.db,
             "reports",
-            "n.source_id=? AND coalesce(n.published_at, n.fetched_at) >= ?",
+            # placed reports only: unplaced ones are off every beat
+            "n.source_id=? AND n.story_id IS NOT NULL "
+            "AND coalesce(n.published_at, n.fetched_at) >= ?",
             (s["id"], since),
         )
         if not reps:
             continue
         ids = {r["id"] for r in reps}
         claims = graph.select(ctx.db, "claims", "n.report_id IN ?", (list(ids),))
-        notes = sum(1 for r in reps if rules.CORRECTION.search(ctx.text_of(r)))
+        notes = sum(1 for r in reps if _correction_note(ctx, r))
         n_silent = len(ids & silent)
         total = len(reps)
         factors = {
             "names_sources": (
-                sum(rules.is_attributed(c["text"]) for c in claims) / len(claims)
+                sum(bool(rules.NAMES_SOURCE.search(c["text"])) for c in claims) / len(claims)
                 if claims
                 else None
             ),
@@ -61,3 +64,11 @@ def run(ctx: Ctx) -> int:
         )
         n += 1
     return n
+
+
+def _correction_note(ctx: Ctx, r: dict[str, Any]) -> bool:
+    """The flag set at ingest. shortcut: reports ingested before the flag existed are read from
+    the raw copy; drop the fallback once they age out (30 days)."""
+    if r.get("correction_note") is not None:
+        return bool(r["correction_note"])
+    return bool(rules.CORRECTION.search(ctx.text_of(r)))

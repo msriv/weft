@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AnomalyCard, IssuerTag, Kicker, SourceTag } from "@/components/bits";
+import ClaimMatrix from "@/components/ClaimMatrix";
 import ReportProblem from "@/components/ReportProblem";
 import { api } from "@/lib/api";
 import { day, perspectiveName } from "@/lib/format";
@@ -26,7 +27,10 @@ export default async function Event({ params }: { params: Promise<{ id: string; 
         </div>
       )}
       <hr />
-      <Kicker>How each side told it</Kicker>
+      <Kicker>Who carries which claim</Kicker>
+      <ClaimMatrix e={e} />
+      <hr />
+      <Kicker>How outlets from each country told it</Kicker>
       <div className="grid g2">
         {Object.entries(e.perspectives).map(([p, reps]) => (
           <section className="card" key={p} aria-label={perspectiveName(p)}>

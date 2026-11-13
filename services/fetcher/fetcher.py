@@ -18,7 +18,7 @@ from urllib.parse import urlsplit, urlunsplit
 import pdfplumber
 import trafilatura
 
-from weft_core import portals
+from weft_core import portals, rules
 from weft_core.polite import PoliteClient
 
 LEDE_CHARS = 500
@@ -158,6 +158,8 @@ def ingest(
             if isinstance(d.get("categories"), list)
             else (d.get("categories") or ""),
             "text_hash": text_hash,
+            # read once here, so the nightly weights stage needs no raw copy
+            "correction_note": bool(rules.CORRECTION.search(text)),
             "gov_domains": sorted(portals.outbound_gov_domains(html, canonical))
             if ext == "html"
             else [],

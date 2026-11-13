@@ -197,6 +197,7 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
             "title": title,
             "summary": lede,
             "text_hash": msg.get("text_hash"),
+            "correction_note": msg.get("correction_note"),
             "minhash": sig,
             "embedding": vec,
             "grouping_confidence": confidence,
