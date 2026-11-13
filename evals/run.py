@@ -125,6 +125,23 @@ def eval_nli() -> dict[str, float]:
     return prf(tp, fp, fn)
 
 
+def eval_attribution() -> dict[str, float]:
+    """Speaker kind, stance and content span of the attribution parser (#101). Placeholder
+    sentences only; the owner's labelled set (200 real sentences) goes in evals/private/."""
+    from weft_core import attribution
+
+    rows = load("attribution")
+    kind = stance = span = 0
+    for c in rows:
+        a = attribution.extract(c["sentence"], default_nlp().parser)
+        s0, s1 = a["content_span"]
+        kind += a["speaker_kind"] == c["speaker_kind"]
+        stance += a["stance"] == c["stance"]
+        span += c["sentence"][s0:s1] == c["content"]
+    n = len(rows)
+    return {"speaker_kind": kind / n, "stance": stance / n, "content_exact": span / n}
+
+
 def eval_translation(live: bool) -> dict[str, float]:
     db = local_db()
     graph.init(db)
@@ -156,6 +173,7 @@ def run_all(live: bool = False) -> dict[str, dict[str, float]]:
         "merges": eval_merges(live),
         "claims": eval_claims(live),
         "nli": eval_nli(),
+        "attribution": eval_attribution(),
         "translation": eval_translation(live),
         "ask": eval_ask(live),
     }

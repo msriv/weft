@@ -13,8 +13,10 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from itertools import pairwise
 from typing import Any
 
+from weft_core.attribution import normalise
 from weft_core.textutil import jaccard, sentences, shingles, words
 
 WIRES = (
@@ -68,6 +70,7 @@ class Rep:
     text: str = ""
     origin_id: str = ""  # independent-text cluster (#98); empty means its own origin
     claims_extracted: bool = True  # False: claim extraction never read it (#106)
+    correction_note: str = ""
 
     @property
     def origin(self) -> str:
@@ -87,7 +90,8 @@ class Group:
     id: str
     label: str
     report_ids: set[str]
-    claims: list[dict[str, Any]] = field(default_factory=list)  # {report_id, text}
+    # {report_id, text}, plus speaker, speaker_kind and stance when attribution ran (#101)
+    claims: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -98,6 +102,17 @@ class Figure:
     value: float
     text: str
     group: str | None = None  # claim group of the sentence the figure sits in
+    hedge: str | None = None  # at_least / at_most / about (#103)
+
+    @property
+    def interval(self) -> tuple[float, float]:
+        """ "at least 40" is [40, inf), "up to 40" is [0, 40], "about 40" is 40 plus or minus 10%."""
+        v = self.value
+        return {
+            "at_least": (v, math.inf),
+            "at_most": (0.0, v),
+            "about": (v * 0.9, v * 1.1),
+        }.get(self.hedge or "", (v, v))
 
 
 @dataclass
@@ -108,6 +123,8 @@ class EventInput:
     reports: list[Rep]
     groups: list[Group]
     figures: list[Figure]
+    conflicts: list[tuple[str, str, float]] = field(default_factory=list)  # group a, b, NLI
+    parties: list[str] = field(default_factory=list)  # names of the story's parties (rule 7)
 
 
 @dataclass
@@ -141,6 +158,18 @@ class Anomaly:
 
 def _a(rule: str, cfg: dict[str, Any], **kw: Any) -> Anomaly:
     return Anomaly(rule=rule, rule_version=cfg["version"], **kw)
+
+
+def fisher_2x2(a: int, b: int, c: int, d: int) -> float:
+    """Two-sided Fisher exact p for [[a, b], [c, d]]: the sum of tables at most as likely."""
+    r1, r2, c1, n = a + b, c + d, a + c, a + b + c + d
+
+    def p(x: int) -> float:
+        return math.comb(r1, x) * math.comb(r2, c1 - x) / math.comb(n, c1)
+
+    obs = p(a)
+    lo, hi = max(0, c1 - r2), min(r1, c1)
+    return min(1.0, sum(p(x) for x in range(lo, hi + 1) if p(x) <= obs * (1 + 1e-9)))
 
 
 def _eligible(reps: list[Rep], skip_paywalled: bool) -> list[Rep]:
@@ -212,45 +241,115 @@ def omission(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
     return out
 
 
+def _disjoint(a: Figure, b: Figure) -> bool:
+    (a0, a1), (b0, b1) = a.interval, b.interval
+    return a1 < b0 or b1 < a0
+
+
 def numbers_differ(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
     """Figures for the same quantity inside one claim group, so "12 people killed" is never
-    compared with "300 people evacuated". Figures outside any group, and years, are skipped."""
+    compared with "300 people evacuated" (#103). Hedges are intervals: "at least 40" and "52"
+    agree. Only reports from different origins within `max_hours_apart` are compared, since
+    tolls rise over time. Figures outside any group, and years, are skipped."""
     c = cfg["rules"]["numbers_differ"]
+    reps = {r.id: r for r in ev.reports}
+    min_log = c.get("min_log_ratio", -math.log(1 - c.get("min_relative_difference", 0.2)))
+    gap = timedelta(hours=c.get("max_hours_apart", 6))
     by_q: dict[tuple[str, str], list[Figure]] = defaultdict(list)
     for f in ev.figures:
-        if f.group and not (1900 <= f.value <= 2100 and f.value.is_integer()):
+        if (
+            f.group
+            and f.report_id in reps
+            and not (1900 <= f.value <= 2100 and f.value.is_integer())
+        ):
             by_q[(f.group, f.quantity)].append(f)
     out = []
     for (g, q), fs in sorted(by_q.items()):
-        lo, hi = min(fs, key=lambda f: f.value), max(fs, key=lambda f: f.value)
-        if lo.report_id == hi.report_id or hi.value <= 0:
+        best: tuple[float, Figure, Figure] | None = None
+        for x in range(len(fs)):
+            for y in range(x + 1, len(fs)):
+                a, b = sorted((fs[x], fs[y]), key=lambda f: f.value)
+                ra, rb = reps[a.report_id], reps[b.report_id]
+                if ra.origin == rb.origin or abs(ra.published_at - rb.published_at) > gap:
+                    continue
+                if a.value <= 0 or not _disjoint(a, b):
+                    continue
+                ratio = math.log(b.value / a.value)
+                if ratio >= min_log and (best is None or ratio > best[0]):
+                    best = (ratio, a, b)
+        if best is None:
             continue
+        ratio, lo, hi = best
         diff = (hi.value - lo.value) / hi.value
-        if diff > c["min_relative_difference"]:
+        out.append(
+            _a(
+                "numbers_differ",
+                cfg,
+                subject_kind="quantity",
+                subject_id=f"{g}:{q}",
+                story_id=ev.story_id,
+                event_id=ev.id,
+                summary=f"Reports of this event give different figures for '{q}': "
+                f"{lo.value:g} and {hi.value:g} ({diff:.0%} apart).",
+                inputs={
+                    "min_log_ratio": min_log,
+                    "max_hours_apart": gap.total_seconds() / 3600,
+                    "log_ratio": ratio,
+                    "difference": diff,
+                    "claim_group": g,
+                    "hedges": [lo.hedge, hi.hedge],
+                },
+                evidence_ids=[lo.id, hi.id],
+                detail={
+                    "figures": [
+                        {"id": f.id, "report_id": f.report_id, "value": f.value, "text": f.text}
+                        for f in (lo, hi)
+                    ]
+                },
+            )
+        )
+    return out
+
+
+def figure_revised(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
+    """One outlet gives a figure for a claim group, then a later report of its own gives a value
+    outside the first one's interval, and the later report carries no correction note (#103)."""
+    reps = {r.id: r for r in ev.reports}
+    by_key: dict[tuple[str, str, str], list[Figure]] = defaultdict(list)
+    for f in ev.figures:
+        if f.group and f.report_id in reps:
+            by_key[(reps[f.report_id].source_id, f.group, f.quantity)].append(f)
+    out = []
+    for (src, g, q), fs in sorted(by_key.items()):
+        fs = sorted(fs, key=lambda f: (reps[f.report_id].published_at, f.id))
+        for a, b in pairwise(fs):
+            ra, rb = reps[a.report_id], reps[b.report_id]
+            if ra.id == rb.id or not _disjoint(a, b):
+                continue
+            if rb.correction_note or CORRECTION.search(rb.text):
+                continue
             out.append(
                 _a(
-                    "numbers_differ",
+                    "figure_revised",
                     cfg,
                     subject_kind="quantity",
                     subject_id=f"{g}:{q}",
                     story_id=ev.story_id,
                     event_id=ev.id,
-                    summary=f"Reports of this event give different figures for '{q}': "
-                    f"{lo.value:g} and {hi.value:g} ({diff:.0%} apart).",
-                    inputs={
-                        "threshold": c["min_relative_difference"],
-                        "difference": diff,
-                        "claim_group": g,
-                    },
-                    evidence_ids=[lo.id, hi.id],
+                    summary=f"{rb.source_name} gave {a.value:g} for '{q}', then {b.value:g} in a "
+                    "later report, with no correction note.",
+                    inputs={"claim_group": g, "source_id": src},
+                    evidence_ids=[a.id, b.id],
                     detail={
                         "figures": [
                             {"id": f.id, "report_id": f.report_id, "value": f.value, "text": f.text}
-                            for f in (lo, hi)
+                            for f in (a, b)
                         ]
                     },
+                    key=src,
                 )
             )
+            break
     return out
 
 
@@ -471,12 +570,169 @@ def loaded_wording(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
     return out
 
 
+def _named_or_attributed(claim: dict[str, Any]) -> bool:
+    kind = claim.get("speaker_kind")
+    return kind != "none" if kind else is_attributed(claim["text"])
+
+
+def _origins_by(ev: EventInput, g: Group) -> dict[str, list[dict[str, Any]]]:
+    """A claim group's claims keyed by the independent origin of their report."""
+    reps = {r.id: r for r in ev.reports}
+    out: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for x in g.claims:
+        if x["report_id"] in reps:
+            out[reps[x["report_id"]].origin].append(x)
+    return out
+
+
+def anonymous_sourcing(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
+    """Independent reports name who said a claim, while others cite only unnamed sources (#101)."""
+    c = cfg["rules"]["anonymous_sourcing"]
+    out = []
+    for g in ev.groups:
+        by_o = _origins_by(ev, g)
+        named = [o for o, xs in by_o.items() if any(x.get("speaker_kind") == "named" for x in xs)]
+        anon = [
+            o
+            for o, xs in by_o.items()
+            if o not in named and any(x.get("speaker_kind") == "anonymous" for x in xs)
+        ]
+        if len(named) >= c["min_named_origins"] and len(anon) >= c["min_anonymous_origins"]:
+            ids = [x["report_id"] for o in named + anon for x in by_o[o]]
+            out.append(
+                _a(
+                    "anonymous_sourcing",
+                    cfg,
+                    subject_kind="claim_group",
+                    subject_id=g.id,
+                    story_id=ev.story_id,
+                    event_id=ev.id,
+                    summary=f"{len(named)} independent reports name who said this; "
+                    f"{len(anon)} cite only unnamed sources.",
+                    inputs={k: c[k] for k in ("min_named_origins", "min_anonymous_origins")}
+                    | {"named_origins": len(named), "anonymous_origins": len(anon)},
+                    evidence_ids=sorted(set(ids)),
+                    detail={"label": g.label},
+                )
+            )
+    return out
+
+
+def single_origin(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
+    """A claim carried by many independent reports that nearly all attribute it to one speaker
+    (#102). Repetition is not corroboration; the summary says who the speaker is and whether
+    they are a party to the story (rule 7), and nothing about truth (rule 1)."""
+    c = cfg["rules"]["single_origin"]
+    out = []
+    for g in ev.groups:
+        by_o = _origins_by(ev, g)
+        if len(by_o) < c["min_origins"]:
+            continue
+        speakers: Counter[str] = Counter()
+        shown: dict[str, str] = {}
+        for xs in by_o.values():
+            keys = {normalise(x.get("speaker")) for x in xs if x.get("speaker")} - {""}
+            for k in keys:
+                speakers[k] += 1
+                shown.setdefault(
+                    k, next(x["speaker"] for x in xs if normalise(x.get("speaker")) == k)
+                )
+        if not speakers:
+            continue
+        top, n = speakers.most_common(1)[0]
+        share = n / len(by_o)
+        if share < c["min_share"]:
+            continue
+        party = next((p for p in ev.parties if p and p.lower() in top), None)
+        who = shown[top] + (", a party to this story" if party else "")
+        out.append(
+            _a(
+                "single_origin",
+                cfg,
+                subject_kind="claim_group",
+                subject_id=g.id,
+                story_id=ev.story_id,
+                event_id=ev.id,
+                summary=f"{len(by_o)} independent reports carry this; {n} attribute it to {who}.",
+                inputs={
+                    "min_origins": c["min_origins"],
+                    "min_share": c["min_share"],
+                    "origins": len(by_o),
+                    "share": share,
+                    "speaker": top,
+                    "party": party,
+                },
+                evidence_ids=sorted({x["report_id"] for xs in by_o.values() for x in xs}),
+                detail={"label": g.label, "speaker": shown[top], "party": party},
+            )
+        )
+    return out
+
+
+def conflicting_accounts(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
+    """Two claim groups the NLI input marks as contradicting (#99), each carried by enough
+    independent texts, with different sets of perspectives behind each side. Fisher's exact p of
+    perspective against side is stored as an input, never used to filter."""
+    c = cfg["rules"]["conflicting_accounts"]
+    groups = {g.id: g for g in ev.groups}
+    persp = {r.id: r.perspective for r in ev.reports}
+    out = []
+    for ga, gb, score in ev.conflicts:
+        a, b = groups.get(ga), groups.get(gb)
+        if a is None or b is None:
+            continue
+        oa, ob = _origins_by(ev, a), _origins_by(ev, b)
+        if len(oa) < c["min_origins_per_side"] or len(ob) < c["min_origins_per_side"]:
+            continue
+        pa = {persp[x["report_id"]] for xs in oa.values() for x in xs} - {"unattributed"}
+        pb = {persp[x["report_id"]] for xs in ob.values() for x in xs} - {"unattributed"}
+        if pa == pb:
+            continue
+
+        def count(o: dict[str, list[dict[str, Any]]], p: str) -> int:
+            return sum(1 for xs in o.values() if any(persp[x["report_id"]] == p for x in xs))
+
+        fisher = {
+            p: fisher_2x2(
+                count(oa, p), len(oa) - count(oa, p), count(ob, p), len(ob) - count(ob, p)
+            )
+            for p in sorted(pa | pb)
+        }
+        out.append(
+            _a(
+                "conflicting_accounts",
+                cfg,
+                subject_kind="conflict",
+                subject_id=f"{ga}|{gb}",
+                story_id=ev.story_id,
+                event_id=ev.id,
+                summary=f"Reports conflict on: “{a.label[:160]}” versus “{b.label[:160]}”.",
+                inputs={
+                    "min_origins_per_side": c["min_origins_per_side"],
+                    "nli": score,
+                    "origins": [len(oa), len(ob)],
+                    "fisher_p": fisher,
+                },
+                evidence_ids=sorted(
+                    {x["report_id"] for o in (oa, ob) for xs in o.values() for x in xs}
+                ),
+                detail={
+                    "sides": [
+                        {"label": a.label, "perspectives": sorted(pa)},
+                        {"label": b.label, "perspectives": sorted(pb)},
+                    ]
+                },
+            )
+        )
+    return out
+
+
 def unattributed(ev: EventInput, cfg: dict[str, Any]) -> list[Anomaly]:
     c = cfg["rules"]["unattributed"]
     out = []
     for g in ev.groups:
-        att = [x for x in g.claims if is_attributed(x["text"])]
-        bare = [x for x in g.claims if not is_attributed(x["text"])]
+        att = [x for x in g.claims if _named_or_attributed(x)]
+        bare = [x for x in g.claims if not _named_or_attributed(x)]
         if bare and len(att) >= c["min_attributed_versions"]:
             out.append(
                 _a(
@@ -502,6 +758,10 @@ EVENT_RULES = {
     "copied_text": copied_text,
     "loaded_wording": loaded_wording,
     "unattributed": unattributed,
+    "figure_revised": figure_revised,
+    "anonymous_sourcing": anonymous_sourcing,
+    "single_origin": single_origin,
+    "conflicting_accounts": conflicting_accounts,
 }
 
 

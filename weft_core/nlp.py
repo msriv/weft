@@ -233,6 +233,11 @@ class Nlp:
     def __init__(self, embedder: Embedder, langid: LangId, entities: Entities, nli: Nli) -> None:
         self.embedder, self.langid, self.entities, self.nli = embedder, langid, entities, nli
 
+    @property
+    def parser(self) -> Any:
+        """The spaCy pipeline when entities come from spaCy (dependency parse for #101)."""
+        return getattr(self.entities, "_nlp", None)
+
 
 def default_nlp() -> Nlp:
     if os.environ.get("WEFT_NLP", "light") == "real":

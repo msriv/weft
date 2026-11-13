@@ -39,6 +39,7 @@ def load_event(
             origin_id=r.get("origin_id") or "",
             # reports from before the flag count as read when they have claims
             claims_extracted=bool(r.get("claims_extracted")) or r["id"] in claimed,
+            correction_note=r.get("correction_note") or "",
         )
         for r in reps
         if r["source_id"] in sources
@@ -46,7 +47,13 @@ def load_event(
     by_group: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for c in claims:
         if c["group_id"]:
-            by_group[c["group_id"]].append({"report_id": c["report_id"], "text": c["text"]})
+            by_group[c["group_id"]].append(
+                {
+                    "report_id": c["report_id"],
+                    "text": c["text"],
+                    **{k: c.get(k) for k in ("speaker", "speaker_kind", "stance") if c.get(k)},
+                }
+            )
     groups = [
         Group(g["id"], g["label"], {c["report_id"] for c in by_group[g["id"]]}, by_group[g["id"]])
         for g in graph.select(ctx.db, "claim_groups", "n.event_id=?", (ev["id"],))
@@ -64,10 +71,53 @@ def load_event(
         return None
 
     figs = [
-        Figure(f["id"], f["report_id"], f["quantity"], f["value"], f["text"], group_of(f))
+        Figure(
+            f["id"],
+            f["report_id"],
+            f["quantity"],
+            f["value"],
+            f["text"],
+            group_of(f),
+            f.get("hedge"),
+        )
         for f in graph.select(ctx.db, "figures", "n.event_id=? AND n.kind='number'", (ev["id"],))
     ]
-    return EventInput(ev["id"], ev["story_id"], _dt(ev["first_seen"]), rr, groups, figs)
+    conflicts = [
+        (c["group_a"], c["group_b"], c["nli_score"])
+        for c in graph.select(ctx.db, "conflicts", "n.event_id=?", (ev["id"],))
+    ]
+    return EventInput(
+        ev["id"],
+        ev["story_id"],
+        _dt(ev["first_seen"]),
+        rr,
+        groups,
+        figs,
+        conflicts,
+        party_names(ctx, ev["story_id"]),
+    )
+
+
+def party_names(ctx: Ctx, story_id: str) -> list[str]:
+    """Names a speaker may carry when it is a party to the story (rule 7): the beat's group
+    labels on grouped beats, else each party country's English name and code."""
+    groups = set(store.beat_groups(ctx.db, story_id).values())
+    if groups:
+        return sorted(groups)
+    codes = [
+        r["p"]
+        for r in ctx.db.execute(
+            "MATCH (n:StoryParty {story_id: ?}) RETURN n.party AS p", (story_id,)
+        )
+    ]
+    names: dict[str, str] = {}
+    try:  # babel comes with trafilatura; without it only the codes match
+        from babel import Locale
+
+        names = dict(Locale("en").territories)
+    except ImportError:
+        pass
+    return sorted({n for c in codes for n in (names.get(c.upper()), c) if n and len(n) > 2})
 
 
 def reconcile(

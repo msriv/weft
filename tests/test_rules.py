@@ -247,3 +247,112 @@ def test_names_source_needs_a_speech_verb_or_quote() -> None:
     assert not NAMES_SOURCE.search("The minister visited the border on Tuesday.")
     assert NAMES_SOURCE.search("The minister said troops would stay.")
     assert NAMES_SOURCE.search("“We will stay,” the minister told reporters.")
+
+
+def test_numbers_differ_reads_hedges_as_intervals_and_compares_close_in_time() -> None:
+    reps = [rep("1"), rep("2", "IR"), rep("3", "IR", hours=12)]
+
+    def fig(i: str, r: str, v: float, h: str | None = None) -> Figure:
+        return Figure(i, r, "missile", v, f"{v:g} missiles", "g", h)
+
+    assert rules.numbers_differ(event(reps, figures=[fig("a", "1", 40), fig("b", "2", 52)]), CFG)
+    # "at least 40" and 52 do not disagree
+    hedged = [fig("a", "1", 40, "at_least"), fig("b", "2", 52)]
+    assert rules.numbers_differ(event(reps, figures=hedged), CFG) == []
+    # 12 hours apart: a rising toll, not a disagreement
+    assert (
+        rules.numbers_differ(event(reps, figures=[fig("a", "1", 40), fig("c", "3", 52)]), CFG) == []
+    )
+    # one text republished: not two independent figures
+    copy = [rep("1"), rep("2", "IR", origin_id="1")]
+    assert (
+        rules.numbers_differ(event(copy, figures=[fig("a", "1", 40), fig("b", "2", 52)]), CFG) == []
+    )
+    lo, hi = Figure("x", "1", "q", 100, "", None, "about").interval
+    assert round(lo) == 90 and round(hi) == 110
+
+
+def test_figure_revised_needs_a_later_report_from_the_same_outlet_without_correction() -> None:
+    reps = [rep("1", src="o"), rep("2", src="o", hours=3)]
+    figs = [
+        Figure("a", "1", "dead", 12, "12 dead", "g"),
+        Figure("b", "2", "dead", 30, "30 dead", "g"),
+    ]
+    (a,) = rules.figure_revised(event(reps, figures=figs), CFG)
+    assert a.evidence_ids == ["a", "b"] and "no correction note" in a.summary
+    noted = [rep("1", src="o"), rep("2", src="o", hours=3, correction_note="Updated toll.")]
+    assert rules.figure_revised(event(noted, figures=figs), CFG) == []
+    others = [rep("1", src="o"), rep("2", src="p", hours=3)]
+    assert rules.figure_revised(event(others, figures=figs), CFG) == []
+
+
+def claim(r: str, speaker: str | None, kind: str) -> dict[str, Any]:
+    return {"report_id": r, "text": "t", "speaker": speaker, "speaker_kind": kind}
+
+
+def test_anonymous_sourcing_and_unattributed_read_attribution_spans() -> None:
+    reps = [rep("1"), rep("2"), rep("3", "IR")]
+    g = Group(
+        "g",
+        "40 missiles were launched",
+        {"1", "2", "3"},
+        [
+            claim("1", "Aldoria's army", "named"),
+            claim("2", "Gen. Voss", "named"),
+            claim("3", "officials", "anonymous"),
+        ],
+    )
+    (a,) = rules.anonymous_sourcing(event(reps, [g]), CFG)
+    assert a.inputs["named_origins"] == 2 and a.inputs["anonymous_origins"] == 1
+    assert "unnamed sources" in a.summary
+    # "officials said" is an attribution for the unattributed rule, not a bare claim
+    assert rules.unattributed(event(reps, [g]), CFG) == []
+
+
+def test_single_origin_names_the_one_speaker_and_their_party_status() -> None:
+    reps = [rep(str(i)) for i in range(5)]
+    cl = [claim(str(i), "The Aldoria defence ministry", "named") for i in range(4)]
+    cl.append(claim("4", "Kessar Times", "named"))
+    g = Group("g", "jets were shot down", {r.id for r in reps}, cl)
+    ev = event(reps, [g])
+    ev.parties = ["Aldoria", "Veymar"]
+    (a,) = rules.single_origin(ev, CFG)
+    assert a.inputs["share"] == 0.8 and a.inputs["party"] == "Aldoria"
+    assert "a party to this story" in a.summary and "true" not in a.summary.lower()
+    ev.groups[0].claims[3] = claim("3", "Kessar Times", "named")  # 3 of 5: below 80%
+    assert rules.single_origin(ev, CFG) == []
+
+
+def test_conflicting_accounts_needs_independent_texts_on_both_sides() -> None:
+    reps = [rep("1"), rep("2"), rep("3", "IR"), rep("4", "IR")]
+    a = Group(
+        "a", "the port was hit", {"1", "2"}, [claim("1", None, "none"), claim("2", None, "none")]
+    )
+    b = Group(
+        "b",
+        "the port was not hit",
+        {"3", "4"},
+        [claim("3", None, "none"), claim("4", None, "none")],
+    )
+    ev = event(reps, [a, b])
+    ev.conflicts = [("a", "b", 0.95)]
+    (x,) = rules.conflicting_accounts(ev, CFG)
+    assert x.summary.startswith("Reports conflict on:") and x.inputs["fisher_p"]["IL"] == 1 / 3
+    ev.reports[3] = rep("4", "IR", origin_id="3")  # side b is one text republished
+    assert rules.conflicting_accounts(ev, CFG) == []
+    assert rules.fisher_2x2(3, 0, 0, 3) == 0.1
+
+
+def test_attribution_spans_split_speaker_cue_and_content() -> None:
+    from weft_core import attribution
+
+    s = "Aldoria's defence ministry said on Friday that 40 missiles were launched."
+    a = attribution.extract(s)
+    assert a["speaker"] == "Aldoria's defence ministry" and a["speaker_kind"] == "named"
+    c0, c1 = a["content_span"]
+    assert s[c0:c1] == "40 missiles were launched"
+    b = attribution.extract("Forty missiles were launched, officials said.")
+    assert b["speaker_kind"] == "anonymous" and b["stance"] == "assert"
+    assert attribution.extract("Veymar denied losing any jets.")["stance"] == "deny"
+    assert attribution.extract("Missiles struck the port overnight.")["speaker_kind"] == "none"
+    assert attribution.normalise("The Aldoria defence ministry") == "aldoria defence ministry"

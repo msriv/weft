@@ -109,6 +109,14 @@ NODES: dict[str, dict[str, Any]] = {
         "start_char": None,
         "end_char": None,
         "embedding": None,
+        "speaker": None,
+        "speaker_kind": None,  # named / anonymous / none (#101)
+        "stance": None,  # assert / deny
+        "cue": None,
+        "speaker_start": None,
+        "speaker_end": None,
+        "content_start": None,
+        "content_end": None,
         **V,
     },
     "ClaimGroup": {
@@ -127,6 +135,7 @@ NODES: dict[str, dict[str, Any]] = {
         "kind": None,
         "quantity": None,
         "value": None,
+        "hedge": None,  # at_least / at_most / about (#103)
         "unit": None,
         "speaker": None,
         "text": None,

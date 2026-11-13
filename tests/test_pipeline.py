@@ -104,6 +104,17 @@ def test_groups_conflicts_and_short_version() -> None:
     assert any(set(g["perspectives"]) >= {"IL", "IR"} for g in gs)
     groups.run_conflicts(ctx)
     assert len(graph.select(ctx.db, "conflicts")) == 1  # report 3 denies what 1 states
+    # NLI scores are cached by text: a second night asks the model nothing new
+    cached = ctx.db.execute("MATCH (n:NliCache) RETURN count(n) AS n")[0]["n"]
+    assert cached >= 2
+    groups.run_conflicts(ctx)
+    assert ctx.db.execute("MATCH (n:NliCache) RETURN count(n) AS n")[0]["n"] == cached
+    # every claim carries its attribution kind (#101)
+    assert {c["speaker_kind"] for c in graph.select(ctx.db, "claims")} <= {
+        "none",
+        "named",
+        "anonymous",
+    }
     short_version.run(ctx)
     sv = graph.get(ctx.db, "short_versions", ctx_event(ctx))
     assert sv and set(sv["payload"]) == {

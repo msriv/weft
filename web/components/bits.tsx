@@ -49,10 +49,20 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 /** What the rule looked at, shown per rule: the claim, the two figures, or the changed lines. */
 export function AnomalyDetail({ a, max = 6 }: { a: Pick<Anomaly, "rule" | "detail">; max?: number }) {
   const d = a.detail ?? {};
-  if ((a.rule === "omission" || a.rule === "unattributed") && str(d.label)) {
+  if (a.rule === "conflicting_accounts" && Array.isArray(d.sides)) {
+    const sides = d.sides as { label: string; perspectives: string[] }[];
+    return (
+      <div className="row" style={{ gap: 12, alignItems: "stretch", margin: "6px 0" }}>
+        {sides.map((x, i) => (
+          <blockquote key={i} style={{ flex: 1, margin: 0 }}>{x.label}<div className="muted" style={{ fontSize: 12 }}>Carried by {x.perspectives.map(perspectiveName).join(", ")}</div></blockquote>
+        ))}
+      </div>
+    );
+  }
+  if (["omission", "unattributed", "anonymous_sourcing", "single_origin"].includes(a.rule) && str(d.label)) {
     return <blockquote style={{ margin: "6px 0" }}>Claim group: {str(d.label)}</blockquote>;
   }
-  if (a.rule === "numbers_differ" && Array.isArray(d.figures)) {
+  if ((a.rule === "numbers_differ" || a.rule === "figure_revised") && Array.isArray(d.figures)) {
     const figs = d.figures as { id: string; text: string; value: number }[];
     return (
       <div className="row" style={{ gap: 12, alignItems: "stretch", margin: "6px 0" }}>
