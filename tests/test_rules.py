@@ -378,3 +378,12 @@ def test_quote_differs_fires_between_faithful_and_unrelated() -> None:
     assert rules.quote_differs(ev, CFG) == []
     ev.quotes = [q | {"speaker": "Kessar Times"}]  # another speaker
     assert rules.quote_differs(ev, CFG) == []
+
+
+def test_one_outlets_own_sites_share_an_owner_key() -> None:
+    from weft_core.outlets import site_owner
+
+    assert site_owner("https://edition.cnn.com") == site_owner("https://www.cnn.com/")
+    assert site_owner("https://www.bbc.co.uk") == "site:bbc.co.uk"
+    assert site_owner("https://a.example") != site_owner("https://b.example")
+    assert site_owner(None) is None

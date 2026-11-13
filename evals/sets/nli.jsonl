@@ -4,3 +4,9 @@
 {"id":"n4","premise":"Talks opened in Ostia on Monday.","hypothesis":"The harbour authority reported fires.","contradiction":false}
 {"id":"n5","premise":"Officials confirmed the ferry was suspended by weather.","hypothesis":"Officials denied the ferry was suspended by weather.","contradiction":true}
 {"id":"n6","premise":"The delegation arrived in Ostia on Tuesday.","hypothesis":"The delegation arrived in Ostia.","contradiction":false}
+{"id":"n7","premise":"Veymar closed the Kessar crossing on Friday.","hypothesis":"Veymar did not close the Kessar crossing on Friday.","contradiction":true}
+{"id":"n8","premise":"The Aldoria council approved the budget.","hypothesis":"The Aldoria council rejected the budget.","contradiction":true}
+{"id":"n9","premise":"Forty ships left the Kessar port.","hypothesis":"Ships left the Kessar port.","contradiction":false}
+{"id":"n10","premise":"The minister resigned on Monday.","hypothesis":"The minister spoke to reporters on Monday.","contradiction":false}
+{"id":"n11","premise":"Aldoria reopened its embassy in Veymar.","hypothesis":"Aldoria never reopened its embassy in Veymar.","contradiction":true}
+{"id":"n12","premise":"Rain delayed the vote in Ostia.","hypothesis":"The vote in Ostia was delayed.","contradiction":false}
