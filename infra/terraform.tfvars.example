@@ -1,3 +1,6 @@
+# Everything has a default in variables.tf (project, region, alert email, model, images).
+# Override here only what differs. Pin images by running infra/build_images.sh, which
+# writes infra/images.auto.tfvars; without it the images default to :latest.
 project_id  = "weft-news-prod"
 alert_email = "you@example.com"
 
@@ -5,6 +8,3 @@ alert_email = "you@example.com"
 smtp_host = "smtp.resend.com"
 smtp_user = "resend"
 mail_from = "digest@your-verified-domain.example"
-
-# The *_image variables come from infra/images.auto.tfvars, written by infra/build_images.sh.
-# region and the model_* variables default in variables.tf; override them here if needed.

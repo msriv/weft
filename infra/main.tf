@@ -5,6 +5,20 @@ module "storage" {
   raw_retention_days = var.raw_retention_days
 }
 
+locals {
+  # shortcut: ":latest" does not redeploy on a new build; build_images.sh pins a tag via images.auto.tfvars
+  images = {
+    poller        = coalesce(var.poller_image, "${var.region}-docker.pkg.dev/${var.project_id}/weft/poller:latest")
+    fetcher       = coalesce(var.fetcher_image, "${var.region}-docker.pkg.dev/${var.project_id}/weft/fetcher:latest")
+    crawler       = coalesce(var.crawler_image, "${var.region}-docker.pkg.dev/${var.project_id}/weft/crawler:latest")
+    discovery     = coalesce(var.discovery_image, "${var.region}-docker.pkg.dev/${var.project_id}/weft/discovery:latest")
+    stream_worker = coalesce(var.stream_worker_image, "${var.region}-docker.pkg.dev/${var.project_id}/weft/stream_worker:latest")
+    nightly       = coalesce(var.nightly_image, "${var.region}-docker.pkg.dev/${var.project_id}/weft/nightly:latest")
+    api           = coalesce(var.api_image, "${var.region}-docker.pkg.dev/${var.project_id}/weft/api:latest")
+    web           = coalesce(var.web_image, "${var.region}-docker.pkg.dev/${var.project_id}/weft/web:latest")
+  }
+}
+
 module "bigquery" {
   source     = "./modules/bigquery"
   project_id = var.project_id
@@ -27,7 +41,7 @@ module "poller" {
   neo4j_secret_ids      = module.discovery.neo4j_secret_ids
   project_id            = var.project_id
   region                = var.region
-  image                 = var.poller_image
+  image                 = local.images.poller
   service_account_email = module.platform.service_account_emails["poller"]
   state_bucket          = module.storage.bucket_names["weft-snapshots"]
   dataset_id            = module.bigquery.dataset_id
@@ -39,7 +53,7 @@ module "fetcher" {
   neo4j_secret_ids      = module.discovery.neo4j_secret_ids
   project_id            = var.project_id
   region                = var.region
-  image                 = var.fetcher_image
+  image                 = local.images.fetcher
   service_account_email = module.platform.service_account_emails["fetcher"]
   raw_bucket            = module.storage.bucket_names["weft-raw"]
   dataset_id            = module.bigquery.dataset_id
@@ -56,7 +70,7 @@ module "crawler" {
   source                = "./modules/crawler"
   project_id            = var.project_id
   region                = var.region
-  image                 = var.crawler_image
+  image                 = local.images.crawler
   service_account_email = module.platform.service_account_emails["crawler"]
   raw_bucket            = module.storage.bucket_names["weft-raw"]
   state_bucket          = module.storage.bucket_names["weft-snapshots"]
@@ -69,7 +83,7 @@ module "discovery" {
   source                = "./modules/discovery"
   project_id            = var.project_id
   region                = var.region
-  image                 = var.discovery_image
+  image                 = local.images.discovery
   service_account_email = module.platform.service_account_emails["discovery"]
 }
 
@@ -78,7 +92,7 @@ module "stream_worker" {
   project_id            = var.project_id
   region                = var.region
   name                  = "weft-stream-worker"
-  image                 = var.stream_worker_image
+  image                 = local.images.stream_worker
   service_account_email = module.platform.service_account_emails["stream-worker"]
   secret_env            = module.discovery.neo4j_secret_ids
   env                   = { PROJECT_ID = var.project_id, WEFT_NLP = "real" }
@@ -123,7 +137,7 @@ module "nightly" {
   source                = "./modules/nightly"
   project_id            = var.project_id
   region                = var.region
-  image                 = var.nightly_image
+  image                 = local.images.nightly
   service_account_email = module.platform.service_account_emails["nightly"]
   stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "statements", "anomalies", "weights", "snapshot", "review_sample", "notify"]
   secret_env = merge(module.discovery.neo4j_secret_ids, {
@@ -211,7 +225,7 @@ module "api" {
   project_id            = var.project_id
   region                = var.region
   name                  = "weft-api"
-  image                 = var.api_image
+  image                 = local.images.api
   service_account_email = module.platform.service_account_emails["api"]
   secret_env = merge(module.discovery.neo4j_secret_ids, {
     ADMIN_TOKEN   = module.discovery.admin_token_secret_id
@@ -235,7 +249,7 @@ module "web" {
   project_id            = var.project_id
   region                = var.region
   name                  = "weft-web"
-  image                 = var.web_image
+  image                 = local.images.web
   service_account_email = module.platform.service_account_emails["web"]
   env                   = { API_URL = module.api.uri, FIREBASE_API_KEY = var.firebase_api_key }
   public                = true
