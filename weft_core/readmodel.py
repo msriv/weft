@@ -488,9 +488,34 @@ def node(db: Db, node_id: str) -> dict[str, Any] | None:
         if kind in ("report", "document"):
             links = [{"label": "Original", "url": row["url"]}]
         if kind == "anomaly":
-            links = [{"label": "Evidence", "id": i} for i in row["evidence_ids"]]
+            links = [_evidence(db, i) for i in row["evidence_ids"]]
         return {"kind": kind, "node": row, "links": links}
     return None
+
+
+def _evidence(db: Db, eid: str) -> dict[str, Any]:
+    """An evidence id as a reader sees it: outlet and headline for a report, the sentence for a
+    figure. Both link to the report node."""
+    fig = graph.get(db, "figures", eid)
+    rid = fig["report_id"] if fig else eid
+    r = graph.get(db, "reports", rid)
+    if r is None:
+        return {"label": "Evidence", "id": eid}
+    src = sources_by_id(db).get(r["source_id"], {}).get("name", r["source_id"])
+    out = {"label": f"{src}: {r['title']}", "id": rid, "source": src}
+    if fig:
+        # the sentence (claim) the figure sits in, else the figure's own span
+        at = fig["start_char"] or 0
+        claim = next(
+            (
+                c
+                for c in graph.select(db, "claims", "n.report_id=?", (rid,))
+                if (c["start_char"] or 0) <= at < (c["end_char"] or 0)
+            ),
+            None,
+        )
+        out["quote"] = claim["text"] if claim else fig["text"]
+    return out
 
 
 # --- sources ----------------------------------------------------------------------------------
