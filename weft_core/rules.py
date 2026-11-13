@@ -41,6 +41,14 @@ ATTRIBUTION = re.compile(
 )
 
 
+# stricter, for the "names sources" weight: a speech verb or phrase, or a quote. Nouns such as
+# "minister" or "statement" alone appear in nearly every political sentence.
+NAMES_SOURCE = re.compile(
+    r"\b(said|says|told|stated|according to|announced|denied|reported by)\b|[“\"]",
+    re.IGNORECASE,
+)
+
+
 def is_attributed(sentence: str) -> bool:
     """A claim sentence names a source: an attribution verb or phrase, a body, or a quote."""
     return bool(ATTRIBUTION.search(sentence))

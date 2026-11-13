@@ -232,3 +232,11 @@ def test_weights() -> None:
     assert weights.compute(bad, "news", 50, CFG)[0] < w
     assert weights.compute(good, "blog", 50, CFG)[0] < w  # blogs weighted lower, never hidden
     assert weights.compute(good, "news", 3, CFG) == (CFG["weights"]["neutral"], True)
+
+
+def test_names_source_needs_a_speech_verb_or_quote() -> None:
+    from weft_core.rules import NAMES_SOURCE
+
+    assert not NAMES_SOURCE.search("The minister visited the border on Tuesday.")
+    assert NAMES_SOURCE.search("The minister said troops would stay.")
+    assert NAMES_SOURCE.search("“We will stay,” the minister told reporters.")
