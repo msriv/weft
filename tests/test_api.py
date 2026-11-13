@@ -201,6 +201,7 @@ def test_digest_only_for_followed_stories_never_provisional_and_unsubscribes() -
         ctx.db, lambda *a: sent.append(a), "https://w.test", datetime(2026, 11, 6, tzinfo=UTC)
     )
     assert n == 1 and [to for to, _, _ in sent] == ["a@x.org"]
+    assert "headline from" in sent[0][2] and "outlets" in sent[0][2]  # new events, not totals
     assert (
         digest.send_due(
             ctx.db, lambda *a: sent.append(a), "https://w.test", datetime(2026, 11, 6, tzinfo=UTC)
@@ -305,3 +306,18 @@ def test_anomaly_evidence_is_named_by_outlet_and_headline() -> None:
     fig = readmodel._evidence(ctx.db, "f1")
     assert fig["id"] == "1" and fig["quote"]  # links to the report, quotes the sentence
     assert readmodel._evidence(ctx.db, "nope") == {"label": "Evidence", "id": "nope"}
+
+
+def test_today_lists_only_what_is_new() -> None:
+    from datetime import UTC, datetime
+
+    from weft_core import readmodel
+
+    _, ctx = build()
+    store.set_public(ctx.db, "iran-israel-war", True)
+    now = datetime(2026, 11, 6, 12, tzinfo=UTC)
+    t = readmodel.today(ctx.db, now=now)
+    assert t["new_events"] and t["breaking"]
+    assert all(e["first_seen"] >= t["since"] for e in t["new_events"])
+    later = readmodel.today(ctx.db, now=datetime(2026, 11, 20, tzinfo=UTC))
+    assert later["new_events"] == [] and later["breaking"] == [] and later["blind_spots"] == []

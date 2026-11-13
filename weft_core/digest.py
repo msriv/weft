@@ -8,7 +8,7 @@ import json
 import re
 import secrets
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from weft_core import readmodel, store
@@ -38,28 +38,39 @@ def unsubscribe(db: Db, token: str) -> bool:
     return bool(db.execute("MATCH (n:Subscription {token: ?}) DELETE n RETURN 1 AS x", (token,)))
 
 
-def compose(db: Db, sub: dict[str, Any], site: str) -> tuple[str, str] | None:
-    t = readmodel.today(db, json.loads(sub["follows"]))
+def compose(
+    db: Db, sub: dict[str, Any], site: str, now: datetime | None = None
+) -> tuple[str, str] | None:
+    """Only what is new in the followed stories since the last mail (or the last day or week)."""
+    now = now or datetime.now(UTC)
+    window = timedelta(days=7 if sub["frequency"] == "weekly" else 1)
+    since = sub.get("last_sent_at") or (now - window).date().isoformat()
+    t = readmodel.today(db, json.loads(sub["follows"]), since=since, now=now)
+    mine = {c["id"] for c in t["followed"]}
     lines: list[str] = []
-    for c in t["followed"]:
-        lines.append(
-            f"{c['title']}: {c['reports']} reports from {len(c['perspectives'])} perspectives. {site}/s/{c['id']}"
-        )
+    for e in t["new_events"]:
+        if e["story_id"] in mine:
+            docs = f", {e['new_documents']} new documents" if e["new_documents"] else ""
+            lines.append(
+                f'{e["title"]}: "{e["label"]}" (headline from {e["label_source"]}), '
+                f"{e['outlets']} outlets, {len(e['perspectives'])} perspectives{docs}. "
+                f"{site}/s/{e['story_id']}/e/{e['id']}"
+            )
     for a in t["new_anomalies"]:
-        if a["story_id"] in {c["id"] for c in t["followed"]}:
+        if a["story_id"] in mine:
             lines.append(f"Reports don't line up: {a['summary']} {site}/s/{a['story_id']}")
+    if not lines:
+        return None
     for b in t["blind_spots"]:
-        if b["story_id"] in {c["id"] for c in t["followed"]}:
+        if b["story_id"] in mine and b["no_source_published"]:
             lines.append(
                 f"No source has published from {', '.join(b['no_source_published'])} on {b['title']}."
             )
-    if not t["followed"] or not t["changes"] and not t["new_anomalies"]:
-        return None
     body = (
         "\n".join(lines)
         + f"\n\nWeft shows who reported what. It does not say what is true.\nUnsubscribe: {site}/api/v1/unsubscribe?token={sub['token']}\n"
     )
-    return f"Weft {sub['frequency']} digest, {t['day']}", body
+    return f"Weft {sub['frequency']} digest, {now.date().isoformat()}", body
 
 
 def send_due(db: Db, send: Send, site: str, now: datetime | None = None) -> int:
@@ -69,9 +80,12 @@ def send_due(db: Db, send: Send, site: str, now: datetime | None = None) -> int:
     for sub in store.nodes(db, "Subscription", "MATCH (n:Subscription) RETURN n"):
         if sub["last_sent"] == today or (sub["frequency"] == "weekly" and now.weekday() != 0):
             continue
-        mail = compose(db, sub, site)
+        mail = compose(db, sub, site, now)
         if mail:
             send(sub["email"], *mail)
             sent += 1
-        db.execute("MATCH (n:Subscription {email: ?}) SET n.last_sent=?", (sub["email"], today))
+        db.execute(
+            "MATCH (n:Subscription {email: ?}) SET n.last_sent=?, n.last_sent_at=?",
+            (sub["email"], today, now.isoformat()),
+        )
     return sent
