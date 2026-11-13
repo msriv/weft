@@ -39,6 +39,24 @@ SAID = re.compile(
 )
 
 
+HEDGE = re.compile(
+    r"(?P<h>at least|more than|over|upwards of|nearly|almost|up to|as many as|about|around|"
+    r"approximately|roughly|some|an estimated)\s+$",
+    re.IGNORECASE,
+)
+LOWER = {"at least", "more than", "over", "upwards of"}
+UPPER = {"nearly", "almost", "up to", "as many as"}
+
+
+def hedge(before: str) -> str | None:
+    """How the words just before a figure bound it (#103): at_least, at_most or about."""
+    m = HEDGE.search(before)
+    if not m:
+        return None
+    h = m["h"].lower()
+    return "at_least" if h in LOWER else "at_most" if h in UPPER else "about"
+
+
 def numbers(text: str) -> list[dict[str, Any]]:
     out = []
     for m in NUM.finditer(text):
@@ -49,7 +67,14 @@ def numbers(text: str) -> list[dict[str, Any]]:
         value *= SCALE.get((m.group("scale") or "").lower(), 1)
         unit = "percent" if unit in ("%", "per cent") else unit.rstrip("s")
         out.append(
-            {"quantity": unit, "value": value, "unit": unit, "start": m.start(), "end": m.end()}
+            {
+                "quantity": unit,
+                "value": value,
+                "hedge": hedge(text[max(0, m.start() - 24) : m.start()]),
+                "unit": unit,
+                "start": m.start(),
+                "end": m.end(),
+            }
         )
     return out
 
@@ -89,6 +114,7 @@ def run(ctx: Ctx) -> int:
                     "kind": kind,
                     "quantity": f.get("quantity"),
                     "value": f.get("value"),
+                    "hedge": f.get("hedge"),
                     "unit": f.get("unit"),
                     "speaker": f.get("speaker"),
                     "text": span[:300],

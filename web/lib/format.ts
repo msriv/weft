@@ -24,7 +24,8 @@ export function ago(iso: string | null, now = Date.now()): string {
 export const RULE_NAMES: Record<string, string> = {
   omission: "Omission", numbers_differ: "Numbers differ", silence: "Silence",
   copied_text: "Copied text", silent_edit: "Silent edit", loaded_wording: "Loaded wording",
-  unattributed: "Unattributed",
+  unattributed: "Unattributed", figure_revised: "Figure revised", anonymous_sourcing: "Anonymous sourcing",
+  single_origin: "One speaker behind it", conflicting_accounts: "Conflicting accounts",
 };
 
 export const STATE_LABEL: Record<string, string> = {

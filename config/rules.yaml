@@ -1,7 +1,9 @@
 # Anomaly rule thresholds. Published on How we weigh.
 # Bump `version` on any change; every anomaly records the version that fired it.
 # These are starting points, to tune against an editor-labelled set before launch.
-version: 4  # 2026-11-13: origins and a hypergeometric baseline for omission (#98, #100)
+version: 5  # 2026-11-13: figure intervals, figure_revised, anonymous_sourcing, single_origin,
+# conflicting_accounts (#99, #101, #102, #103)
+# version 4: origins and a hypergeometric baseline for omission (#98, #100)
 # version 3: anomaly ids per perspective/edit; promotion gate from owner labels
 
 # A rule fires as active (and may notify) only after owner labels on its anomalies reach these;
@@ -26,7 +28,21 @@ rules:
     exclude_paywalled_sources: true
   numbers_differ:
     enabled: true
-    min_relative_difference: 0.20
+    min_log_ratio: 0.22                # ln(52/40) = 0.26 fires; hedged intervals that overlap never do
+    max_hours_apart: 6                 # tolls rise: only compare reports published close together
+  figure_revised:
+    enabled: true                      # same outlet, later report, value outside the first one's interval
+  anonymous_sourcing:
+    enabled: true
+    min_named_origins: 2               # independent texts that name who said it
+    min_anonymous_origins: 1           # and at least one citing only unnamed sources
+  single_origin:
+    enabled: true
+    min_origins: 4                     # carried by this many independent texts
+    min_share: 0.80                    # and this share of them attribute it to one speaker
+  conflicting_accounts:
+    enabled: true                      # provisional until owner labels pass the promotion gate
+    min_origins_per_side: 2
   silence:
     enabled: true
     outlet_quiet_hours: 48

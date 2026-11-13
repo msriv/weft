@@ -1,0 +1,8 @@
+{"id":"a1","sentence":"Aldoria's defence ministry said on Friday that 40 missiles were launched.","speaker_kind":"named","content":"40 missiles were launched","stance":"assert"}
+{"id":"a2","sentence":"Forty missiles were launched, officials said.","speaker_kind":"anonymous","content":"Forty missiles were launched","stance":"assert"}
+{"id":"a3","sentence":"Veymar denied losing any jets.","speaker_kind":"named","content":"losing any jets","stance":"deny"}
+{"id":"a4","sentence":"According to two people familiar with the talks, the Kessar deal is close.","speaker_kind":"anonymous","content":"the Kessar deal is close","stance":"assert"}
+{"id":"a5","sentence":"\"We targeted military bases only,\" said Defence Minister Arlen Voss.","speaker_kind":"named","content":"We targeted military bases only","stance":"assert"}
+{"id":"a6","sentence":"Missiles struck the Kessar port overnight.","speaker_kind":"none","content":"Missiles struck the Kessar port overnight.","stance":"assert"}
+{"id":"a7","sentence":"A spokesman told reporters the port was closed.","speaker_kind":"anonymous","content":"the port was closed","stance":"assert"}
+{"id":"a8","sentence":"The port reopened on Monday, according to the Veymar Herald.","speaker_kind":"named","content":"The port reopened on Monday","stance":"assert"}

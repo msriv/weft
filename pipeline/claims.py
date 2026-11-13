@@ -14,7 +14,7 @@ from typing import Any
 from jsonschema import ValidationError, validate
 
 from pipeline.ctx import Ctx
-from weft_core import graph
+from weft_core import attribution, graph
 from weft_core.models import ModelClient
 from weft_core.textutil import sentences
 
@@ -81,6 +81,8 @@ def order(reps: list[dict[str, Any]], weight: dict[str, float]) -> list[dict[str
 
 
 def _put(ctx: Ctx, r: dict[str, Any], text: str, s: int, e: int) -> None:
+    att = attribution.extract(text[s:e], ctx.nlp.parser)
+    sp, ct = att["speaker_span"], att["content_span"]
     graph.put(
         ctx.db,
         "claims",
@@ -93,6 +95,14 @@ def _put(ctx: Ctx, r: dict[str, Any], text: str, s: int, e: int) -> None:
             "start_char": s,
             "end_char": e,
             "embedding": ctx.nlp.embedder.embed(text[s:e]),
+            "speaker": att["speaker"],
+            "speaker_kind": att["speaker_kind"],
+            "stance": att["stance"],
+            "cue": att["cue"],
+            "speaker_start": s + sp[0] if sp else None,
+            "speaker_end": s + sp[1] if sp else None,
+            "content_start": s + ct[0],
+            "content_end": s + ct[1],
         },
     )
 
