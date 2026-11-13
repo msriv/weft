@@ -52,6 +52,7 @@ class NewSource(BaseModel):
 class BeatTerms(BaseModel):
     patterns: list[str]
     exclude: list[str] = []
+    groups: dict[str, str] | None = None  # source id -> outlet group (D21); None leaves as is
 
 
 class Subscription(BaseModel):
@@ -300,9 +301,17 @@ def create_app(
                 re.compile(p)
             except re.error as exc:
                 raise HTTPException(422, f"bad pattern {p!r}: {exc}") from exc
+        groups = beat["groups"]
+        if body.groups is not None:
+            known = {s["id"] for s in store.all_sources(db)}
+            groups = {k.strip(): v.strip() for k, v in body.groups.items() if k.strip() and v.strip()}
+            if bad := sorted(set(groups) - known):
+                raise HTTPException(422, f"unknown source ids: {', '.join(bad)}")
         store.add_beat(db, beat_id, beat["name"], pats, parties=beat["parties"], exclude=excl)
         db.execute("MATCH (n:Beat {id: ?}) SET n.edited=1", (beat_id,))
-        return {"id": beat_id, "patterns": pats, "exclude": excl}
+        if body.groups is not None:
+            store.set_beat_groups(db, beat_id, groups)
+        return {"id": beat_id, "patterns": pats, "exclude": excl, "groups": groups}
 
     @adm.get("/unplaced")
     def unplaced(limit: int = 50) -> list[dict[str, Any]]:

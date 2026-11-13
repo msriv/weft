@@ -83,6 +83,7 @@ def untracked(db: Db, codes: list[str]) -> tuple[list[str], list[str]]:
     """Split "no source has published" perspectives into (sources exist but published nothing,
     Weft tracks no active source there). The second is a gap in Weft's list, not silence."""
     have = {perspective_of(s) for s in store.all_sources(db, "n.status='active'")}
+    have |= {g for b in store.beats(db) for g in b["groups"].values()}
     return [c for c in codes if c in have], [c for c in codes if c not in have]
 
 

@@ -6,7 +6,7 @@ type Story = { id: string; beat_id: string; title: string; public: boolean };
 type Item = { id: string; kind: string; payload: Record<string, unknown> };
 type Problem = { id: number; kind: string; ref_id: string | null; message: string };
 type Src = { id: string; name: string; domain: string; country: string | null; country_source: string | null; paywalled: number; status: string; rejected_reason: string | null; last_report_at: string | null };
-type Beat = { id: string; name: string; patterns: string[]; exclude: string[]; edited: number | null };
+type Beat = { id: string; name: string; patterns: string[]; exclude: string[]; groups: Record<string, string>; edited: number | null };
 type Unplaced = { id: string; title: string | null; url: string | null; source_id: string; fetched_at: string };
 type Run = { run_id: string; stage: string; started_at: string; ended_at: string | null; rows_out: number | null; status: string; error: string | null };
 
@@ -80,7 +80,7 @@ export default function Admin() {
       </form>
       {sources.map((s) => (
         <div className="row" key={s.id}>
-          <b>{s.name}</b><span className="muted">{s.domain}</span>
+          <b>{s.name}</b><span className="muted">{s.domain} · id <code>{s.id}</code></span>
           <label>country <input defaultValue={s.country ?? ""} size={3} maxLength={2} aria-label={`Country of ${s.name}`}
             onBlur={(e) => { const v = e.target.value.trim().toUpperCase(); if (v !== (s.country ?? "")) void act(`/sources/${s.id}`, { country: v || null }, "PATCH"); }} /></label>
           {s.country_source && <span className="muted">from {s.country_source}</span>}
@@ -96,13 +96,16 @@ export default function Admin() {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
           const lines = (k: string) => String(f.get(k) ?? "").split("\n");
-          void act(`/beats/${b.id}`, { patterns: lines("patterns"), exclude: lines("exclude") }, "PUT");
+          const groups = Object.fromEntries(lines("groups").map((l) => l.split("=").map((x) => x.trim())).filter((kv) => kv.length === 2 && kv[0] && kv[1]));
+          void act(`/beats/${b.id}`, { patterns: lines("patterns"), exclude: lines("exclude"), groups }, "PUT");
         }}>
           <Kicker>{b.name}{b.edited ? " · edited" : ""}</Kicker>
           <label className="muted" htmlFor={`p-${b.id}`}>Match any</label>
           <textarea id={`p-${b.id}`} name="patterns" rows={3} style={{ width: "100%" }} defaultValue={b.patterns.join("\n")} />
           <label className="muted" htmlFor={`x-${b.id}`}>But not</label>
           <textarea id={`x-${b.id}`} name="exclude" rows={2} style={{ width: "100%" }} defaultValue={b.exclude.join("\n")} />
+          <label className="muted" htmlFor={`g-${b.id}`}>Outlet groups, one per line as source id = group. Leave empty to group outlets by country. Use this for domestic beats where every outlet shares one country.</label>
+          <textarea id={`g-${b.id}`} name="groups" rows={3} style={{ width: "100%" }} defaultValue={Object.entries(b.groups ?? {}).map(([k, v]) => `${k} = ${v}`).join("\n")} />
           <button>Save</button>
         </form>
       ))}

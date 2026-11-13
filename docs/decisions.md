@@ -104,3 +104,9 @@ Short record of what was decided and why. Add an entry before changing any of th
 **Eval:** the two prompts are in the baseline prompt list with no scored eval. The hit rate on the panel is the measurement.
 **Amended (Mihir, 2026-11-12, #111, #82):** keep speculations and add tracked open questions. Each prediction carries the model's probability, shown in the UI. Resolution no longer uses a model: a later claim group whose label NLI-entails `confirm_if` (supported) or `refute_if` (contradicted), carried after the guess and by its deadline by reports from at least 2 outlets and 2 perspectives. Expired counts as a miss. The panel shows a Brier score against a coin (0.25) and a calibration table instead of a hit rate. At most 5 open predictions per story. Prompt `detective@2`; `detective-check@1` is retired.
 
+
+## D21. Perspective is per beat: outlet country, or owner-set outlet groups
+**Decided (2026-11-13, #70, under Mihir's "fix them" on the product review):** A perspective is the key Weft compares coverage by. On war beats it stays the outlet's country. A beat may instead carry `groups` (source id to group label, set in admin), for domestic beats where every outlet shares one country (US Senate, India CEC). On a grouped beat a report's perspective is its outlet's group, outlets with no group are `unattributed`, and the groups are the sides for "reported by all", "no source has published", omission and the perspective bands.
+**Why:** With one country, these features could never produce output for 2 of the 4 beats.
+**Rules:** Groups are an editorial choice by the owner, never inferred by a model. Nothing labels a group as more right or wrong; coverage language only (rule 1). Changing groups re-tags the beat's reports; a country edit on a source does not override its group on a grouped beat.
+**Revisit when:** a beat needs both (country and group), or groups need citations shown to readers.
