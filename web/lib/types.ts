@@ -36,7 +36,7 @@ export type ShortVersion = {
 export type StoryGraph = {
   story: StoryCard; as_of: string | null; summary: string[]; perspectives: string[];
   nodes: GraphNode[]; edges: GraphEdge[]; anomalies: Anomaly[];
-  events: { id: string; label: string | null; label_source?: string | null; first_seen: string; reports: number; perspectives: string[] }[];
+  events: { id: string; label: string | null; label_source?: string | null; first_seen: string; reports: number; perspectives: string[]; follows?: string | null; thread_id?: string; thread_label?: string | null }[];
   short_version: ShortVersion;
   window: { from: string | null; to: string; days: number; older: boolean };
 };
@@ -62,6 +62,7 @@ export type World = { stories: WorldItem[]; places?: WorldPlace[]; gaps: { story
 export type NewEvent = {
   id: string; story_id: string; title: string; beat: string; label: string | null; label_source: string | null;
   first_seen: string; reports: number; outlets: number; perspectives: string[]; new_documents: number;
+  follows?: string | null; thread_label?: string | null;
 };
 export type Today = {
   day: string | null; since: string; changes: { kind: string; label: string; count: number }[];
