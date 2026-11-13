@@ -321,6 +321,7 @@ def event_row(db: Db, e: dict[str, Any], at: str | None = None) -> dict[str, Any
         "label_source": _source_name(db, first["source_id"]) if first else None,
         "first_seen": e["first_seen"],
         "reports": len(reps),
+        "outlets": len({r["source_id"] for r in reps}),
         "perspectives": sorted({r["perspective"] for r in reps}),
         "grouping_confidence": e["grouping_confidence"],
     }
@@ -838,13 +839,22 @@ def method(db: Db) -> dict[str, Any]:
 # --- today ------------------------------------------------------------------------------------
 
 
-def today(db: Db, followed_beats: list[str] | None = None) -> dict[str, Any]:
-    """Overnight changes (latest daily diff, public stories only), breaking now, blind spots."""
+def today(
+    db: Db,
+    followed_beats: list[str] | None = None,
+    since: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """What is new since `since` (default: the last 24 hours) in public stories: new events with
+    their headline, outlets and new documents, new anomalies, the stories they belong to, and
+    blind spots among events of the last 48 hours."""
+    now = now or datetime.now(UTC)
+    since = since or (now - timedelta(days=1)).isoformat()
+    recent = (now - timedelta(hours=48)).isoformat()
     public = {
         s["id"]: s
         for s in store.nodes(db, "Story", "MATCH (n:Story {public: 1}) RETURN n ORDER BY n.id")
     }
-    cards = {sid: story_card(db, s) for sid, s in public.items()}
     diff_rows = db.execute(
         "MATCH (n:DailyDiff) RETURN n.day AS day, n.payload AS payload ORDER BY n.day DESC LIMIT 1"
     )
@@ -861,34 +871,43 @@ def today(db: Db, followed_beats: list[str] | None = None) -> dict[str, Any]:
     new_anoms = [
         a
         for a in anomalies_for(db, "n.status='active'")
-        if a["story_id"] in public
-        and a["since"] >= (datetime.now(UTC) - timedelta(days=1)).isoformat()
+        if a["story_id"] in public and a["since"] >= since
     ]
-    breaking = [
-        c
-        for c in cards.values()
-        if c["status"] == "developing" and c["provisional_anomalies"] + c["anomalies"] >= 0
-    ]
-    breaking.sort(key=lambda c: c["last_report_at"] or "", reverse=True)
-    blind = []
-    for sid in public:
-        for e in graph.select(db, "events", "n.story_id=?", (sid,)):
+    new_events, blind = [], []
+    for sid, st in public.items():
+        for e in graph.select(db, "events", "n.story_id=? AND n.first_seen >= ?", (sid, recent)):
+            if e["first_seen"] >= since:
+                docs = graph.select(
+                    db, "documents", "n.event_id=? AND n.published_at >= ?", (e["id"], since)
+                )
+                new_events.append(
+                    event_row(db, e)
+                    | {"title": st["title"], "beat": st["beat_id"], "new_documents": len(docs)}
+                )
             sv = graph.get(db, "short_versions", e["id"])
             split = _split_sv(db, sv["payload"]) if sv else None
             if split and (split["no_source_published"] or split["untracked"]):
                 blind.append(
                     {
                         "story_id": sid,
-                        "title": public[sid]["title"],
+                        "title": st["title"],
                         "event_id": e["id"],
                         "no_source_published": split["no_source_published"],
                         "untracked": split["untracked"],
                     }
                 )
+    new_events.sort(key=lambda e: e["first_seen"], reverse=True)
+    active = {e["story_id"] for e in new_events} | {a["story_id"] for a in new_anoms}
+    cards = {sid: story_card(db, s) for sid, s in public.items()}
+    breaking = sorted(
+        (cards[sid] for sid in active), key=lambda c: c["last_report_at"] or "", reverse=True
+    )
     followed = [c for c in cards.values() if followed_beats and c["beat"] in followed_beats]
     return {
         "day": diff_rows[0]["day"] if diff_rows else None,
+        "since": since,
         "changes": changes,
+        "new_events": new_events,
         "new_anomalies": new_anoms,  # provisional ones are excluded: they never notify
         "breaking": breaking[:10],
         "blind_spots": blind,
