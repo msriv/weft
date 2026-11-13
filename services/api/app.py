@@ -22,6 +22,7 @@ from weft_core import (
     accounts,
     detective,
     digest,
+    directions,
     feedback,
     graph,
     questions,
@@ -177,7 +178,20 @@ def create_app(
         if not detective.enabled():
             raise HTTPException(404, "not found")
         found(readmodel.public_story(db, story_id))
-        return detective.scorecard(db, story_id)
+        return detective.scorecard(db, story_id) | {"domains": directions.for_story(db, story_id)}
+
+    @v1.get("/directions")
+    def directions_list() -> dict[str, Any]:
+        # D22: model speculation on domains, served only with the detective flag on
+        if not detective.enabled():
+            raise HTTPException(404, "not found")
+        return directions.overview(db)
+
+    @v1.get("/directions/{domain_id}")
+    def directions_one(domain_id: str) -> Any:
+        if not detective.enabled():
+            raise HTTPException(404, "not found")
+        return found(directions.detail(db, domain_id))
 
     @v1.get("/events/{event_id}")
     def event(event_id: str) -> Any:

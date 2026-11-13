@@ -24,8 +24,15 @@ from weft_core.textutil import sentences
 HERE = Path(__file__).parent
 
 
-def load(name: str) -> list[dict[str, Any]]:
-    return [json.loads(x) for x in (HERE / "sets" / f"{name}.jsonl").read_text().splitlines() if x]
+def load(name: str, private: bool = False) -> list[dict[str, Any]]:
+    """A labelled set. With `private`, the owner's own labels in evals/private/<name>.jsonl
+    (gitignored: real sentences never enter git) are added, so the model-free gates grow with
+    real labels (#93). Model tasks replay recordings, so they read the committed set only."""
+    rows = [json.loads(x) for x in (HERE / "sets" / f"{name}.jsonl").read_text().splitlines() if x]
+    extra = HERE / "private" / f"{name}.jsonl"
+    if private and extra.exists():
+        rows += [json.loads(x) for x in extra.read_text().splitlines() if x.strip()]
+    return rows
 
 
 def prf(tp: int, fp: int, fn: int) -> dict[str, float]:
@@ -117,7 +124,7 @@ def eval_claims(live: bool) -> dict[str, float]:
 def eval_nli() -> dict[str, float]:
     nli = default_nlp().nli
     tp = fp = fn = 0
-    for c in load("nli"):
+    for c in load("nli", private=True):
         got = nli.contradiction(c["premise"], c["hypothesis"]) >= 0.8
         tp += got and c["contradiction"]
         fp += got and not c["contradiction"]
@@ -130,7 +137,7 @@ def eval_attribution() -> dict[str, float]:
     sentences only; the owner's labelled set (200 real sentences) goes in evals/private/."""
     from weft_core import attribution
 
-    rows = load("attribution")
+    rows = load("attribution", private=True)
     kind = stance = span = 0
     for c in rows:
         a = attribution.extract(c["sentence"], default_nlp().parser)

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
 import { day } from "@/lib/format";
@@ -10,6 +11,7 @@ type Card = {
   disclaimer: string; predictions: Prediction[]; counts: Record<Prediction["status"], number>;
   resolved: number; brier: number | null; brier_coin: number;
   calibration: { band: [number, number]; n: number; happened: number }[];
+  domains?: { id: string; label: string }[];
 };
 
 const STATUS: Record<Prediction["status"], string> = {
@@ -51,6 +53,11 @@ export default async function DetectivePanel({ storyId }: { storyId: string }) {
           )}
         </div>
       )) : <p className="muted">No guesses yet. They are made during the nightly run.</p>}
+      {c.domains && c.domains.length > 0 && (
+        <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>
+          Directions: {c.domains.map((d) => <Link key={d.id} href={`/directions/${encodeURIComponent(d.id)}`} style={{ marginRight: 8 }}>{d.label}</Link>)}
+        </p>
+      )}
     </aside>
   );
 }

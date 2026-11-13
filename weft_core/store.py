@@ -253,7 +253,45 @@ NODES: dict[str, dict[str, Any]] = {
         "status": "open",
         "evidence": "[]",
         "checked_at": None,
+        "probability": None,
+        # World directions (D22): a domain-scoped prediction leaves story_id empty
+        "domain_id": None,
+        "kind": "claim",  # claim / numeric
+        "origin": "model",  # model / template
+        "reference_class": None,
+        "drivers": "[]",
+        "series_id": None,
+        "op": None,
+        "threshold": None,
+        "base_rate": None,
+        "model": None,
+        "prompt": None,
+        "useful": None,
     },
+    "Domain": {
+        "id": None,  # facet:subject, e.g. currency:IN or politics:us-senate
+        "subject": None,
+        "subject_kind": None,  # country / beat
+        "facet": None,
+        "label": None,
+        "status": "active",  # active / dormant
+        "score": 0,
+        "currency": None,
+        "last_above_at": None,
+        "last_called_at": None,
+        "proposed": 0,
+        "dropped": 0,
+        "updated_at": None,
+    },
+    "DomainDriver": {
+        "domain_id": None,
+        "group_id": None,
+        "day": None,
+        "score": None,
+        "n_origins": None,
+        "perspectives": "[]",
+    },
+    "SeriesPoint": {"series_id": None, "day": None, "value": None, "source": None},
     "BatchRun": {
         "run_id": None,
         "stage": None,

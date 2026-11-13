@@ -44,8 +44,16 @@ def run(ctx: Ctx) -> int:
         n_silent = len(ids & silent)
         total = len(reps)
         factors = {
+            # a named speaker from the attribution spans (#101); the stricter regex only for
+            # claims stored before spans existed (#94)
             "names_sources": (
-                sum(bool(rules.NAMES_SOURCE.search(c["text"])) for c in claims) / len(claims)
+                sum(
+                    c["speaker_kind"] == "named"
+                    if c.get("speaker_kind")
+                    else bool(rules.NAMES_SOURCE.search(c["text"]))
+                    for c in claims
+                )
+                / len(claims)
                 if claims
                 else None
             ),

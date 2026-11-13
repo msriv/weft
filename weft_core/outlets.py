@@ -135,3 +135,22 @@ def fill_countries(db: Any) -> int:
             store.set_country(db, s["id"], c, "outlet table (unverified)")
             n += 1
     return n
+
+
+_SLD = {"co", "com", "org", "net", "gov", "ac", "edu", "gen", "nic"}
+
+
+def site_owner(homepage: str | None) -> str | None:
+    """Owner key from a homepage's registrable domain ("edition.cnn.com" and "cnn.com" share
+    "site:cnn.com"), so copy shared between one outlet's own sites is not counted as copying
+    (#94). It never claims a corporate owner; a cited `owner_id` replaces it."""
+    if not homepage:
+        return None
+    from urllib.parse import urlsplit
+
+    host = urlsplit(homepage if "//" in homepage else f"//{homepage}").netloc.lower()
+    parts = host.split(":")[0].removeprefix("www.").split(".")
+    if len(parts) < 2:
+        return None
+    n = 3 if len(parts) >= 3 and parts[-2] in _SLD and len(parts[-1]) == 2 else 2
+    return "site:" + ".".join(parts[-n:])

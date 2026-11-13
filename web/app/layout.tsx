@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import DirectionsLink from "@/components/DirectionsLink";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <nav className="nav" aria-label="Main">
           <Link href="/" className="brand">Weft</Link>
           {LINKS.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
+          <DirectionsLink />
         </nav>
         <main className="wrap">{children}</main>
       </body>

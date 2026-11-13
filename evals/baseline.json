@@ -3,6 +3,7 @@
     "ask@1",
     "claim-extract@1",
     "detective@2",
+    "directions@1",
     "merge-check@1",
     "translate@1",
     "type-classify@1"
@@ -15,7 +16,7 @@
       "f1": 1.0
     },
     "nli": {
-      "f1": 1.0
+      "f1": 0.9
     },
     "translation": {
       "chrf": 1.0

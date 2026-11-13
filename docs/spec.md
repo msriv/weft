@@ -442,6 +442,10 @@ The largest risks are legal (copyright, defamation, scraping terms), not technic
 
 GDELT data is used under its terms, with a citation and link on How we weigh.
 
+## Experiments behind the detective flag
+
+Detective mode (D20) and World directions (D22) are the only places a model speculates. Both are off unless `DETECTIVE=on`, never feed reporting (anomalies, rules, weights, summaries, digest, Ask), label every item as model speculation, and are scored by a fixed rule against later reports or published data. Directions adds domains (a country or beat, and a facet), template currency questions from optional ECB rates (`DIRECTIONS_SERIES=on`), and kill criteria in D22.
+
 ## Milestones
 
 Build one beat end to end before widening. Each phase has an exit check; durations are open until the team size is known. Task-level breakdown: `docs/backlog.md`.

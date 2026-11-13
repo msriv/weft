@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from pipeline.ctx import Ctx
-from weft_core import config, feedback, graph, rules, store
+from weft_core import config, feedback, graph, outlets, rules, store
 from weft_core.rules import Anomaly, EventInput, Figure, Group, Rep
 
 
@@ -31,7 +31,8 @@ def load_event(
             source_name=sources[r["source_id"]]["name"],
             perspective=r["perspective"],
             published_at=_dt(r["published_at"] or r["fetched_at"]),
-            owner_id=sources[r["source_id"]]["owner_id"],
+            owner_id=sources[r["source_id"]]["owner_id"]
+            or outlets.site_owner(sources[r["source_id"]].get("homepage")),
             paywalled=bool(sources[r["source_id"]]["paywalled"]),
             healthy=bool(sources[r["source_id"]]["healthy"]),
             type=r["type"],

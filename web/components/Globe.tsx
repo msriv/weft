@@ -21,7 +21,7 @@ type Marker = {
 type Filter = "all" | "anomalies" | "gaps";
 const W = 560;
 
-export default function Globe({ world }: { world: World }) {
+export default function Globe({ world, directions = [] }: { world: World; directions?: string[] }) {
   const topo = land as unknown as Topology;
   const features = useMemo(
     () => (feature(topo, topo.objects.countries as GeometryCollection) as unknown as GeoJSON.FeatureCollection).features,
@@ -144,6 +144,9 @@ export default function Globe({ world }: { world: World }) {
               </p>
             )}
             <Link href={`/s/${card.storyId}`}>Open the story</Link>
+            {directions.includes(card.country) && (
+              <Link href={`/directions?subject=${card.country}`} style={{ marginLeft: 12 }}>Directions for {perspectiveName(card.country)}</Link>
+            )}
             {pinned && <button style={{ marginLeft: 12 }} onClick={() => setPinned(null)}>Close</button>}
           </div>
         )}

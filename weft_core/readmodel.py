@@ -13,7 +13,7 @@ from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from weft_core import config, feedback, graph, store
+from weft_core import config, detective, feedback, graph, store
 from weft_core.perspectives import perspective_of
 from weft_core.rules import log_odds
 from weft_core.store import Db
@@ -1045,7 +1045,11 @@ def today(
         key=lambda c: (-c["rank"], c["last_report_at"] or ""),
     )
     followed = [c for c in cards.values() if followed_beats and c["beat"] in followed_beats]
+    dn, dr = len(diff.get("directions_new", [])), len(diff.get("directions_resolved", []))
     return {
+        "directions": f"Directions: {dn} new, {dr} resolved"
+        if detective.enabled() and dn + dr
+        else None,
         "day": diff_rows[0]["day"] if diff_rows else None,
         "since": since,
         "changes": changes,

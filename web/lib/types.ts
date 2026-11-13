@@ -72,4 +72,29 @@ export type Today = {
   new_anomalies: Anomaly[]; breaking: StoryCard[];
   blind_spots: { story_id: string; title: string; event_id: string; no_source_published: string[]; untracked: string[] }[];
   followed: StoryCard[];
+  directions?: string | null;
+};
+
+// World directions (D22): model speculation on domains, only with the detective flag on.
+export type Speculation = {
+  id: string; text: string; probability: number | null; expected_by: string; made_at: string;
+  confirm_if: string; refute_if: string; status: "open" | "supported" | "contradicted" | "expired";
+  outcome: string; origin: "model" | "template"; kind: "claim" | "numeric"; base_rate: number | null;
+  reference_class: string | null; model: string | null; prompt: string | null; evidence: unknown[];
+};
+export type TrackRecord = {
+  resolved: number; counts: Record<string, number>; brier: number | null; brier_half: number;
+  brier_base_rate: number | null; base_rate_n: number;
+  calibration: { decile: [number, number]; n: number; said: number; happened: number }[];
+};
+export type Driver = { group_id: string; label: string; event_id: string | null; n_origins: number; perspectives: string[]; outlets: string[] };
+export type DomainCard = {
+  id: string; label: string; facet: string; subject: string; subject_kind: "country" | "beat"; status: string;
+  notice: string; not_advice: string | null;
+  direction: { coverage_by_week: number[]; series: { id: string; points: [string, number][]; source: string } | null };
+  open: Speculation[]; resolved: Speculation[]; drivers: Driver[]; track_record: TrackRecord;
+};
+export type Directions = {
+  notice: string; disclaimer: string; facets: string[]; domains: DomainCard[];
+  calibration: TrackRecord & { by_origin: Record<string, TrackRecord>; by_facet: Record<string, TrackRecord> };
 };

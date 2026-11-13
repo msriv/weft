@@ -1,0 +1,40 @@
+# World directions (D22, #117). Thresholds and the facet lexicon. Bump `version` on any change.
+version: 1
+
+domains:
+  max_active: 12
+  min_reports_named: 20        # a non-party country becomes a subject when named in this many reports
+  window_days: 30
+  dormant_after_days: 30       # below threshold this long: dormant
+
+drivers:
+  min_share_naming: 0.5        # a claim group belongs to a country when this share of its reports names it
+  min_pool: 5                  # fewer matching groups than this: no drivers
+  keep: 40
+  half_life_days: 7            # recency weight
+
+generation:
+  min_cited_groups: 2
+  min_origins: 2
+  min_days: 7
+  max_days: 90
+  max_new: 2
+  max_open: 5
+  min_new_drivers: 5
+  min_days_between_calls: 3
+  max_calls_per_night: 12
+  token_budget: 60000
+  dedupe_cosine: 0.85
+
+resolution:
+  match_entailment: 0.8
+  min_sources: 2
+  min_perspectives: 2
+  min_base_rate_n: 20
+
+# A claim group joins a facet when its label matches any pattern (case-insensitive).
+facets:
+  currency: ['\bcurrenc', '\bexchange rate', '\bforex\b', '\bdevalu', '\bcentral bank', '\brupee\b', '\brial\b', '\bshekel\b', '\bhryvnia\b', '\brouble\b', '\bruble\b', '\bdollar\b', '\beuro\b']
+  economy: ['\binflation', '\bgdp\b', '\beconom', '\btrade\b', '\btariff', '\bbudget\b', '\bunemployment', '\bexports?\b', '\bimports?\b', '\binterest rate', '\boil price', '\bsanction']
+  government: ['\bcabinet\b', '\bminister', '\bparliament', '\bcoalition', '\bresign', '\bgovernment\b', '\bprime minister', '\bpresident\b', '\bdecree', '\bknesset\b', '\brada\b', '\bduma\b', '\blok sabha\b']
+  politics: ['\belection', '\bvote', '\bpoll', '\bcampaign', '\bparty\b', '\bsenate\b', '\bimpeach', '\bopposition', '\bcandidate', '\bprimary\b', '\bballot']

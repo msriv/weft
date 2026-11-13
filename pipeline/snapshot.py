@@ -95,6 +95,17 @@ def diff(ctx: Ctx, since: str) -> dict[str, list[str]]:
             "RETURN DISTINCT r.id AS id",
             since,
         ),
+        # World directions (D22): shown on Today only with the detective flag on
+        "directions_new": ids(
+            "MATCH (n:Prediction) WHERE n.domain_id IS NOT NULL AND n.made_at > ? "
+            "RETURN n.id AS id",
+            since,
+        ),
+        "directions_resolved": ids(
+            "MATCH (n:Prediction) WHERE n.domain_id IS NOT NULL AND n.checked_at > ? "
+            "RETURN n.id AS id",
+            since,
+        ),
     }
 
 
