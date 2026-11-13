@@ -28,6 +28,7 @@ NODES: dict[str, dict[str, Any]] = {
         "languages": '["en"]',
         "parties": "[]",
         "places": "[]",
+        "groups": "{}",
         "edited": None,
     },
     "Source": {
@@ -369,6 +370,7 @@ def beats(db: Db) -> list[dict[str, Any]]:
             "patterns": json.loads(r["patterns"]),
             "exclude": json.loads(r["exclude"] or "[]"),
             "places": json.loads(r["places"] or "[]"),
+            "groups": json.loads(r.get("groups") or "{}"),
             "parties": json.loads(r["parties"]),
         }
         for r in nodes(db, "Beat", "MATCH (n:Beat) RETURN n")
@@ -491,12 +493,53 @@ def set_country(db: Db, source_id: str, country: str | None, citation: str | Non
         "MATCH (n:Source {id: ?}) SET n.country=?, n.country_source=?",
         (source_id, country.upper() if country else None, citation),
     )
+    retag(db, source_id)
+
+
+def beat_groups(db: Db, story_id: str | None) -> dict[str, str]:
+    """The owner-set outlet groups of a story's beat (D21): source id -> group. Empty for beats
+    whose perspective is the outlet's country."""
+    if not story_id:
+        return {}
+    rows = db.execute(
+        "MATCH (s:Story {id: ?}) MATCH (b:Beat {id: s.beat_id}) RETURN b.groups AS g", (story_id,)
+    )
+    return json.loads(rows[0]["g"] or "{}") if rows else {}
+
+
+def report_perspective(db: Db, src: dict[str, Any], story_id: str | None) -> str:
+    """A report's perspective: its outlet's group on a grouped beat, else its outlet's country."""
     from weft_core.perspectives import perspective_of
 
+    groups = beat_groups(db, story_id)
+    if groups:
+        return groups.get(src["id"], "unattributed")
+    return perspective_of(src)
+
+
+def retag(db: Db, source_id: str) -> None:
+    """Re-derive the perspective copied onto a source's reports at ingest."""
     for src in all_sources(db, "n.id=?", (source_id,)):
-        db.execute(
-            "MATCH (r:Report {source_id: ?}) SET r.perspective=?", (source_id, perspective_of(src))
+        stories = db.execute(
+            "MATCH (r:Report {source_id: ?}) RETURN DISTINCT r.story_id AS s", (source_id,)
         )
+        for row in stories:
+            db.execute(
+                "MATCH (r:Report {source_id: ?}) WHERE r.story_id = ? OR (? IS NULL AND "
+                "r.story_id IS NULL) SET r.perspective=?",
+                (source_id, row["s"], row["s"], report_perspective(db, src, row["s"])),
+            )
+
+
+def set_beat_groups(db: Db, beat_id: str, groups: dict[str, str]) -> None:
+    """Set a beat's outlet groups and re-tag the reports of its stories."""
+    db.execute("MATCH (n:Beat {id: ?}) SET n.groups=?", (beat_id, json.dumps(groups)))
+    for row in db.execute(
+        "MATCH (s:Story {beat_id: ?}) MATCH (r:Report {story_id: s.id}) "
+        "RETURN DISTINCT r.source_id AS id",
+        (beat_id,),
+    ):
+        retag(db, row["id"])
 
 
 def all_sources(db: Db, where: str = "true", args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:

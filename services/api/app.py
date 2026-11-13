@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from weft_core import accounts, detective, digest, graph, readmodel, review, store
+from weft_core import accounts, detective, digest, graph, questions, readmodel, review, store
 
 STREAM_POLL_SECONDS = 5
 
@@ -52,6 +52,7 @@ class NewSource(BaseModel):
 class BeatTerms(BaseModel):
     patterns: list[str]
     exclude: list[str] = []
+    groups: dict[str, str] | None = None  # source id -> outlet group (D21); None leaves as is
 
 
 class Subscription(BaseModel):
@@ -143,6 +144,12 @@ def create_app(
         when = f"{at[:10]}T23:59:59+00:00" if at else None
         end = f"{until}T23:59:59+00:00" if until else None
         return found(readmodel.story_graph(db, story_id, when, days, end))
+
+    @v1.get("/stories/{story_id}/questions")
+    def story_questions(story_id: str) -> list[dict[str, Any]]:
+        """Open questions (#111): fixed rules over the graph, no model, always on."""
+        found(readmodel.public_story(db, story_id))
+        return questions.open_questions(db, story_id)
 
     @v1.get("/stories/{story_id}/detective")
     def story_detective(story_id: str) -> dict[str, Any]:
@@ -300,9 +307,19 @@ def create_app(
                 re.compile(p)
             except re.error as exc:
                 raise HTTPException(422, f"bad pattern {p!r}: {exc}") from exc
+        groups = beat["groups"]
+        if body.groups is not None:
+            known = {s["id"] for s in store.all_sources(db)}
+            groups = {
+                k.strip(): v.strip() for k, v in body.groups.items() if k.strip() and v.strip()
+            }
+            if bad := sorted(set(groups) - known):
+                raise HTTPException(422, f"unknown source ids: {', '.join(bad)}")
         store.add_beat(db, beat_id, beat["name"], pats, parties=beat["parties"], exclude=excl)
         db.execute("MATCH (n:Beat {id: ?}) SET n.edited=1", (beat_id,))
-        return {"id": beat_id, "patterns": pats, "exclude": excl}
+        if body.groups is not None:
+            store.set_beat_groups(db, beat_id, groups)
+        return {"id": beat_id, "patterns": pats, "exclude": excl, "groups": groups}
 
     @adm.get("/unplaced")
     def unplaced(limit: int = 50) -> list[dict[str, Any]]:

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from pipeline.ctx import Ctx
-from weft_core import graph
+from weft_core import graph, store
 from weft_core.textutil import jaccard, words
 
 
@@ -60,7 +60,8 @@ def run(ctx: Ctx) -> int:
     n = 0
     recent = (datetime.fromisoformat(ctx.now) - timedelta(days=7)).isoformat()
     for story in {r["story_id"] for r in ctx.recent_reports(14)}:
-        parties = {
+        # grouped beats (D21): every outlet group is a side; else country parties
+        parties = set(store.beat_groups(ctx.db, story).values()) or {
             p["party"].upper()
             for p in ctx.db.execute(
                 "MATCH (n:StoryParty {story_id: ?}) RETURN n.party AS party", (story,)

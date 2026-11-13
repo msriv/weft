@@ -15,7 +15,6 @@ from weft_core import beats as beats_mod
 from weft_core import graph, portals, store
 from weft_core.models import ModelClient
 from weft_core.nlp import Nlp
-from weft_core.perspectives import perspective_of
 from weft_core.textutil import cosine, jaccard, minhash, minhash_similarity, shingles
 
 OPINION = ("/opinion/", "/op-ed/", "/oped/", "/comment/", "/commentisfree/", "/views/", "/column")
@@ -187,7 +186,7 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
             "id": rid,
             "url": msg["url"],
             "source_id": msg["source_id"],
-            "perspective": perspective_of(src),
+            "perspective": store.report_perspective(d.db, src, story_id),
             "story_id": story_id,
             "event_id": event_id,
             "published_at": published,

@@ -346,3 +346,47 @@ def test_method_page_names_the_configured_model(monkeypatch: pytest.MonkeyPatch)
     jobs = {m["job"]: m["model"] for m in readmodel.models()}
     assert jobs["Claim extraction"] == "org/some-model (revision abc)"
     assert "Translation" not in jobs
+
+
+def test_domestic_beat_groups_outlets_instead_of_countries() -> None:
+    from pipeline import short_version
+
+    c, ctx = build()
+    srcs = sorted(
+        {r["source_id"] for r in graph.select(ctx.db, "reports", "n.story_id IS NOT NULL")}
+    )
+    body = {"patterns": [r"\biran\b"], "groups": {"nope": "Left"}}
+    assert c.put("/admin/beats/iran-israel-war", json=body, headers=H).status_code == 422
+    groups = {srcs[0]: "Left", **{s: "Right" for s in srcs[1:]}}
+    body["groups"] = groups
+    assert c.put("/admin/beats/iran-israel-war", json=body, headers=H).json()["groups"] == groups
+    tags = {
+        r["source_id"]: r["perspective"]
+        for r in graph.select(ctx.db, "reports", "n.story_id IS NOT NULL")
+    }
+    assert tags == groups  # every report re-tagged with its outlet's group
+    store.set_country(ctx.db, srcs[0], "us", "admin")  # a country edit does not undo the group
+    assert graph.get(ctx.db, "reports", "1")["perspective"] in {"Left", "Right"}  # type: ignore[index]
+    short_version.run(ctx)
+    ev = graph.get(ctx.db, "reports", "1")["event_id"]  # type: ignore[index]
+    sv = graph.get(ctx.db, "short_versions", ev)["payload"]  # type: ignore[index]
+    assert set(sv["no_source_published"]) <= {"Left", "Right"}  # sides are the groups now
+
+
+def test_open_questions_come_from_rules_and_leave_when_answered() -> None:
+    from datetime import UTC, date, datetime
+
+    from weft_core import questions
+
+    assert questions.future_dates(
+        "A vote on 20 November and talks March 3", date(2026, 11, 13)
+    ) == [date(2026, 11, 20)]  # March 3 has passed this year
+    c, ctx = build()
+    assert c.get("/v1/stories/iran-israel-war/questions").status_code == 404  # not public
+    store.set_public(ctx.db, "iran-israel-war", True)
+    qs = c.get("/v1/stories/iran-israel-war/questions").json()
+    assert any(q["kind"] == "conflict" for q in qs)  # the fixture has a conflict
+    assert all(q["groups"] and q["would_change"] for q in qs)
+    ctx.db.execute("MATCH (n:Conflict) DETACH DELETE n")
+    later = questions.open_questions(ctx.db, "iran-israel-war", datetime(2026, 11, 6, tzinfo=UTC))
+    assert not any(q["kind"] == "conflict" for q in later)
