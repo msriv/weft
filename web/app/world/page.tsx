@@ -3,12 +3,15 @@ import Globe from "@/components/Globe";
 import { Empty, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
 import { perspectiveName } from "@/lib/format";
-import type { World } from "@/lib/types";
+import type { Directions, World } from "@/lib/types";
 
 export default async function WorldPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const { view } = await searchParams;
   const w = (await api<World>("/v1/world")) ?? { stories: [], gaps: [] };
   const byStory = Map.groupBy(w.stories, (s) => s.story_id);
+  // countries with a directions domain; empty unless the detective flag is on (D22)
+  const dir = await api<Directions>("/v1/directions").catch(() => null);
+  const withDirections = [...new Set((dir?.domains ?? []).filter((d) => d.subject_kind === "country").map((d) => d.subject))];
   return (
     <>
       <Kicker>World desk</Kicker>
@@ -17,7 +20,7 @@ export default async function WorldPage({ searchParams }: { searchParams: Promis
         <Link className={`pill${view !== "globe" ? " on" : ""}`} href="/world">Threads</Link>
         <Link className="pill" href="/">Globe</Link>
       </div>
-      {view === "globe" ? <Globe world={w} /> : (
+      {view === "globe" ? <Globe world={w} directions={withDirections} /> : (
         <>
           {[...byStory.entries()].map(([id, items]) => (
             <div className="card" key={id}>
@@ -25,6 +28,11 @@ export default async function WorldPage({ searchParams }: { searchParams: Promis
               <div className="row" style={{ marginTop: 8 }}>
                 {items.map((i) => <span key={i.country} className="pill on">{perspectiveName(i.country)} · {i.reports}</span>)}
               </div>
+              {items.some((i) => withDirections.includes(i.country)) && (
+                <p className="muted" style={{ fontSize: 13 }}>
+                  {items.filter((i) => withDirections.includes(i.country)).map((i) => <Link key={i.country} href={`/directions?subject=${i.country}`} style={{ marginRight: 8 }}>Directions for {perspectiveName(i.country)}</Link>)}
+                </p>
+              )}
             </div>
           ))}
           {!byStory.size && <Empty>No public stories yet.</Empty>}

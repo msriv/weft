@@ -65,6 +65,11 @@ class ModelClient:
             timeout=60,
         )
 
+    @property
+    def name(self) -> str:
+        """Pinned model and revision, shown beside model speculation (D22)."""
+        return f"{self._model}@{self._revision}"
+
     def complete(
         self,
         *,

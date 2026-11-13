@@ -43,6 +43,7 @@ export default async function TodayPage() {
       ))}
       {t && t.new_anomalies.length > 0 && <><hr /><Kicker>New anomalies</Kicker></>}
       {t && t.new_anomalies.map((a) => <AnomalyCard key={a.id} a={a} />)}
+      {t?.directions && <p className="muted" style={{ fontSize: 13 }}><Link href="/directions">{t.directions}</Link> (model speculation, not reporting).</p>}
       {t && t.changes.length > 0 && (
         <p className="muted" style={{ fontSize: 13 }}>Last nightly run: {t.changes.map((c) => `${c.count} ${c.label.toLowerCase()}`).join(" · ")}.</p>
       )}
