@@ -180,8 +180,10 @@ def create_app(
         return readmodel.method(db)
 
     @v1.get("/today")
-    def today(follow: Annotated[list[str] | None, Query()] = None) -> dict[str, Any]:
-        return readmodel.today(db, follow)
+    def today(
+        follow: Annotated[list[str] | None, Query()] = None, since: str | None = None
+    ) -> dict[str, Any]:
+        return readmodel.today(db, follow, since)
 
     @v1.post("/reports-problem", status_code=201)
     def report_problem(body: Problem) -> dict[str, Any]:
