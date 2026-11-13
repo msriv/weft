@@ -6,7 +6,10 @@ COPY pyproject.toml uv.lock ./
 # Shared download cache, one build at a time (sharing=locked): later builds reuse the first one's
 # downloads instead of racing it for uv's cache locks. Retries reuse whatever already arrived.
 ENV UV_HTTP_TIMEOUT=300 UV_LINK_MODE=copy
-RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked uv sync --frozen --no-dev --no-install-project
+# the `ml` group brings BGE-M3: Ask must embed questions with the embedder the pipeline used for claims
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked uv sync --frozen --no-dev --group ml --no-install-project
+RUN uv run --no-sync python -c "from sentence_transformers import SentenceTransformer as S; S('BAAI/bge-m3')"
+ENV WEFT_NLP=real
 COPY weft_core weft_core
 COPY pipeline pipeline
 COPY services services

@@ -152,6 +152,7 @@ def test_ask_cites_retrieved_passages_and_drops_verdicts() -> None:
             "statements": [
                 {"text": "Outlet A reported the strike.", "passages": [1]},
                 {"text": "The strike is confirmed.", "passages": [1]},
+                {"text": "{outlet} reported that officials confirmed the strike.", "passages": [1]},
                 {"text": "Nobody cited this.", "passages": [99]},
             ]
         }
@@ -162,8 +163,16 @@ def test_ask_cites_retrieved_passages_and_drops_verdicts() -> None:
             lambda req: httpx.Response(200, json={"choices": [{"message": {"content": reply}}]})
         ),
     )  # fmt: skip
-    out = ask.answer(ctx.db, ctx.nlp.embedder, model, "what did outlets report about the strike?")
-    assert [s["text"] for s in out["sentences"]] == ["Outlet A reported the strike."]
+    q = "what did outlets report about the strike?"
+    outlet = ask.retrieve(ctx.db, ctx.nlp.embedder, q)[0]["outlet"]
+    reply = reply.replace("{outlet}", outlet)
+    out = ask.answer(ctx.db, ctx.nlp.embedder, model, q)
+    assert [s["text"] for s in out["sentences"]] == [
+        "Outlet A reported the strike.",
+        f"{outlet} reported that officials confirmed the strike.",  # attributed: kept
+    ]
+    assert "1 statement(s) were left out" in out["note"]  # the bare verdict, and the reader is told
+    assert out["cites"][0]["published_at"]
     assert out["cites"] and out["cites"][0]["id"] == out["sentences"][0]["cites"][0]
     _, hidden = build()  # nothing public: nothing retrievable
     assert ask.retrieve(hidden.db, hidden.nlp.embedder, "strike") == []
@@ -178,6 +187,8 @@ def test_live_changes_and_stream_is_hidden_until_public() -> None:
     assert c.get("/v1/stories/iran-israel-war/stream").status_code == 404
     got = readmodel.changes(ctx.db, "iran-israel-war", "2000-01-01")
     assert {m["type"] for m in got} >= {"node.added"}
+    added = next(m for m in got if m["type"] == "node.added")["data"]
+    assert added["title"] and added["source"] and added["url"].startswith("https://")
     assert readmodel.changes(ctx.db, "iran-israel-war", "2999-01-01") == []
 
 

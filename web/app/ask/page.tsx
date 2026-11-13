@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Kicker } from "@/components/bits";
 
-type Cite = { id: string; label: string; url?: string; quote: string };
+type Cite = { id: string; label: string; url?: string; quote: string; published_at?: string | null };
 type Answer = { sentences: { text: string; cites: string[] }[]; cites: Cite[]; note?: string };
 
 export default function Ask() {
@@ -38,7 +38,7 @@ export default function Ask() {
             <Kicker>Evidence</Kicker>
             {open && cite(open) ? (
               <>
-                <b>{cite(open)!.label}</b>
+                <b>{cite(open)!.label}</b>{cite(open)!.published_at && <span className="muted"> · {cite(open)!.published_at!.slice(0, 10)}</span>}
                 <blockquote>{cite(open)!.quote}</blockquote>
                 {cite(open)!.url && <a href={cite(open)!.url} rel="noopener noreferrer">Open source</a>}
               </>

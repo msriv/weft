@@ -243,3 +243,9 @@ def default_nlp() -> Nlp:
             MdebertaNli(),
         )
     return Nlp(HashEmbedder(), StopwordLangId(), RegexEntities(), LexicalNli())
+
+
+def default_embedder() -> Embedder:
+    """The embedder alone (the API needs no NLI or language id). Must match the pipeline's
+    WEFT_NLP setting: a query embedded one way and claims another give cosine noise."""
+    return BgeM3Embedder() if os.environ.get("WEFT_NLP", "light") == "real" else HashEmbedder()
