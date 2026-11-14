@@ -125,7 +125,7 @@ module "nightly" {
   region                = var.region
   image                 = var.nightly_image
   service_account_email = module.platform.service_account_emails["nightly"]
-  stages                = ["regroup", "claims", "figures", "claim_groups", "conflicts", "short_version", "statements", "anomalies", "weights", "snapshot", "review_sample", "notify"]
+  stages                = yamldecode(file("${path.root}/../config/pipeline.yaml")).stages
   secret_env = merge(module.discovery.neo4j_secret_ids, {
     MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
   }, var.smtp_host == "" ? {} : { SMTP_PASSWORD = google_secret_manager_secret.smtp_password.secret_id })
