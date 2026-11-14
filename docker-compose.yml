@@ -71,7 +71,10 @@ services:
     command: ["-scheme", "http", "-port", "4443", "-backend", "memory"]
   bigquery:
     image: ghcr.io/goccy/bigquery-emulator:latest
-    command: ["--project=weft-local", "--dataset=weft"]
+    # on disk so a restart keeps the tables init made; restart because it can crash under load
+    command: ["--project=weft-local", "--dataset=weft", "--database=/data/bq.db"]
+    volumes: ["bigquery:/data"]
+    restart: unless-stopped
   pubsub:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085"]
@@ -144,3 +147,4 @@ services:
 
 volumes:
   neo4j:
+  bigquery:
