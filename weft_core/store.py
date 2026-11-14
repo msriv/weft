@@ -292,6 +292,15 @@ NODES: dict[str, dict[str, Any]] = {
         "perspectives": "[]",
     },
     "SeriesPoint": {"series_id": None, "day": None, "value": None, "source": None},
+    "ModelSpend": {
+        "key": None,
+        "day": None,
+        "caller": None,
+        "tokens": 0,
+        "cost_usd": 0.0,
+        "calls": 0,
+    },
+    "ModelOutput": {"key": None, "output": None, "at": None},
     "BatchRun": {
         "run_id": None,
         "stage": None,
@@ -317,6 +326,8 @@ UNIQUE = {
     "EntityLink": "name",
     "ReaderReport": "id",
     "Prediction": "id",
+    "ModelSpend": "key",
+    "ModelOutput": "key",
 }
 INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
 
