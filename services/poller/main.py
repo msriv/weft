@@ -33,15 +33,19 @@ class GcsState:
         self._blob(url).upload_from_string(json.dumps(state.__dict__))
 
 
+def health_rows(results: dict[str, str | None], now: datetime) -> list[dict[str, object]]:
+    return [
+        {"source_id": sid, "checked_at": now.isoformat(), "ok": err is None, "error": err}
+        for sid, err in results.items()
+    ]
+
+
 def record_and_report(project: str, results: dict[str, str | None]) -> list[str]:
     """Append this run to `source_health`, then log one ERROR per unhealthy source."""
     bq = bigquery_client(project)
     table = f"{project}.weft.source_health"
     now = datetime.now(UTC)
-    rows = [
-        {"source_id": sid, "checked_at": now.isoformat(), "ok": err is None, "error": err}
-        for sid, err in results.items()
-    ]
+    rows = health_rows(results, now)
     if errs := bq.insert_rows_json(table, rows):
         raise RuntimeError(f"insert into source_health failed: {errs}")
     q = f"SELECT source_id, MAX(IF(ok, checked_at, NULL)) AS last_ok FROM `{table}` GROUP BY 1"
