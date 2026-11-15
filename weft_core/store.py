@@ -315,8 +315,6 @@ NODES: dict[str, dict[str, Any]] = {
         "calls": 0,
     },
     "ModelOutput": {"key": None, "output": None, "at": None},
-
-
     "Lock": {"key": None, "at": None},  # write-lock rows for placement (#160)
     "Seen": {
         "key": None,
@@ -352,8 +350,6 @@ UNIQUE = {
     "Prediction": "id",
     "ModelSpend": "key",
     "ModelOutput": "key",
-
-
     "Lock": "key",
     "Seen": "key",
 }
