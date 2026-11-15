@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Kicker } from "@/components/bits";
 import { adminHeaders } from "@/lib/account";
-
 import { Fields } from "@/components/Fields";
 
 type Story = { id: string; beat_id: string; title: string; public: boolean };
