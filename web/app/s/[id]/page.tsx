@@ -59,7 +59,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
       </p>
       <div className="row my12">
         <Link className={`btn small switch`} aria-pressed={!!q.live} href={href({ live: q.live ? "" : "1" })}>{q.live ? "Live: on" : "Go live"}</Link>
-        <FollowButton beat={st.beat} />
+        <FollowButton beat={st.beat} name={beatLabel(st.beat_name, st.beat)} />
         <nav className="row muted fs13" aria-label="Story window">
           <span>{w.from ? `${dateShort(w.from)} to ${dateShort(w.to)}` : "Whole story"}</span>
           {w.from && w.older && <Link scroll={false} className="btn small" href={href({ until: shift(w.from, -1) })}>Previous week</Link>}

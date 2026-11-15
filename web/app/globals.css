@@ -228,3 +228,6 @@ details.report summary { padding: var(--s2) 0; cursor: pointer; }
 .bar { display: block; height: 6px; background: var(--hair); border-radius: 3px; }
 .bar i { display: block; height: 100%; background: var(--text); border-radius: 3px; }
 .story-row { border-radius: 12px; justify-items: start; text-align: left; text-transform: none; letter-spacing: 0; }
+.skeleton { color: transparent; background: linear-gradient(90deg, var(--hair), transparent, var(--hair)); background-size: 200% 100%; animation: sk 1.4s linear infinite; }
+@keyframes sk { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }

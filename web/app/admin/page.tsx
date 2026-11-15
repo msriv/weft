@@ -25,7 +25,10 @@ export default function Admin() {
   const [err, setErr] = useState("");
   const call = useCallback(async (path: string, init: RequestInit = {}) => {
     const r = await fetch(`/api/admin${path}`, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
-    if (!r.ok) throw new Error(`${r.status}`);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(typeof j.detail === "string" ? j.detail : r.status === 401 ? "Not signed in as an editor." : `The server answered ${r.status}.`);
+    }
     return r.json();
   }, [token]);
   const load = useCallback(async () => {
@@ -44,7 +47,7 @@ export default function Admin() {
     return () => clearInterval(t);
   }, [token, live, call]);
   const byRun = [...new Set(runs.map((r) => r.run_id))].slice(0, 5).map((id) => runs.filter((r) => r.run_id === id).reverse());
-  const act = (p: string, body: unknown, method = "POST") => call(p, { method, body: JSON.stringify(body) }).then(load).catch(() => setErr("Action failed."));
+  const act = (p: string, body: unknown, method = "POST") => call(p, { method, body: JSON.stringify(body) }).then(load).then(() => setErr("")).catch((e: Error) => setErr(`Action failed: ${e.message}`));
   return (
     <>
       <Kicker>Editors</Kicker>
