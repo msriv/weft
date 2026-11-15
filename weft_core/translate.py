@@ -23,7 +23,10 @@ def translate(db: Db, model: ModelClient, text: str, dst: str) -> str:
     if cached:
         return str(cached[0]["text"])
     out = model.complete(
-        prompt_template="translate@1", instructions=INSTRUCTIONS.format(lang=dst), data=text
+        prompt_template="translate@1",
+        instructions=INSTRUCTIONS.format(lang=dst),
+        data=text,
+        max_tokens=min(4000, len(text) // 2 + 256),
     ).strip()
     db.execute(
         "MERGE (n:Translation {key: ?}) ON CREATE SET n.lang=?, n.text=?, n.created_at=?",
