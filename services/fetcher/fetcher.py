@@ -13,13 +13,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any, Protocol
-from urllib.parse import urlsplit, urlunsplit
 
 import pdfplumber
 import trafilatura
 
 from weft_core import portals, rules
 from weft_core.polite import PoliteClient
+from weft_core.urls import normalize_url
 
 LEDE_CHARS = 500
 MAX_OCR_PAGES = 30  # shortcut: scans longer than this are cut, raise when a portal needs it
@@ -48,16 +48,21 @@ class Store(Protocol):
         """Write the raw copy, set raw_row["raw_gcs_uri"], insert both rows."""
 
 
+def seen_keys(url: str | None, text_hash: str) -> list[str]:
+    """Keys of the `Seen` nodes: one per normalised URL, one per text hash."""
+    keys = []
+    if url:
+        keys.append("u:" + hashlib.sha256(normalize_url(url).encode()).hexdigest()[:32])
+    if text_hash:
+        keys.append("h:" + text_hash)
+    return keys
+
+
 @dataclass
 class Result:
     status: str  # stored | duplicate | skipped | blocked | extract_failed
     item_id: str | None = None
     message: dict[str, Any] | None = None  # `items-extracted` payload, set when stored
-
-
-def normalize_url(url: str) -> str:
-    p = urlsplit(url)
-    return urlunsplit((p.scheme.lower(), p.netloc.lower(), p.path.rstrip("/") or "/", p.query, ""))
 
 
 def fetch_item(

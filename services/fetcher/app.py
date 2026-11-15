@@ -6,15 +6,16 @@ Run with max instances 1 and concurrency 1 so there is one connection at a time.
 import base64
 import json
 import os
+import time
 from collections.abc import Callable
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
-from google.cloud import bigquery, pubsub_v1, storage  # type: ignore[attr-defined]
+from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.fetcher import refetch as refetch_mod
-from services.fetcher.fetcher import Store, fetch_item
+from services.fetcher.fetcher import Store, fetch_item, seen_keys
 from services.fetcher.tasks import CloudTasksQueue
 from weft_core import store
 from weft_core import store as store_mod
@@ -23,22 +24,30 @@ from weft_core.polite import PoliteClient
 
 
 class GcpStore:
-    def __init__(self, project: str, raw_bucket: str, dataset: str = "weft") -> None:
+    """Raw copies in GCS, the append-only log in BigQuery. "Seen" lives in the graph store, so
+    no BigQuery query job runs per message (#161); BigQuery is only written to."""
+
+    def __init__(
+        self, project: str, raw_bucket: str, db: "store_mod.Db", dataset: str = "weft"
+    ) -> None:
         self._bq = bigquery_client(project)
         self._bucket = storage.Client(project=project).bucket(raw_bucket)
         self._ds = f"{project}.{dataset}"
+        self._db = db
 
     def seen(self, canonical_url: str | None, text_hash: str) -> bool:
-        job = self._bq.query(
-            f"SELECT 1 FROM `{self._ds}.raw_items` WHERE canonical_url = @u OR url = @u OR text_hash = @h LIMIT 1",
-            job_config=bigquery.QueryJobConfig(
-                query_parameters=[
-                    bigquery.ScalarQueryParameter("u", "STRING", canonical_url),
-                    bigquery.ScalarQueryParameter("h", "STRING", text_hash),
-                ]
-            ),
+        keys = seen_keys(canonical_url, text_hash)
+        return bool(keys) and bool(
+            self._db.execute("MATCH (n:Seen) WHERE n.key IN ? RETURN n.key AS k LIMIT 1", (keys,))
         )
-        return bool(job.result().total_rows)
+
+    def _mark_seen(self, raw_row: dict[str, Any]) -> None:
+        keys = seen_keys(raw_row["url"], raw_row.get("text_hash") or "")
+        keys += seen_keys(raw_row["canonical_url"], "")
+        self._db.execute(
+            "UNWIND ? AS k MERGE (n:Seen {key: k}) ON CREATE SET n.at = ?",
+            (sorted(set(keys)), raw_row["fetched_at"]),
+        )
 
     def save_version(self, item_id: str, n: int, content: bytes, ext: str) -> None:
         self._bucket.blob(f"{item_id}.v{n}.{ext}").upload_from_string(content)
@@ -49,9 +58,32 @@ class GcpStore:
         blob = self._bucket.blob(f"{raw_row['item_id']}.{ext}")
         blob.upload_from_string(content)
         raw_row["raw_gcs_uri"] = f"gs://{self._bucket.name}/{blob.name}"
+        self._mark_seen(raw_row)  # first: this, not the log, decides whether a URL is fetched again
         for table, row in (("raw_items", raw_row), ("extracted_items", extracted_row)):
-            if errs := self._bq.insert_rows_json(f"{self._ds}.{table}", [row]):
-                raise RuntimeError(f"insert into {table} failed: {errs}")
+            self._log(table, row)
+
+    def _log(self, table: str, row: dict[str, Any]) -> None:
+        """Append to the BigQuery log. A failed insert is retried, then reported; it never fails
+        the fetch (the raw copy and the seen mark are already written)."""
+        errs: Any = None
+        for attempt in range(3):
+            try:
+                errs = self._bq.insert_rows_json(f"{self._ds}.{table}", [row])
+            except Exception as exc:  # noqa: BLE001 - any client error is retried, then logged
+                errs = repr(exc)
+            if not errs:
+                return
+            time.sleep(2**attempt)
+        print(
+            json.dumps(
+                {
+                    "event": "log_insert_failed",
+                    "table": table,
+                    "item_id": row.get("item_id"),
+                    "errors": str(errs)[:500],
+                }
+            )
+        )
 
 
 def create_app(
@@ -124,7 +156,7 @@ def _default_app() -> FastAPI:
     def publish(m: dict[str, Any]) -> None:
         publisher.publish(topic, json.dumps(m).encode()).result()
 
-    gcp = GcpStore(project, os.environ["RAW_BUCKET"])
+    gcp = GcpStore(project, os.environ["RAW_BUCKET"], db)
 
     def queue_for(base_url: str) -> refetch_mod.Enqueue:
         return CloudTasksQueue(
