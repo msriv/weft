@@ -19,7 +19,7 @@ from typing import Any
 from jsonschema import ValidationError, validate
 
 from weft_core import graph, store
-from weft_core.models import ModelClient
+from weft_core.models import ModelClient, ModelRefused
 from weft_core.nlp import Nli
 from weft_core.store import Db
 
@@ -146,9 +146,16 @@ def predict(db: Db, model: ModelClient, story_id: str, now: str, allow: Any = No
     )
     if allow is not None and not allow(data):
         return 0
-    out = model.complete(
-        prompt_template="detective@2", instructions=PREDICT, data=data, json_schema=PREDICT_SCHEMA
-    )
+    try:
+        out = model.complete(
+            prompt_template="detective@2",
+            instructions=PREDICT,
+            data=data,
+            max_tokens=3000,
+            json_schema=PREDICT_SCHEMA,
+        )
+    except ModelRefused:
+        return 0
     today = datetime.fromisoformat(now).date()
     made = 0
     for p in _parse(out, PREDICT_SCHEMA, "predictions")[:room]:
