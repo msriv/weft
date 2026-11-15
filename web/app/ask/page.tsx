@@ -9,7 +9,7 @@ export default function Ask() {
   const [q, setQ] = useState("");
   const [a, setA] = useState<Answer | null>(null);
   const [open, setOpen] = useState<string | null>(null);
-  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+  const [state, setState] = useState<"idle" | "busy" | "error" | "limit">("idle");
   const cite = (id: string) => a?.cites.find((c) => c.id === id);
   return (
     <>
@@ -19,6 +19,7 @@ export default function Ask() {
       <form onSubmit={async (e) => {
         e.preventDefault(); setState("busy"); setA(null); setOpen(null);
         const r = await fetch("/api/v1/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q }) });
+        if (r.status === 429) return setState("limit");
         if (!r.ok) return setState("error");
         setA((await r.json()) as Answer); setState("idle");
       }}>
@@ -26,6 +27,7 @@ export default function Ask() {
         <p><button disabled={state === "busy"}>{state === "busy" ? "Reading sources" : "Ask"}</button></p>
       </form>
       {state === "error" && <p role="alert">Could not answer. Try again.</p>}
+      {state === "limit" && <p role="alert">Ask has reached its limit for now. Try again later; the rest of the site still works.</p>}
       {a && (
         <div className="row ifs">
           <div className="flex2">

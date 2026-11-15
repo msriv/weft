@@ -230,6 +230,11 @@
   "valid_to",
   "value"
  ],
+ "HashUrl": [
+  "at",
+  "hash",
+  "key"
+ ],
  "Lock": [
   "at",
   "key"
@@ -390,6 +395,7 @@
   "owner_id",
   "ownership_source",
   "paywalled",
+  "paywalled_source",
   "rejected_reason",
   "sitemaps",
   "state_run",
@@ -397,6 +403,13 @@
   "status",
   "type",
   "verified_at"
+ ],
+ "SourceDay": [
+  "day",
+  "items",
+  "key",
+  "source_id",
+  "stubs"
  ],
  "SourceWeight": [
   "day",
@@ -429,10 +442,12 @@
  "Subscription": [
   "created_at",
   "email",
+  "fails",
   "follows",
   "frequency",
   "last_sent",
   "last_sent_at",
+  "status",
   "token"
  ],
  "Translation": [
