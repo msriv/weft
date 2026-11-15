@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule: {interval: weekly}
+    groups: {python: {patterns: ["*"]}}
+  - package-ecosystem: npm
+    directory: /web
+    schedule: {interval: weekly}
+    groups: {npm: {patterns: ["*"]}}
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+    groups: {actions: {patterns: ["*"]}}
+  - package-ecosystem: terraform
+    directory: /infra
+    schedule: {interval: weekly}
+    groups: {terraform: {patterns: ["*"]}}
+  - package-ecosystem: docker
+    directories: [/services/api, /services/crawler, /services/discovery, /services/fetcher, /services/poller, /services/stream_worker, /pipeline, /web]
+    schedule: {interval: weekly}
+    groups: {docker: {patterns: ["*"]}}

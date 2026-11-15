@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import ReportProblem from "@/components/ReportProblem";
 import { AnomalyCard, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
+import { meta } from "@/lib/meta";
 import { STATE_LABEL, perspectiveName } from "@/lib/format";
 import type { Anomaly, SourceLabel } from "@/lib/types";
 
@@ -17,6 +18,12 @@ const FACTORS: Record<string, [string, "raises" | "lowers"]> = {
   corrects_openly: ["Corrections issued openly", "raises"], silent_edits: ["Silent edits detected", "lowers"],
   copied_wording: ["Copied wording", "lowers"], opinion_share: ["Share of output that is opinion", "lowers"],
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const p = await params;
+  const x = await api<Profile>(`/v1/sources/${p.id}`);
+  return meta(x?.source.name, "How this source reports: what it names, links and corrects.");
+}
 
 export default async function SourcePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

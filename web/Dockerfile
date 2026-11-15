@@ -11,4 +11,5 @@ ENV NODE_ENV=production PORT=8080 HOSTNAME=0.0.0.0
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
+USER node
 CMD ["node", "server.js"]
