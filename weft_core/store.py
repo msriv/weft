@@ -307,6 +307,13 @@ NODES: dict[str, dict[str, Any]] = {
     },
     "SeriesPoint": {"series_id": None, "day": None, "value": None, "source": None},
     "Lock": {"key": None, "at": None},  # write-lock rows for placement (#160)
+    "Seen": {
+        "key": None,
+        "at": None,
+        "stored": None,
+        "fails": None,
+        "last": None,
+    },  # fetched URL / text hash keys (#161); stored or failed extractions (#150)
     "BatchRun": {
         "run_id": None,
         "stage": None,
@@ -333,6 +340,7 @@ UNIQUE = {
     "ReaderReport": "id",
     "Prediction": "id",
     "Lock": "key",
+    "Seen": "key",
 }
 INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
 
