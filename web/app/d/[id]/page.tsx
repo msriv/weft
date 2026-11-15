@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import { storyTitle } from "@/lib/crumbs";
 import ReportProblem from "@/components/ReportProblem";
 import { IssuerTag, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
@@ -25,9 +27,10 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const d = await api<Doc>(`/v1/documents/${id}`);
   if (!d) notFound();
   const speakers = [...new Map(d.statements.map((s) => [s.actor_id, s])).values()];
+  const title = await storyTitle(d.document.story_id);
   return (
     <>
-      <Link href={`/s/${d.document.story_id}`} className="muted">← Back to the story</Link>
+      <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: title, href: `/s/${d.document.story_id}` }, ...(d.event ? [{ label: d.event.label ?? "Event", href: `/s/${d.document.story_id}/e/${d.event.id}` }] : []), { label: d.document.title }]} />
       <Kicker>Official document · {d.document.kind} · {day(d.document.published_at)}</Kicker>
       <h1>{d.document.title}</h1>
       <div className="row my10">{d.issuer && <IssuerTag i={d.issuer} />}</div>

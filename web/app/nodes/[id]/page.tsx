@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import { storyTitle } from "@/lib/crumbs";
 import { AnomalyDetail, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
 import { perspectiveName } from "@/lib/format";
@@ -29,8 +31,12 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
   const carrying = ids("carrying");
   const without = ids("perspective_reports");
   const omission = x.rule === "omission" && (carrying.size > 0 || without.size > 0);
+  const sid = typeof x.story_id === "string" ? x.story_id : null;
+  const eid = typeof x.event_id === "string" ? x.event_id : null;
+  const title = sid ? await storyTitle(sid) : null;
   return (
     <>
+      {sid && title && <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: title, href: `/s/${sid}` }, ...(eid ? [{ label: "Event", href: `/s/${sid}/e/${eid}` }] : []), { label: "Evidence" }]} />}
       <Kicker>{n.kind.replace("_", " ")}</Kicker>
       <h1>{String(x.title ?? x.summary ?? x.label ?? x.text ?? x.id)}</h1>
       {n.kind === "anomaly" && (
