@@ -7,6 +7,7 @@ A destructive rule (it deletes graph data) runs only after a good snapshot, so w
 still exists in a dated Parquet snapshot. Nothing here is decided by weight or by a model.
 """
 
+import importlib
 import json
 import os
 import uuid
@@ -206,9 +207,8 @@ def run_all(
     raw: Blobs | None = None,
 ) -> list[dict[str, Any]]:
     """Every registered rule, in registration order. One rule failing does not stop the rest."""
-    import weft_core.autoclean_expiry
-    import weft_core.autoclean_graph
-    import weft_core.autoclean_rules  # noqa: F401
+    for module in ("rules", "graph", "expiry", "versions"):  # importing registers the rules
+        importlib.import_module(f"weft_core.autoclean_{module}")
 
     cfg = cfg or config.load("autoclean.yaml")
     # the bucket lifecycle and this follow one Terraform variable, so they cannot drift

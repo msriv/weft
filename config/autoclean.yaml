@@ -61,3 +61,6 @@ rules:
   orphan_state: {prefix_days: {"poller-state/": 30, "crawler-state/": 90}, max_rows: 100000}
   partial_snapshots: {max_rows: 1000000000, max_fraction: 1.0}  # report only
   raw_without_row: {limit: 20000, max_rows: 1000000000, max_fraction: 1.0}  # report only
+  # Version compaction (#151). Lossless for Replay; history is never deleted by age (D23).
+  strip_closed_vectors: {days: 7, max_fraction: 1.0, max_rows: 100000000}
+  collapse_intraday_versions: {days: 30, max_fraction: 0.9, max_rows: 100000000}
