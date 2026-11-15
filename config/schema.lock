@@ -230,6 +230,11 @@
   "valid_to",
   "value"
  ],
+ "HashUrl": [
+  "at",
+  "hash",
+  "key"
+ ],
  "Lock": [
   "at",
   "key"
@@ -237,6 +242,11 @@
  "MergeRejected": [
   "created_at",
   "pair"
+ ],
+ "MinhashBand": [
+  "at",
+  "band",
+  "report_id"
  ],
  "ModelOutput": [
   "at",
@@ -387,6 +397,7 @@
   "owner_id",
   "ownership_source",
   "paywalled",
+  "paywalled_source",
   "rejected_reason",
   "sitemaps",
   "state_run",
@@ -394,6 +405,13 @@
   "status",
   "type",
   "verified_at"
+ ],
+ "SourceDay": [
+  "day",
+  "items",
+  "key",
+  "source_id",
+  "stubs"
  ],
  "SourceWeight": [
   "day",
