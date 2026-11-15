@@ -37,6 +37,7 @@ from weft_core import (
 )
 from weft_core.cache import TtlCache
 from weft_core.models import BudgetExceeded, ModelRefused
+from weft_core.probes import add_probes
 
 STREAM_POLL_SECONDS = 5
 PUBLIC_TTL_SECONDS = 30
@@ -138,6 +139,8 @@ def create_app(
     site: str = "",
 ) -> FastAPI:
     app = FastAPI(title="Weft API")
+    add_probes(app, db)
+
     lim = limits if limits is not None else config.pipeline()["limits"]
     limiter = limiter or Limiter()
     streams = Streams(lim["streams"]["per_client"], lim["streams"]["total"])
