@@ -20,6 +20,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel, Field
 
 from services.api.limits import Limiter, Streams, client_key
+from services.api.models import (
+    EventPageOut,
+    SourceLabel,
+    StoryCard,
+    StoryGraphOut,
+    TodayOut,
+    WorldOut,
+)
 from services.api.streams import ChangeHub
 from weft_core import (
     accounts,
@@ -290,7 +298,7 @@ def create_app(
         prefs.put(uid, body.model_dump())
         return body.model_dump()
 
-    @v1.get("/stories")
+    @v1.get("/stories", responses={200: {"model": list[StoryCard]}})
     def stories(
         region: str | None = None,
         topic: str | None = None,
@@ -303,7 +311,7 @@ def create_app(
         """Stories, events, sources and people whose title or name contains `q`. Public stories only."""
         return readmodel.search(db, q)
 
-    @v1.get("/stories/{story_id}")
+    @v1.get("/stories/{story_id}", responses={200: {"model": StoryGraphOut}})
     def story(
         story_id: str,
         at: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}-\d{2}.*$")] = None,
@@ -343,7 +351,7 @@ def create_app(
             raise HTTPException(404, "not found")
         return found(directions.detail(db, domain_id))
 
-    @v1.get("/events/{event_id}")
+    @v1.get("/events/{event_id}", responses={200: {"model": EventPageOut}})
     def event(event_id: str) -> Any:
         return found(readmodel.event_page(db, event_id))
 
@@ -351,7 +359,7 @@ def create_app(
     def node(node_id: str) -> Any:
         return found(readmodel.node(db, node_id))
 
-    @v1.get("/sources")
+    @v1.get("/sources", responses={200: {"model": list[SourceLabel]}})
     def sources() -> list[dict[str, Any]]:
         return readmodel.list_sources(db)
 
@@ -367,7 +375,7 @@ def create_app(
     def actor(actor_id: str) -> Any:
         return found(readmodel.actor_page(db, actor_id))
 
-    @v1.get("/world")
+    @v1.get("/world", responses={200: {"model": WorldOut}})
     def world() -> dict[str, Any]:
         return readmodel.world(db)
 
@@ -375,7 +383,7 @@ def create_app(
     def method() -> dict[str, Any]:
         return readmodel.method(db)
 
-    @v1.get("/today")
+    @v1.get("/today", responses={200: {"model": TodayOut}})
     def today(
         follow: Annotated[list[str] | None, Query()] = None, since: str | None = None
     ) -> dict[str, Any]:
