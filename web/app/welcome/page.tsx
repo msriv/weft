@@ -41,7 +41,7 @@ export default function Welcome() {
       setError(false); setSaved(true);
     }}>
       <Kicker>Welcome</Kicker>
-      <h1>What do you want to follow?</h1>
+      <h1>Following and preferences</h1>
       <p className="muted">Stays in this browser unless you sign in. Nothing is tracked. Changes ordering and what the digest covers, never what is hidden.</p>
       <Kicker>Account</Kicker>
       {who ? (

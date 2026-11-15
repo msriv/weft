@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import ReportProblem from "@/components/ReportProblem";
 import { AnomalyCard, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
@@ -32,6 +33,7 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
   const s = p.source;
   return (
     <>
+      <Breadcrumbs items={[{ label: "Sources", href: "/sources" }, { label: s.name }]} />
       <Kicker>Source · {perspectiveName(s.perspective)} · {s.type} · {STATE_LABEL[s.state_run]}</Kicker>
       <h1>{s.name}</h1>
       <div className="row"><div className="stat">{s.weight_insufficient ? "—" : s.weight?.toFixed(2)}</div><div className="kicker">Current weight{s.weight_insufficient ? " · not enough reports yet" : ""}</div></div>

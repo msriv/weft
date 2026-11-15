@@ -153,6 +153,11 @@ def create_app(
     ) -> list[dict[str, Any]]:
         return readmodel.list_stories(db, region, topic, sort)
 
+    @v1.get("/search")
+    def search(q: Annotated[str, Query(max_length=80)] = "") -> dict[str, list[dict[str, Any]]]:
+        """Stories, events, sources and people whose title or name contains `q`. Public stories only."""
+        return readmodel.search(db, q)
+
     @v1.get("/stories/{story_id}")
     def story(
         story_id: str,

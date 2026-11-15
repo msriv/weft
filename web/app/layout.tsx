@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import DirectionsLink from "@/components/DirectionsLink";
+import Nav from "@/components/Nav";
 import { IBM_Plex_Mono, Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
@@ -14,11 +15,6 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
 };
 
-const LINKS: [string, string][] = [
-  ["/", "Globe"], ["/today", "Today"], ["/world", "Threads"], ["/stories", "Stories"], ["/sources", "Sources"],
-  ["/ask", "Ask"], ["/method", "How we weigh"], ["/admin", "Admin"],
-];
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable}`}>
@@ -26,12 +22,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#060708" />
       </head>
       <body>
-        <nav className="nav" aria-label="Main">
-          <Link href="/" className="brand">Weft</Link>
-          {LINKS.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
-          <DirectionsLink />
-        </nav>
-        <main className="wrap">{children}</main>
+        <a className="skip" href="#main">Skip to content</a>
+        <Nav><DirectionsLink /></Nav>
+        <main id="main" className="wrap">{children}</main>
+        <footer className="footer">
+          <p className="m0">Weft shows who reported what, when and from where. It collects coverage; it does not say what is true.</p>
+          <div className="row">
+            <Link href="/method">How we weigh</Link>
+            <Link href="/method#corrections">Corrections</Link>
+            <Link href="/admin">Admin</Link>
+          </div>
+        </footer>
       </body>
     </html>
   );

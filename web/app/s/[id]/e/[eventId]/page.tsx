@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import { storyTitle } from "@/lib/crumbs";
 import { AnomalyCard, IssuerTag, Kicker, SourceTag } from "@/components/bits";
 import ClaimMatrix from "@/components/ClaimMatrix";
 import Conflict from "@/components/Conflict";
@@ -22,6 +24,7 @@ export default async function Event({ params }: { params: Promise<{ id: string; 
   if (!e) notFound();
   const sv = e.short_version;
   const label = Object.fromEntries(e.claim_groups.map((g) => [g.id, g.label]));
+  const title = await storyTitle(id);
   const reports = new Map(Object.values(e.perspectives).flat().map((r) => [r.id, r]));
   const side = (gid: string): Side => {
     const g = e.claim_groups.find((x) => x.id === gid);
@@ -29,7 +32,7 @@ export default async function Event({ params }: { params: Promise<{ id: string; 
   };
   return (
     <>
-      <Link href={`/s/${id}`} className="muted">← Back to the story</Link>
+      <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: title, href: `/s/${id}` }, { label: e.event.label ?? "Event" }]} />
       <Kicker>Event · {day(e.event.first_seen)} · {plural(e.event.perspectives.length, "perspective")} · {plural(e.event.reports, "report")}{e.event.outlets != null && e.event.origins != null ? ` · ${plural(e.event.outlets, "outlet")}, ${plural(e.event.origins, "independent text")}` : ""}</Kicker>
       <h1>{e.event.label ?? "Event"}</h1>
       {e.event.label_source && <p className="muted">Headline from {e.event.label_source}</p>}

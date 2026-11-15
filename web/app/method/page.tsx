@@ -51,7 +51,7 @@ export default async function MethodPage() {
       <p>Reader subscriptions and donations, when they start. No advertising, because ads reward exactly the engagement we&apos;re trying not to create. No funding from governments or parties covered in our stories.</p>
       <p className="muted">{m.gdelt_citation}</p>
       <hr />
-      <Kicker>Our own mistakes</Kicker>
+      <div id="corrections"><Kicker>Our own mistakes</Kicker></div>
       <p>Every correction Weft makes to its own groupings, translations or flags.</p>
       {m.corrections.length ? m.corrections.map((c, i) => <div className="row" key={i}><span className="kicker">{c.day}</span><span className="pill">{c.kind}</span><span>{c.what}</span></div>) : <p className="muted">No corrections yet.</p>}
       <ReportProblem kind="other" label="Report a problem" />

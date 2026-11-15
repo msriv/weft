@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { AnomalyCard, Empty, Kicker } from "@/components/bits";
 import Conflict from "@/components/Conflict";
 import DetectivePanel from "@/components/DetectivePanel";
@@ -40,6 +41,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
   const days = [...new Set(g.events.map((e) => day(e.first_seen)))].sort().reverse();
   return (
     <>
+      <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: st.title }]} />
       <Kicker>
         {beatName(st.beat)} · {st.status === "quiet" ? "Quiet" : "Developing"}
         {g.as_of ? ` · Replay of ${shortDay(g.as_of)}` : ""}
@@ -58,16 +60,16 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
         <FollowButton beat={st.beat} />
         <nav className="row muted fs13" aria-label="Story window">
           <span>{w.from ? `${shortDay(w.from)} to ${shortDay(w.to)}` : "Whole story"}</span>
-          {w.from && w.older && <Link className="btn small" href={href({ until: shift(w.from, -1) })}>Previous week</Link>}
-          {q.until && w.from && <Link className="btn small" href={href({ until: shift(w.to, w.days) })}>Next week</Link>}
-          {(q.until || q.days) && <Link className="btn small" href={href({ until: "", days: "" })}>Latest</Link>}
-          {w.from && <Link className="btn small" href={href({ days: "0", until: "" })}>Whole story</Link>}
+          {w.from && w.older && <Link scroll={false} className="btn small" href={href({ until: shift(w.from, -1) })}>Previous week</Link>}
+          {q.until && w.from && <Link scroll={false} className="btn small" href={href({ until: shift(w.to, w.days) })}>Next week</Link>}
+          {(q.until || q.days) && <Link scroll={false} className="btn small" href={href({ until: "", days: "" })}>Latest</Link>}
+          {w.from && <Link scroll={false} className="btn small" href={href({ days: "0", until: "" })}>Whole story</Link>}
         </nav>
       </div>
-      {g.as_of && <p className="c-anomaly-light">You are looking at a replay of {shortDay(g.as_of)}. <Link href={href({ at: "" })}>Back to now</Link></p>}
+      {g.as_of && <p className="c-anomaly-light">You are looking at a replay of {shortDay(g.as_of)}. <Link scroll={false} href={href({ at: "" })}>Back to now</Link></p>}
 
       <nav className="tabs" aria-label="Story sections">
-        {TABS.map(([k, label]) => <Link key={k} href={href({ tab: k })} aria-current={tab === k ? "page" : undefined}>{label}</Link>)}
+        {TABS.map(([k, label]) => <Link key={k} scroll={false} href={href({ tab: k })} aria-current={tab === k ? "page" : undefined}>{label}</Link>)}
       </nav>
       {q.live && <LiveFeed storyId={id} />}
 
@@ -77,7 +79,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
             <Kicker anomaly>Where accounts differ</Kicker>
             {clashes.length ? clashes.slice(0, 6).map((c, i) => <Conflict key={i} a={c.a} b={c.b} href={`/s/${id}/e/${c.event_id}`} />)
               : <Empty>No conflicting claims recorded.</Empty>}
-            {g.anomalies.length > 0 && <p className="fs13"><Link href={href({ tab: "anomalies" })}>{plural(g.anomalies.length, "anomaly", "anomalies")} flagged by written rules</Link></p>}
+            {g.anomalies.length > 0 && <p className="fs13"><Link scroll={false} href={href({ tab: "anomalies" })}>{plural(g.anomalies.length, "anomaly", "anomalies")} flagged by written rules</Link></p>}
           </section>
           <section aria-label="Carried by every perspective" className="mt24">
             <Kicker>Carried by every perspective</Kicker>
@@ -96,7 +98,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
               {!sv.no_source_published.length && !sv.untracked?.length && <p className="muted">Every party to the story has at least one published report.</p>}
             </div>
           </div>
-          <p className="muted fs13"><Link href={href({ tab: "questions" })}>Open questions about this coverage</Link></p>
+          <p className="muted fs13"><Link scroll={false} href={href({ tab: "questions" })}>Open questions about this coverage</Link></p>
         </>
       )}
 
