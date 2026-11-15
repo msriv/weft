@@ -49,6 +49,7 @@ NODES: dict[str, dict[str, Any]] = {
         "crawl": None,
         "feeds": "[]",
         "sitemaps": "[]",
+        "link_domains": "[]",  # extra domains this outlet legitimately publishes on (#169)
         "healthy": 1,
         "paywalled": 0,
         "min_interval": 10.0,
@@ -704,6 +705,8 @@ def active_sources(db: Db) -> list[dict[str, Any]]:
             "id": r["id"],
             "name": r["name"],
             "homepage": r["homepage"],
+            "domain": r["domain"],
+            "link_domains": json.loads(r.get("link_domains") or "[]"),
             "languages": json.loads(r["languages"]),
             "type": r["type"],
             "feeds": json.loads(r["feeds"]),
@@ -766,6 +769,15 @@ class LiveSources(dict[str, dict[str, Any]]):
     def __init__(self, db: Db) -> None:
         super().__init__()
         self._db = db
+        self._loaded = 0.0
+
+    def all(self) -> list[dict[str, Any]]:
+        """Every active source, reloaded at most once a minute (for domain attribution)."""
+        if not self or time.monotonic() - self._loaded > 60:
+            self.clear()
+            self.update({s["id"]: s for s in active_sources(self._db)})
+            self._loaded = time.monotonic()
+        return list(self.values())
 
     def __missing__(self, key: str) -> dict[str, Any]:
         self.clear()
