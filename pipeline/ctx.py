@@ -6,17 +6,24 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from weft_core import config, graph, store
+from weft_core import config, graph, models, store
 from weft_core.autoclean import Publish, Warehouse
+from weft_core.ledger import Ledger
 from weft_core.models import ModelClient
 from weft_core.nlp import Nlp
 
 
 class Budget:
     """Token budget per beat per night. Stages degrade (skip optional model calls) rather than
-    overspend. Tokens are estimated as characters / 4."""
+    overspend. With a ledger, tokens already spent today under `scope` (real usage from the
+    provider) are subtracted at the start, so a re-run or a restart does not get a fresh budget;
+    inside one process a call is reserved at characters / 4 before it is made."""
 
-    def __init__(self, tokens: int) -> None:
+    def __init__(self, tokens: int, ledger: Ledger | None = None, scope: str | None = None) -> None:
+        self.scope = scope
+        if ledger and scope:
+            day = datetime.now(UTC).date().isoformat()
+            tokens -= ledger.spent(day, scope)[0]
         self.left = tokens
 
     def take(self, text: str) -> bool:
@@ -24,6 +31,7 @@ class Budget:
         if cost > self.left:
             return False
         self.left -= cost
+        models.scope.set(self.scope)  # the client charges the real usage of the next call here
         return True
 
 
@@ -38,6 +46,7 @@ class Ctx:
     versions_of: Callable[[str], list[tuple[datetime, str]]] = lambda report_id: []
     rules: dict[str, Any] = field(default_factory=config.rules)  # config/rules.yaml
     budgets: dict[str, Budget] = field(default_factory=dict)
+    ledger: Ledger | None = None  # spend ledger (#157); None in tests
     warehouse: Warehouse | None = None  # BigQuery, for autoclean
     publish: Publish | None = None  # Pub/Sub, for autoclean re-queues
 
@@ -47,7 +56,8 @@ class Ctx:
         n = self.cfg["nightly"]
         share = n.get("token_shares", {}).get(stage, 1.0)
         return self.budgets.setdefault(
-            f"{stage}:{story_id}", Budget(int(n["token_budget_per_beat"] * share))
+            f"{stage}:{story_id}",
+            Budget(int(n["token_budget_per_beat"] * share), self.ledger, f"{stage}:{story_id}"),
         )
 
     def recent_reports(self, days: int) -> list[dict[str, Any]]:
