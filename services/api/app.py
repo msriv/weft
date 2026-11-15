@@ -421,6 +421,8 @@ def create_app(
             raise HTTPException(404, "no such source")
         if "country" in data:  # also re-tags the source's reports
             store.set_country(db, source_id, data.pop("country"), "admin")
+        if "paywalled" in data:
+            data["paywalled_source"] = "admin"  # the fetcher never overrides a hand-set flag
         for col, val in data.items():  # col is a SourcePatch field name, never user text
             if isinstance(val, list):  # stored as JSON text, like feeds and sitemaps
                 val = json.dumps(val)

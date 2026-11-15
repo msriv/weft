@@ -18,7 +18,7 @@ from typing import Any, Protocol
 import pdfplumber
 import trafilatura
 
-from weft_core import domains, portals, rules
+from weft_core import domains, portals, quality, rules
 from weft_core.polite import PoliteClient
 from weft_core.urls import normalize_url
 
@@ -43,6 +43,10 @@ class Store(Protocol):
         or the text hash is already stored."""
         ...
 
+    # Optional (GcpStore has them): per-source outcome counts and same-text-under-many-URLs.
+    # def note_outcome(self, source_id: str, stub: bool, cfg: dict) -> None
+    # def boilerplate(self, text_hash: str, url: str, limit: int) -> bool
+
     def save(
         self, raw_row: dict[str, Any], extracted_row: dict[str, Any], content: bytes, ext: str
     ) -> None:
@@ -61,7 +65,8 @@ def seen_keys(url: str | None, text_hash: str) -> list[str]:
 
 @dataclass
 class Result:
-    status: str  # stored | duplicate | skipped | blocked | extract_failed | foreign
+    # stored | duplicate | skipped | blocked | extract_failed | foreign | thin | stub | title | boilerplate
+    status: str
     item_id: str | None = None
     message: dict[str, Any] | None = None  # `items-extracted` payload, set when stored
 
@@ -72,6 +77,7 @@ def fetch_item(
     http: PoliteClient,
     store: Store,
     sources: list[dict[str, Any]] | None = None,
+    qcfg: dict[str, Any] | None = None,
 ) -> Result:
     if store.seen(msg["url"], ""):
         return Result("duplicate")  # feeds repeat entries every poll: never re-download them
@@ -87,6 +93,7 @@ def fetch_item(
         resp.status_code,
         store,
         owner=(lambda url: domains.attribute(url, source, sources)) if sources else None,
+        qcfg=qcfg,
     )
 
 
@@ -118,6 +125,7 @@ def ingest(
     *,
     versioned: bool = False,
     owner: Callable[[str], str | None] | None = None,
+    qcfg: dict[str, Any] | None = None,
 ) -> Result:
     """Extract and store one document.
 
@@ -149,6 +157,17 @@ def ingest(
         item_id = hashlib.sha256((canonical + text_hash).encode()).hexdigest()[:32]
     if store.seen(None if versioned else canonical, text_hash):
         return Result("duplicate", item_id)
+    if qcfg and not versioned and not msg["url"].lower().endswith(".pdf"):  # portals: documents
+        reason = quality.check(
+            text, d.get("title"), msg.get("title"), d.get("sitename"), d.get("language"), qcfg
+        )
+        boiler = getattr(store, "boilerplate", None)
+        if reason is None and boiler and boiler(text_hash, canonical, qcfg["boilerplate_urls"]):
+            reason = "boilerplate"
+        if getattr(store, "note_outcome", None):
+            store.note_outcome(msg["source_id"], reason in ("thin", "stub"), qcfg)
+        if reason:
+            return Result(reason, item_id)  # the status is the reason, in the item_processed log
 
     lede = text[:LEDE_CHARS]
     meta = {k: v for k, v in d.items() if k in _META_KEYS and v}

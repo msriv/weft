@@ -8,6 +8,7 @@ import json
 import os
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -17,7 +18,7 @@ from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 from services.fetcher import refetch as refetch_mod
 from services.fetcher.fetcher import Store, fetch_item, seen_keys
 from services.fetcher.tasks import CloudTasksQueue
-from weft_core import store
+from weft_core import config, store
 from weft_core import store as store_mod
 from weft_core.gcp import bigquery_client
 from weft_core.polite import PoliteClient
@@ -40,6 +41,37 @@ class GcpStore:
         return bool(keys) and bool(
             self._db.execute("MATCH (n:Seen) WHERE n.key IN ? RETURN n.key AS k LIMIT 1", (keys,))
         )
+
+    def boilerplate(self, text_hash: str, url: str, limit: int) -> bool:
+        """True once one text has been served under `limit` distinct URLs of the same source."""
+        key = f"{text_hash}|{url}"
+        self._db.execute(
+            "MERGE (n:HashUrl {key: ?}) ON CREATE SET n.hash = ?, n.at = ?",
+            (key, text_hash, datetime.now(UTC).isoformat()),
+        )
+        (r,) = self._db.execute("MATCH (n:HashUrl {hash: ?}) RETURN count(n) AS c", (text_hash,))
+        return bool(r["c"] >= limit)
+
+    def note_outcome(self, source_id: str, stub: bool, cfg: dict[str, Any]) -> None:
+        """Count the day's items and stubs per source; flag a source whose last 7 days are mostly
+        stubs as paywalled (an admin-set flag is never touched)."""
+        today = datetime.now(UTC).date()
+        self._db.execute(
+            "MERGE (n:SourceDay {key: ?}) ON CREATE SET n.source_id = ?, n.day = ?, n.items = 0, "
+            "n.stubs = 0 SET n.items = n.items + 1, n.stubs = n.stubs + ?",
+            (f"{source_id}|{today}", source_id, str(today), int(stub)),
+        )
+        (r,) = self._db.execute(
+            "MATCH (n:SourceDay {source_id: ?}) WHERE n.day >= ? "
+            "RETURN sum(n.items) AS i, sum(n.stubs) AS s",
+            (source_id, str(today - timedelta(days=7))),
+        )
+        if r["i"] >= cfg["paywall_min_items"] and r["s"] / r["i"] >= cfg["paywall_share"]:
+            self._db.execute(
+                "MATCH (n:Source {id: ?}) WHERE n.paywalled_source IS NULL OR n.paywalled_source = 'auto' "
+                "SET n.paywalled = 1, n.paywalled_source = 'auto'",
+                (source_id,),
+            )
 
     def _mark_seen(self, raw_row: dict[str, Any]) -> None:
         keys = seen_keys(raw_row["url"], raw_row.get("text_hash") or "")
@@ -98,6 +130,7 @@ def create_app(
     db: "store_mod.Db | None" = None,
     files: refetch_mod.VersionStore | None = None,
     queue_for: Callable[[str], refetch_mod.Enqueue] | None = None,
+    qcfg: dict[str, Any] | None = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -110,7 +143,7 @@ def create_app(
         except (KeyError, ValueError):
             return Response(status_code=204)  # malformed or unknown source: drop, don't retry
         try:
-            result = fetch_item(msg, source, http, store, _all(sources))
+            result = fetch_item(msg, source, http, store, _all(sources), qcfg)
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         # structured line; log-based metrics for the dashboards count these (infra/modules/monitoring)
@@ -177,7 +210,7 @@ def _default_app() -> FastAPI:
             base_url,
         )
 
-    return create_app(gcp, http, sources, publish, db, gcp, queue_for)
+    return create_app(gcp, http, sources, publish, db, gcp, queue_for, config.pipeline()["quality"])
 
 
 def __getattr__(name: str) -> FastAPI:  # `uvicorn services.fetcher.app:app` builds it lazily
