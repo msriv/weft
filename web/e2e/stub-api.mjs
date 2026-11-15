@@ -62,7 +62,7 @@ const event = {
   documents: [], anomalies: [anomaly], short_version: null, parties: STORY.parties,
 };
 const routes = {
-  "/v1/world": { stories: [{ story_id: "kessar-strait", title: STORY.title, country: "AL", reports: 14, perspectives: 3, anomalies: 1, provisional: true, last_report_at: STORY.last_report_at }], gaps: [{ story_id: "kessar-strait", title: STORY.title, country: "VE", reports: 0 }] },
+  "/v1/world": { places: [["kessar-strait","AL",14,1],["kessar-strait","MK",9,0],["strait-talks","AL",30,0],["harbour-fire","GR",6,0],["grain-dispute","MK",20,1]].map(([id, c, r, a]) => ({ story_id: id, title: id === "kessar-strait" ? STORY.title : `Fictional story ${id}`, country: c, reports: r, perspectives: 2, anomalies: a, provisional: false, from: { [c]: r } })), stories: [{ story_id: "kessar-strait", title: STORY.title, country: "AL", reports: 14, perspectives: 3, anomalies: 1, provisional: true, last_report_at: STORY.last_report_at }], gaps: [{ story_id: "kessar-strait", title: STORY.title, country: "VE", reports: 0 }] },
   "/v1/stories": [STORY],
   "/v1/stories/kessar-strait": graph,
   "/v1/events/e1": event,

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Globe from "@/components/Globe";
+import GlobeLoader from "@/components/GlobeLoader";
 import { Empty, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
 import type { Directions, World } from "@/lib/types";
@@ -14,7 +14,7 @@ export default async function Home() {
       <Kicker>World desk</Kicker>
       <h1>Where the news is</h1>
       <p className="muted">Each story sits on the countries it is about; open one to see where its reports come from. Weft shows coverage; it never says what is true. <Link href="/today">See today&apos;s changes</Link>.</p>
-      {w.stories.length ? <Globe world={w} directions={withDirections} /> : <Empty>No public stories yet. Stories appear here once collected and published.</Empty>}
+      {w.stories.length ? <><GlobeLoader world={w} directions={withDirections} /><noscript><ul>{[...new Map((w.places ?? []).map((p) => [p.story_id, p.title])).entries()].map(([id, t]) => <li key={id}><Link href={`/s/${id}`}>{t}</Link></li>)}</ul></noscript></> : <Empty>No public stories yet. Stories appear here once collected and published.</Empty>}
     </>
   );
 }
