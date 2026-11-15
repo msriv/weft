@@ -7,12 +7,19 @@ import LiveFeed from "@/components/LiveFeed";
 import OpenQuestions from "@/components/OpenQuestions";
 import StoryGraph from "@/components/StoryGraph";
 import { api } from "@/lib/api";
+import { meta } from "@/lib/meta";
 import { day, perspectiveName } from "@/lib/format";
 import type { StoryGraph as SG } from "@/lib/types";
 
 type Q = { view?: string; at?: string; live?: string; until?: string; days?: string };
 
 const shift = (iso: string, d: number) => new Date(Date.parse(iso) + d * 86400000).toISOString().slice(0, 10);
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const p = await params;
+  const x = await api<SG>(`/v1/stories/${p.id}`);
+  return meta(x?.story.title, "Coverage of this story by perspective.");
+}
 
 export default async function StoryPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Q> }) {
   const { id } = await params;

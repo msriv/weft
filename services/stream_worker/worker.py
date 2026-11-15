@@ -15,7 +15,7 @@ from typing import Any
 from weft_core import beats as beats_mod
 from weft_core import clustering, graph, portals, relevance, store
 from weft_core.cache import TtlCache
-from weft_core.models import ModelClient
+from weft_core.models import ModelClient, ModelRefused
 from weft_core.nlp import Nlp
 from weft_core.textutil import bands, minhash, minhash_similarity, shingles
 
@@ -34,9 +34,8 @@ class Deps:
     cfg: dict[str, Any]  # config/pipeline.yaml
     publish: Callable[[dict[str, Any]], None] = lambda m: None
     model: ModelClient | None = None
-    cache: TtlCache = field(
-        default_factory=lambda: TtlCache(60.0)
-    )  # config stream.cache_ttl_seconds
+    # config stream.cache_ttl_seconds
+    cache: TtlCache = field(default_factory=lambda: TtlCache(60.0))
 
 
 def _source(d: "Deps", source_id: str) -> dict[str, Any] | None:
@@ -62,13 +61,19 @@ def classify_type(url: str, section: str, title: str, lede: str, model: ModelCli
         return "analysis"
     if section or model is None:
         return "news"
-    out = (
-        model.complete(
-            prompt_template="type-classify@1", instructions=TYPE_PROMPT, data=f"{title}\n{lede}"
+    try:
+        out = (
+            model.complete(
+                prompt_template="type-classify@1",
+                instructions=TYPE_PROMPT,
+                data=f"{title}\n{lede}",
+                max_tokens=10,
+            )
+            .strip()
+            .lower()
         )
-        .strip()
-        .lower()
-    )
+    except ModelRefused:
+        return "news"
     return out if out in ("news", "op-ed", "analysis") else "news"
 
 

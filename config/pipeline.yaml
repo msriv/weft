@@ -15,6 +15,15 @@ stream:
   near_dup_jaccard: 0.80
   near_dup_window_hours: 72
 
+# Spend limits per UTC day across all services (#157). Each caller gets its share, so the
+# public /v1/ask can never use up the pipeline's tokens and the reverse. A refused call degrades
+# the stage (fewer checks); it never fails the run. Tune against the OpenRouter bill.
+model_budget:
+  daily_tokens: 4000000
+  daily_cost_usd: 4.0
+  shares: {pipeline: 0.70, stream: 0.15, ask: 0.15}
+
+
 # Poller prefilter (#163): feed entries whose title and summary match no beat are not fetched.
 # A small random sample still flows, so the admin "unplaced" view sees what the beats miss.
 prefilter:

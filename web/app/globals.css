@@ -2,8 +2,8 @@
   --bg: #060708; --text: #e8e6e1; --muted: #8e939b; --body2: #b9bdc4; --party: #9a9fa7;
   --anomaly: #ff7a45; --anomaly-tint: rgba(255, 122, 69, 0.1); --anomaly-light: #ffd3c0;
   --hair: rgba(232, 230, 225, 0.12);
-  --serif: "Instrument Serif", Georgia, serif; --sans: Inter, system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --serif: var(--font-serif), "Instrument Serif", Georgia, serif; --sans: var(--font-sans), Inter, system-ui, sans-serif;
+  --mono: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
