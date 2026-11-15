@@ -5,6 +5,16 @@
   "role",
   "wikidata_id"
  ],
+ "AdminLog": [
+  "actor",
+  "after",
+  "at",
+  "before",
+  "id",
+  "method",
+  "route",
+  "target"
+ ],
  "Anomaly": [
   "detail",
   "event_id",
@@ -237,6 +247,24 @@
  "MergeRejected": [
   "pair"
  ],
+ "MinhashBand": [
+  "at",
+  "band",
+  "report_id"
+ ],
+ "ModelOutput": [
+  "at",
+  "key",
+  "output"
+ ],
+ "ModelSpend": [
+  "caller",
+  "calls",
+  "cost_usd",
+  "day",
+  "key",
+  "tokens"
+ ],
  "NliCache": [
   "c",
   "e",
@@ -366,6 +394,7 @@
   "homepage",
   "id",
   "languages",
+  "link_domains",
   "min_interval",
   "name",
   "owner_id",
