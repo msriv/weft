@@ -30,7 +30,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       <Link href={`/s/${d.document.story_id}`} className="muted">← Back to the story</Link>
       <Kicker>Official document · {d.document.kind} · {day(d.document.published_at)}</Kicker>
       <h1>{d.document.title}</h1>
-      <div className="row" style={{ margin: "10px 0" }}>{d.issuer && <IssuerTag i={d.issuer} />}</div>
+      <div className="row my10">{d.issuer && <IssuerTag i={d.issuer} />}</div>
       {d.label && <p>{d.label}</p>}
       <a href={d.document.url} rel="noopener noreferrer">Original document ↗</a>
       <p className="muted">{d.document.summary}</p>

@@ -63,9 +63,8 @@ export default function StoryGraph(props: {
               const label = doc ? `${n.title ?? "Document"}, issued by ${n.issuer?.name ?? "unknown"}` : `${n.count} reports from ${perspectiveName(n.perspective ?? "")}, ${day(n.at)}`;
               return (
                 <g
-                  key={n.id} className="node fade-in" tabIndex={0} role="button" aria-label={label}
+                  key={n.id} className="node fade-in pointer" tabIndex={0} role="button" aria-label={label}
                   onClick={() => setSel(n)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setSel(n)}
-                  style={{ cursor: "pointer" }}
                 >
                   {(flagged || prov) && (
                     <circle cx={n.x} cy={n.y} r={n.r + 6} fill="none" stroke="var(--anomaly)" strokeWidth={2}
@@ -84,7 +83,7 @@ export default function StoryGraph(props: {
         )}
       </div>
       {days.length > 1 && (
-        <div className="row" style={{ margin: "12px 0" }}>
+        <div className="row my12">
           <label className="kicker" htmlFor="replay">Replay</label>
           <input
             id="replay" type="range" min={0} max={days.length - 1} step={1}
@@ -104,11 +103,11 @@ export default function StoryGraph(props: {
 
 function Legend() {
   return (
-    <div className="row muted" style={{ fontSize: 12 }}>
+    <div className="row muted fs12">
       <span>● Grey: document from a party to the story</span><span>● Bright: document from an issuer not listed as a party</span>
       <span>◌ Dashed: group of reports, number = how many</span>
-      <span style={{ color: "var(--anomaly)" }}>◯ Orange ring: anomaly (dashed: provisional)</span>
-      <span style={{ color: "var(--anomaly)" }}>┄ Dashed orange line: conflicting reports</span>
+      <span className="c-anomaly">◯ Orange ring: anomaly (dashed: provisional)</span>
+      <span className="c-anomaly">┄ Dashed orange line: conflicting reports</span>
     </div>
   );
 }
@@ -133,7 +132,7 @@ function Detail({ n, anomalies, onClose }: { n: Placed; anomalies: Anomaly[]; on
           <a href={`#event-${n.event_id}`}>Jump to this event in the list</a>
         </>
       )}
-      {mine.map((a) => <p key={a.id} style={{ color: "var(--anomaly-light)" }}>{a.summary}</p>)}
+      {mine.map((a) => <p key={a.id} className="c-anomaly-light">{a.summary}</p>)}
     </div>
   );
 }

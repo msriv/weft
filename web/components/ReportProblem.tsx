@@ -22,7 +22,7 @@ export default function ReportProblem({ refId, kind, label }: { refId?: string; 
       {state === "sent" ? <p>Thank you. An editor will look at it, and fixes appear in the corrections log on How we weigh.</p> : (
         <>
           <label htmlFor="msg" className="kicker">What looks wrong?</label>
-          <textarea id="msg" required minLength={3} maxLength={2000} rows={4} style={{ width: "100%" }} value={msg} onChange={(e) => setMsg(e.target.value)} />
+          <textarea id="msg" required minLength={3} maxLength={2000} rows={4} className="w100" value={msg} onChange={(e) => setMsg(e.target.value)} />
           <label htmlFor="em" className="kicker">Email, only if you want a reply (optional)</label>
           <input id="em" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <div className="row"><button type="submit">Send</button><button type="button" onClick={() => setOpen(false)}>Cancel</button></div>
