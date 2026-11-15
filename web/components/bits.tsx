@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AnomalyFeedback from "@/components/AnomalyFeedback";
-import { RULE_NAMES, STATE_LABEL, ago, perspectiveName } from "@/lib/format";
+import Time from "@/components/Time";
+import { STATE_LABEL, count, perspectiveName, ruleName } from "@/lib/format";
 import type { Anomaly, Issuer, SourceLabel, StoryCard } from "@/lib/types";
 
 export function Kicker({ children, anomaly }: { children: React.ReactNode; anomaly?: boolean }) {
@@ -30,13 +31,13 @@ export function AnomalyCard({ a }: { a: Anomaly }) {
   return (
     <div className="card anomaly">
       <Kicker anomaly>
-        Anomaly · {RULE_NAMES[a.rule] ?? a.rule}
+        Anomaly · {ruleName(a.rule)}
         {a.status === "provisional" ? " · provisional" : ""}
       </Kicker>
       <p className="c-anomaly-light my6">{a.summary}</p>
       <AnomalyDetail a={a} />
       <div className="muted fs12">
-        Rule {a.rule} version {a.rule_version} · {a.evidence_ids.length} pieces of evidence ·{" "}
+        Rule: {ruleName(a.rule)}, version {a.rule_version} · {count(a.evidence_ids.length, "piece")} of evidence ·{" "}
         <Link href={`/nodes/${a.id}`}>See the rule and evidence</Link>
       </div>
       <AnomalyFeedback id={a.id} />
@@ -103,14 +104,14 @@ export function StoryRow({ s }: { s: StoryCard }) {
   return (
     <Link href={`/s/${s.id}`} className="card block">
       <Kicker>
-        {s.beat} · {s.status === "quiet" ? "Quiet" : "Developing"} · {s.perspectives.map(perspectiveName).join(", ")}
+        {s.beat_name ?? s.beat} · {s.status === "quiet" ? "Quiet" : "Developing"} · {s.perspectives.map(perspectiveName).join(", ")}
       </Kicker>
       <h3 className="my6">{s.title}</h3>
       <div className="row muted fs13">
-        <span>{s.reports} reports</span><span>{s.sources} sources</span><span>{s.perspectives.length} perspectives</span>
-        {s.anomalies > 0 && <span className="pill anomaly">{s.anomalies} anomalies</span>}
+        <span>{count(s.reports, "report")}</span><span>{count(s.sources, "source")}</span><span>{count(s.perspectives.length, "perspective")}</span>
+        {s.anomalies > 0 && <span className="pill anomaly">{count(s.anomalies, "anomaly", "anomalies")}</span>}
         {s.provisional_anomalies > 0 && <span className="pill">{s.provisional_anomalies} provisional</span>}
-        <span>Last report {ago(s.last_report_at)}</span>
+        <span>Last report <Time iso={s.last_report_at} relative /></span>
       </div>
     </Link>
   );

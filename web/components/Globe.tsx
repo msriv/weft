@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import land from "world-atlas/countries-110m.json";
-import { perspectiveName } from "@/lib/format";
+import { count, perspectiveName } from "@/lib/format";
 import type { World } from "@/lib/types";
 
 type Marker = {
@@ -135,8 +135,8 @@ export default function Globe({ world, directions = [] }: { world: World; direct
             <h3>{card.title}</h3>
             <p className="muted">
               {card.kind === "gap"
-                ? `We hold ${card.reports} reports from ${perspectiveName(card.country)} on this story. That describes our coverage, not the story.`
-                : `About ${perspectiveName(card.country)} · ${card.reports} reports from ${card.perspectives} perspectives`}
+                ? `We hold ${count(card.reports, "report")} from ${perspectiveName(card.country)} on this story. That describes our coverage, not the story.`
+                : `About ${perspectiveName(card.country)} · ${count(card.reports, "report")} from ${count(card.perspectives, "perspective")}`}
             </p>
             {card.from && (
               <p className="muted fs13">
@@ -155,7 +155,7 @@ export default function Globe({ world, directions = [] }: { world: World; direct
         <div className="kicker">Coverage gaps</div>
         {world.gaps.length ? world.gaps.map((g) => (
           <div className="card" key={`${g.story_id}-${g.country}`}>
-            <b>{perspectiveName(g.country)}</b> · {g.reports} reports on <Link href={`/s/${g.story_id}`}>{g.title}</Link>
+            <b>{perspectiveName(g.country)}</b> · {count(g.reports, "report")} on <Link href={`/s/${g.story_id}`}>{g.title}</Link>
           </div>
         )) : <p className="muted">No gaps recorded.</p>}
         <div className="kicker mt18">Stories on the globe, by where they happen</div>

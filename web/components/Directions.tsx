@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Kicker } from "@/components/bits";
-import { day } from "@/lib/format";
+import Time from "@/components/Time";
 import type { DomainCard, Speculation, TrackRecord } from "@/lib/types";
 
 // World directions (D22). Dashed border and a neutral kicker: orange stays for anomalies.
@@ -44,7 +44,7 @@ export function SpeculationRow({ p }: { p: Speculation }) {
         </div>
       )}
       <p className="muted fs12 m0">
-        {p.origin === "template" ? "Template question, no model" : `Model ${p.model ?? ""} · ${p.prompt ?? ""}`} · by {day(p.expected_by)} · {p.outcome}
+        {p.origin === "template" ? "Template question, no model" : `Model ${p.model ?? ""} · ${p.prompt ?? ""}`} · by <Time iso={p.expected_by} /> · {p.outcome}
         {p.base_rate !== null && ` · base rate ${Math.round(p.base_rate * 100)}%`}
       </p>
     </div>

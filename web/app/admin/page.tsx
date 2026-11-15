@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Kicker } from "@/components/bits";
+import { Fields } from "@/components/Fields";
 
 type Story = { id: string; beat_id: string; title: string; public: boolean };
 type Item = { id: string; kind: string; payload: Record<string, unknown> };
@@ -137,7 +138,7 @@ export default function Admin() {
       {maybes.map((m) => (
         <div className="row" key={`${m.report_id}:${m.beat_id}`}>
           {m.url ? <a href={m.url} target="_blank" rel="noreferrer">{m.title ?? m.url}</a> : <span>{m.title ?? m.report_id}</span>}
-          <span className="muted">{m.beat_id} · {m.score.toFixed(2)}</span>
+          <span className="muted">{m.beat_id} · match {m.score.toFixed(2)}</span>
           {[true, false].map((on) => <button key={String(on)} onClick={() => act(`/beat-maybes/${encodeURIComponent(m.report_id)}`, { beat_id: m.beat_id, on_beat: on })}>{on ? "On beat" : "Off beat"}</button>)}
         </div>
       ))}
@@ -145,7 +146,7 @@ export default function Admin() {
       {review?.open.map((i) => (
         <div className="card" key={i.id}>
           <Kicker>{i.kind}</Kicker>
-          <pre className="prewrap m0">{JSON.stringify(i.payload, null, 1)}</pre>
+          <Fields data={i.payload} />
           <div className="row">
             {["good", "bad"].map((r) => <button key={r} onClick={() => act(`/review/${encodeURIComponent(i.id)}`, { rating: r, reviewer: "editor" })}>{r}</button>)}
           </div>
