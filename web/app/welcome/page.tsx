@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { DEFAULTS, loadPrefs, savePrefs, type Prefs } from "@/lib/prefs";
 import { Kicker } from "@/components/bits";
-import { pullPrefs, signIn, signOut, signedInAs } from "@/lib/account";
+import { pullPrefs, signIn, signOut, signedInAs, token } from "@/lib/account";
 
 type Card = { id: string; title: string; beat: string; perspectives: string[] };
 
@@ -11,6 +11,7 @@ export default function Welcome() {
   const [stories, setStories] = useState<Card[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(false);
+  const [pending, setPending] = useState(false);
   const [who, setWho] = useState<string | null>(null);
   const [cred, setCred] = useState({ email: "", password: "" });
   const [authError, setAuthError] = useState("");
@@ -35,13 +36,15 @@ export default function Welcome() {
     <form onSubmit={async (e) => {
       e.preventDefault(); savePrefs(prefs); setSaved(false);
       if (prefs.frequency !== "never" && prefs.email) {
-        const r = await fetch("/api/v1/subscription", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: prefs.email, frequency: prefs.frequency, follows: prefs.follows }) });
+        const t = await token(); // a signed-in account may change its own address's subscription
+        const r = await fetch("/api/v1/subscription", { method: "PUT", headers: { "Content-Type": "application/json", ...(t ? { authorization: `Bearer ${t}` } : {}) }, body: JSON.stringify({ email: prefs.email, frequency: prefs.frequency, follows: prefs.follows }) });
         if (!r.ok) return setError(true);
+        setPending(Boolean(((await r.json()) as { pending?: boolean }).pending));
       }
       setError(false); setSaved(true);
     }}>
       <Kicker>Welcome</Kicker>
-      <h1>What do you want to follow?</h1>
+      <h1>Following and preferences</h1>
       <p className="muted">Stays in this browser unless you sign in. Nothing is tracked. Changes ordering and what the digest covers, never what is hidden.</p>
       <Kicker>Account</Kicker>
       {who ? (
@@ -76,7 +79,7 @@ export default function Welcome() {
         <p><label className="kicker" htmlFor="email">Email</label><br />
           <input id="email" type="email" value={prefs.email ?? ""} onChange={(e) => setPrefs({ ...prefs, email: e.target.value })} /></p>
       )}
-      <p><button type="submit">Save</button> {saved && <span role="status">Saved.</span>}{error && <span role="alert">Could not subscribe. Check the email.</span>}</p>
+      <p><button type="submit">Save</button> {saved && <span role="status">{pending ? "Saved. Check your inbox to confirm the digest." : "Saved."}</span>}{error && <span role="alert">Could not subscribe. Check the email.</span>}</p>
     </form>
   );
 }

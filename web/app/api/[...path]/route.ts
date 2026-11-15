@@ -9,6 +9,13 @@ async function proxy(req: Request, { params }: { params: Promise<{ path: string[
     const v = req.headers.get(h);
     if (v) headers.set(h, v);
   }
+  // The API limits callers by address. It trusts this one only with the shared secret, so a
+  // direct caller cannot forge it. Cloud Run appends the real peer last in x-forwarded-for.
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",").at(-1)?.trim();
+  if (ip && process.env.PROXY_SECRET) {
+    headers.set("x-weft-client-ip", ip);
+    headers.set("x-weft-proxy", process.env.PROXY_SECRET);
+  }
   const hasBody = !["GET", "HEAD"].includes(req.method);
   const r = await fetch(`${API()}/${path.join("/")}${url.search}`, {
     method: req.method, headers, body: hasBody ? await req.arrayBuffer() : undefined, cache: "no-store",

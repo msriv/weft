@@ -185,6 +185,62 @@ def list_stories(
     return sorted(cards, key=key, reverse=True)
 
 
+SEARCH_MIN = 2
+
+
+def search(db: Db, q: str, limit: int = 5) -> dict[str, list[dict[str, Any]]]:
+    """Header search: fixed read-only queries, no model, public stories only. Matches are a
+    case-insensitive contains on titles and names, grouped by kind."""
+    needle = q.strip().lower()[:80]
+    out: dict[str, list[dict[str, Any]]] = {
+        "stories": [],
+        "events": [],
+        "sources": [],
+        "people": [],
+    }
+    if len(needle) < SEARCH_MIN:
+        return out
+    limit = max(1, min(limit, 20))
+    out["stories"] = [
+        {"id": r["id"], "title": r["title"]}
+        for r in db.execute(
+            "MATCH (s:Story {public: 1}) WHERE toLower(s.title) CONTAINS ? "
+            "RETURN s.id AS id, s.title AS title ORDER BY s.title LIMIT ?",
+            (needle, limit),
+        )
+    ]
+    out["events"] = [
+        {"id": r["id"], "story_id": r["story_id"], "title": r["title"]}
+        for r in db.execute(
+            "MATCH (e:Event) WHERE e.valid_to IS NULL "
+            "MATCH (s:Story {public: 1}) WHERE s.id = e.story_id "
+            "MATCH (r:Report) WHERE r.id = e.label_report_id AND toLower(r.title) CONTAINS ? "
+            "RETURN e.id AS id, e.story_id AS story_id, r.title AS title ORDER BY r.title LIMIT ?",
+            (needle, limit),
+        )
+    ]
+    out["sources"] = [
+        {"id": r["id"], "title": r["name"]}
+        for r in db.execute(
+            "MATCH (n:Source) WHERE toLower(n.name) CONTAINS ? "
+            "RETURN n.id AS id, n.name AS name ORDER BY n.name LIMIT ?",
+            (needle, limit),
+        )
+    ]
+    out["people"] = [
+        {"id": r["id"], "title": r["name"]}
+        for r in db.execute(
+            "MATCH (a:Actor) WHERE toLower(a.name) CONTAINS ? "
+            "AND EXISTS { MATCH (st:Statement {actor_id: a.id}) "
+            "MATCH (d:Document {id: st.document_id}) MATCH (s:Story {public: 1}) "
+            "WHERE s.id = d.story_id } "
+            "RETURN a.id AS id, a.name AS name ORDER BY a.name LIMIT ?",
+            (needle, limit),
+        )
+    ]
+    return out
+
+
 WINDOW_DAYS = 7
 
 

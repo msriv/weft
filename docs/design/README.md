@@ -37,7 +37,13 @@ All names, numbers, outlets and stories in them (Aldoria, Veymar, Kessar Strait,
 | Document from a party (node fill) | `#9A9FA7` |
 | Independent document (node) | `#E8E6E1` with outer ring and glow |
 | Anomaly | `#FF7A45` (tint `rgba(255,122,69,0.1)`, light text `#FFD3C0`) |
-| Hairlines | `rgba(232,230,225,0.12)` |
+| Hairlines | `rgba(232,230,225,0.12)` (decorative dividers only) |
+| Strong border | `#6B7078`, 4.05:1 on the background. Edges of inputs, buttons, cards and pills (WCAG 1.4.11) |
+| Spacing scale | `--s1..--s6`: 4, 8, 12, 16, 24, 40 px |
+| Type scale | `--t-sm` 12 (floor for content text), `--t-md` 15, `--t-lg` 20, `--t-xl` 28, `--t-2xl` 44 px |
+| Text measure | `--measure` 68ch, applied to paragraphs |
+| Links | Text colour, underlined with a 3px offset; chrome links (nav, pills, cards) are not underlined, card titles are |
+| Native controls | `color-scheme: dark`, `accent-color: #E8E6E1` |
 | Headings | Instrument Serif |
 | Body | Inter |
 | Labels, numbers | IBM Plex Mono, uppercase, letter-spacing 0.12–0.2em |
