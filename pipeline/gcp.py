@@ -7,6 +7,7 @@ from typing import Any
 from google.cloud import storage  # type: ignore[attr-defined]
 
 from services.fetcher.fetcher import _extract
+from weft_core.autoclean import Blob
 from weft_core.gcp import bigquery_client
 from weft_core.models import ModelCall, as_row
 from weft_core.store import Db
@@ -81,7 +82,9 @@ class BqWarehouse:
     def _job(self, sql: str, params: dict[str, Any]):  # type: ignore[no-untyped-def]
         from google.cloud import bigquery
 
-        def typed(k: str, v: Any) -> bigquery.ScalarQueryParameter:
+        def typed(k: str, v: Any) -> Any:
+            if isinstance(v, list):
+                return bigquery.ArrayQueryParameter(k, "STRING", v)
             kind = (
                 "TIMESTAMP"
                 if isinstance(v, datetime)
@@ -114,3 +117,17 @@ def pubsub_publish(project: str):  # type: ignore[no-untyped-def]
         ).result()
 
     return publish
+
+
+class GcsBlobs:
+    """`weft_core.autoclean.Blobs` on one bucket."""
+
+    def __init__(self, bucket: str) -> None:
+        self._b = storage.Client().bucket(bucket)
+
+    def list(self, prefix: str = "", limit: int | None = None) -> list[Blob]:
+        blobs = self._b.list_blobs(prefix=prefix or None, max_results=limit)
+        return [Blob(b.name, b.updated) for b in blobs]
+
+    def delete(self, name: str) -> None:
+        self._b.blob(name).delete()

@@ -235,10 +235,25 @@
   "key"
  ],
  "MergeRejected": [
+  "created_at",
   "pair"
+ ],
+ "ModelOutput": [
+  "at",
+  "key",
+  "output"
+ ],
+ "ModelSpend": [
+  "caller",
+  "calls",
+  "cost_usd",
+  "day",
+  "key",
+  "tokens"
  ],
  "NliCache": [
   "c",
+  "created_at",
   "e",
   "key"
  ],
@@ -366,6 +381,7 @@
   "homepage",
   "id",
   "languages",
+  "link_domains",
   "min_interval",
   "name",
   "owner_id",
@@ -420,6 +436,7 @@
   "created_at",
   "key",
   "lang",
+  "last_used",
   "text"
  ]
 }
