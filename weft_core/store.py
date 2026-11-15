@@ -314,8 +314,6 @@ NODES: dict[str, dict[str, Any]] = {
         "calls": 0,
     },
     "ModelOutput": {"key": None, "output": None, "at": None},
-
-
     "Seen": {"key": None, "at": None},  # fetched URL / text hash keys (#161)
     "BatchRun": {
         "run_id": None,
@@ -344,8 +342,6 @@ UNIQUE = {
     "Prediction": "id",
     "ModelSpend": "key",
     "ModelOutput": "key",
-
-
     "Seen": "key",
 }
 INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
