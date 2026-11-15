@@ -14,6 +14,7 @@ stream:
   veto_min_reports: 20           # entity veto once the story has this many reports in 30 days
   near_dup_jaccard: 0.80
   near_dup_window_hours: 72
+  event_inplace_minutes: 10      # an attach within this long of the event's last write updates it in place (#151)
 
 # Spend limits per UTC day across all services (#157). Each caller gets its share, so the
 # public /v1/ask can never use up the pipeline's tokens and the reverse. A refused call degrades

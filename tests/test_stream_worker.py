@@ -434,3 +434,17 @@ def test_push_unknown_source_is_retried_not_dropped() -> None:
     m = msg("y", "no-such-source", "T", "T.", "2026-11-06T01:00:00+00:00")
     r = c.post("/", json={"message": {"data": base64.b64encode(json.dumps(m).encode()).decode()}})
     assert r.status_code == 503 and not sent  # Pub/Sub retries, then dead-letters
+
+
+def test_quick_attaches_update_the_event_in_place() -> None:
+    """Every attach used to write a full new Event node; inside the window it updates one (#151)."""
+    db, d, _ = setup()
+    t = "Iran fires missiles at Israel, Tehran says it targeted military bases"
+    lede = "Israel air defences intercepted missiles from Iran overnight."
+    for i, src in (("1", "a-il"), ("2", "b-ir"), ("3", "a-il")):
+        process(msg(i, src, t, lede, "2026-11-06T01:00:00+00:00"), d)
+    ev = db.execute("MATCH (n:Event) RETURN n.n_reports AS n, n.valid_to AS t")
+    assert ev == [{"n": 3, "t": None}]  # one node, three reports, still open
+    d.cfg["stream"]["event_inplace_minutes"] = 0  # switched off: back to a version per attach
+    process(msg("4", "b-ir", t, lede, "2026-11-06T01:30:00+00:00"), d)
+    assert db.execute("MATCH (n:Event) RETURN count(n) AS n")[0]["n"] == 2
