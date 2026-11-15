@@ -10,6 +10,7 @@ from google.cloud import pubsub_v1  # type: ignore[attr-defined]
 
 from services.stream_worker.worker import Deps, process, process_document
 from weft_core import config, graph, store
+from weft_core.cache import TtlCache
 from weft_core.nlp import default_nlp
 from weft_core.probes import add_probes
 
@@ -67,7 +68,9 @@ def _default_app() -> FastAPI:
     def publish(m: dict[str, Any]) -> None:
         publisher.publish(topic, json.dumps(m).encode()).result()
 
-    return create_app(Deps(db, default_nlp(), config.pipeline(), publish))
+    cfg = config.pipeline()
+    cache = TtlCache(float(cfg["stream"]["cache_ttl_seconds"]))
+    return create_app(Deps(db, default_nlp(), cfg, publish, cache=cache))
 
 
 def __getattr__(name: str) -> FastAPI:
