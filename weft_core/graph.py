@@ -84,11 +84,14 @@ def select(
     args: tuple[Any, ...] = (),
     at: str | None = None,
     tail: str = "",
+    props: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Versioned nodes valid at `at`. `where` and `tail` are Cypher over `n`."""
+    """Versioned nodes valid at `at`. `where` and `tail` are Cypher over `n`. `props` limits
+    what is read: hot paths leave out `embedding`, `centroid` and `minhash` (about 20 KB a row)."""
     clause, cargs = asof(at)
     label = LABELS[table]
-    q = f"MATCH (n:{label}) WHERE {clause} AND ({where}) RETURN n {tail}"
+    ret = "n {" + ", ".join(f".{p}" for p in props) + "} AS n" if props else "n"
+    q = f"MATCH (n:{label}) WHERE {clause} AND ({where}) RETURN {ret} {tail}"
     return [_dec(r) for r in store.nodes(db, label, q, cargs + args)]
 
 
