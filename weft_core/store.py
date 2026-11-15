@@ -52,6 +52,7 @@ NODES: dict[str, dict[str, Any]] = {
         "link_domains": "[]",  # extra domains this outlet legitimately publishes on (#169)
         "healthy": 1,
         "paywalled": 0,
+        "paywalled_source": None,  # "auto" when the fetcher flagged it, "admin" when set by hand
         "min_interval": 10.0,
         "status": "active",
         "discovered_via": None,
@@ -240,6 +241,8 @@ NODES: dict[str, dict[str, Any]] = {
         "token": None,
         "created_at": None,
         "last_sent": None,
+        "status": "pending",  # pending -> confirmed; bouncing after 3 hard send failures (#167)
+        "fails": 0,
         "last_sent_at": None,
     },
     "DailyDiff": {"day": None, "payload": None},
@@ -355,6 +358,8 @@ NODES: dict[str, dict[str, Any]] = {
         "fails": None,
         "last": None,
     },  # fetched URL / text hash keys (#161); stored or failed extractions (#150)
+    "HashUrl": {"key": None, "hash": None, "at": None},  # urls that served one text (#170)
+    "SourceDay": {"key": None, "source_id": None, "day": None, "items": 0, "stubs": 0},
     "BatchRun": {
         "run_id": None,
         "stage": None,
@@ -383,8 +388,11 @@ UNIQUE = {
     "ModelOutput": "key",
     "Lock": "key",
     "Seen": "key",
+    "HashUrl": "key",
+    "SourceDay": "key",
 }
 INDEXED = [
+    "hash",
     "band",
     "id",
     "event_id",

@@ -22,7 +22,7 @@ async function auth(action: string, body: object): Promise<Session> {
 }
 export const signIn = (email: string, password: string, create: boolean) => auth(create ? "signup" : "signin", { email, password });
 
-async function token(): Promise<string | null> {
+export async function token(): Promise<string | null> {
   let s = load();
   if (!s) return null;
   if (Date.now() > s.expiresAt) {
