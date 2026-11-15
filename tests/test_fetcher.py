@@ -123,3 +123,24 @@ def test_push_logs_one_structured_line(capsys: pytest.CaptureFixture[str]) -> No
     _push(c, MSG)
     line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert line == {"event": "item_processed", "source_id": "x", "status": "stored"}
+
+
+def test_failed_extraction_is_retried_daily_up_to_three_times() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from services.fetcher.fetcher import seen_from_rows
+
+    now = datetime(2026, 11, 14, 12, tzinfo=UTC)
+
+    def failed(ago: timedelta) -> tuple[str | None, datetime]:
+        return None, now - ago
+
+    assert not seen_from_rows([], now)
+    assert seen_from_rows([("abc", now - timedelta(days=9))], now)  # stored item
+    assert seen_from_rows([failed(timedelta(hours=2))], now)  # too soon to retry
+    assert not seen_from_rows([failed(timedelta(hours=25))], now)  # a day on: try again
+    two = [failed(timedelta(days=2)), failed(timedelta(days=1, hours=1))]
+    assert not seen_from_rows(two, now)
+    assert seen_from_rows([*two, failed(timedelta(days=3))], now)  # third failure: give up
+    # a retry that worked: the stored row wins over the earlier failure
+    assert seen_from_rows([failed(timedelta(days=2)), ("abc", now)], now)

@@ -10,7 +10,7 @@ import io
 import json
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any, Protocol
 from urllib.parse import urlsplit, urlunsplit
@@ -46,6 +46,20 @@ class Store(Protocol):
         self, raw_row: dict[str, Any], extracted_row: dict[str, Any], content: bytes, ext: str
     ) -> None:
         """Write the raw copy, set raw_row["raw_gcs_uri"], insert both rows."""
+
+
+FAIL_RETRY = timedelta(days=1)  # a page that failed extraction is tried again after a day ...
+FAIL_ATTEMPTS = 3  # ... until it has failed this many times (the first try plus two retries)
+
+
+def seen_from_rows(rows: list[tuple[str | None, datetime]], now: datetime) -> bool:
+    """Decide `Store.seen` from the (text_hash, fetched_at) of every stored row that matches.
+    A row with a text hash is a stored item: seen. A row without one is a failed extraction,
+    which blocks only for a day, and for good after `FAIL_ATTEMPTS` failures (#150)."""
+    if any(h for h, _ in rows):
+        return True
+    failed = sorted(t for h, t in rows if not h)
+    return bool(failed) and (len(failed) >= FAIL_ATTEMPTS or now - failed[-1] < FAIL_RETRY)
 
 
 @dataclass
