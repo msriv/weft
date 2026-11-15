@@ -7,8 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from services.fetcher.app import create_app
-from services.fetcher.fetcher import fetch_item, normalize_url, published_at
+from services.fetcher.fetcher import fetch_item, published_at
 from weft_core.polite import PoliteClient
+from weft_core.urls import normalize_url
 
 BODY = " ".join(f"Sentence number {i} of the report." for i in range(60))
 HTML = f"""<html><head><title>Port closed</title>
@@ -123,3 +124,65 @@ def test_push_logs_one_structured_line(capsys: pytest.CaptureFixture[str]) -> No
     _push(c, MSG)
     line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert line == {"event": "item_processed", "source_id": "x", "status": "stored"}
+
+
+def test_normalize_url_drops_tracking_and_sorts_the_rest() -> None:
+    bare = "https://x.test/a?id=3&page=2"
+    assert normalize_url("https://x.test/a/?page=2&utm_source=x&id=3&fbclid=9") == bare
+    assert normalize_url("https://x.test/a?utm_campaign=q") == "https://x.test/a"
+
+
+def test_seen_check_uses_the_graph_not_a_bigquery_job() -> None:
+    from services.fetcher.app import GcpStore
+
+    class Bq:
+        def query(self, *a: Any, **k: Any) -> Any:
+            raise AssertionError("seen() must not run a BigQuery query job")
+
+    class Db:
+        def __init__(self) -> None:
+            self.keys: set[str] = set()
+
+        def execute(self, q: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+            if q.startswith("UNWIND"):
+                self.keys |= set(args[0])
+                return []
+            return [
+                {"stored": True, "fails": 0, "last": "2026-01-01T00:00:00+00:00"}
+                for k in args[0]
+                if k in self.keys
+            ][:1]
+
+    s = object.__new__(GcpStore)
+    s._bq, s._db = Bq(), Db()  # type: ignore[assignment]
+    assert not s.seen("https://x.test/a", "")
+    s._mark_seen(
+        {"url": "https://x.test/a?utm_source=x", "canonical_url": "https://x.test/a",
+         "text_hash": "abc", "fetched_at": "2026-01-01T00:00:00+00:00"}
+    )  # fmt: skip
+    assert (
+        s.seen("https://x.test/a", "")
+        and s.seen(None, "abc")
+        and not s.seen("https://x.test/b", "zzz")
+    )
+
+
+def test_failed_extraction_is_retried_daily_up_to_three_times() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from services.fetcher.fetcher import seen_from_rows
+
+    now = datetime(2026, 11, 14, 12, tzinfo=UTC)
+
+    def failed(ago: timedelta) -> tuple[str | None, datetime]:
+        return None, now - ago
+
+    assert not seen_from_rows([], now)
+    assert seen_from_rows([("abc", now - timedelta(days=9))], now)  # stored item
+    assert seen_from_rows([failed(timedelta(hours=2))], now)  # too soon to retry
+    assert not seen_from_rows([failed(timedelta(hours=25))], now)  # a day on: try again
+    two = [failed(timedelta(days=2)), failed(timedelta(days=1, hours=1))]
+    assert not seen_from_rows(two, now)
+    assert seen_from_rows([*two, failed(timedelta(days=3))], now)  # third failure: give up
+    # a retry that worked: the stored row wins over the earlier failure
+    assert seen_from_rows([failed(timedelta(days=2)), ("abc", now)], now)

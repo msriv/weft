@@ -127,3 +127,99 @@ def test_run_reports_failing_source_and_continues() -> None:
     good = {**SRC, "id": "good", "feeds": ["https://x.test/rss"]}
     res = p.run([bad, good])
     assert res["bad"] and res["good"] is None and len(out) == 2
+
+
+def test_second_poll_of_the_same_feed_publishes_nothing_and_a_new_entry_alone() -> None:
+    body = [RSS]
+    p, out, _ = make(
+        lambda r: httpx.Response(404 if r.url.path == "/robots.txt" else 200, content=body[0])
+    )
+    assert p.poll_feed(SRC, "https://x.test/rss") == 2
+    assert p.poll_feed(SRC, "https://x.test/rss") == 0
+    body[0] = RSS.replace(
+        b"</channel>",
+        b"<item><title>C</title><link>https://x.test/c?utm_source=z</link></item></channel>",
+    )
+    assert p.poll_feed(SRC, "https://x.test/rss") == 1
+    assert [m["url"] for m in out] == [
+        "https://x.test/a", "https://x.test/b", "https://x.test/c?utm_source=z",
+    ]  # fmt: skip
+
+
+def test_tracking_parameters_do_not_make_an_entry_new() -> None:
+    body = [RSS]
+    p, _, _ = make(
+        lambda r: httpx.Response(404 if r.url.path == "/robots.txt" else 200, content=body[0])
+    )
+    p.poll_feed(SRC, "https://x.test/rss")
+    body[0] = RSS.replace(b"x.test/a<", b"x.test/a?utm_source=tw&fbclid=1<")
+    assert p.poll_feed(SRC, "https://x.test/rss") == 0
+
+
+FEED10 = (
+    b'<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>'
+    + b"".join(
+        f"<item><title>{t}</title><link>https://x.test/{i}</link>"
+        f"<description>{d}</description></item>".encode()
+        for i, (t, d) in enumerate(
+            [("Iran strikes Israel", "missiles"), ("Cat show", "fluffy")] * 2
+            + [("Cooking tips", "pasta")] * 4
+            + [("Israel Iran war talks", "<b>diplomats</b>"), ("Garden", "roses")]
+        )
+    )
+    + b"</channel></rss>"
+)
+BEATS = [{"id": "w", "name": "w", "patterns": [r"\bIran\b", r"\bIsrael\b"], "exclude": []}]
+
+
+def beat_poller(rate: float = 0.0) -> tuple[Poller, list[dict[str, Any]]]:
+    out: list[dict[str, Any]] = []
+    polite = PoliteClient(
+        httpx.Client(transport=httpx.MockTransport(site(httpx.Response(200, content=FEED10)))),
+        sleep=lambda s: None,
+    )
+    import random
+
+    return Poller(polite, Mem(), out.append, BEATS, rate, random.Random(1)), out
+
+
+def test_prefilter_publishes_only_entries_that_match_a_beat() -> None:
+    p, out = beat_poller()
+    p.poll_feed(SRC, "https://x.test/rss")
+    assert [m["url"] for m in out] == ["https://x.test/0", "https://x.test/2", "https://x.test/8"]
+    assert p.stats["x"] == {"published": 3, "skipped": 7, "sampled": 0}
+
+
+def test_prefilter_sample_still_flows_and_is_counted() -> None:
+    p, out = beat_poller(rate=1.0)
+    p.poll_feed(SRC, "https://x.test/rss")
+    assert len(out) == 10 and p.stats["x"]["sampled"] == 7
+    assert [m["url"] for m in out[:3]] == [
+        "https://x.test/0",
+        "https://x.test/2",
+        "https://x.test/8",
+    ]
+
+
+def test_entries_without_title_or_summary_are_published() -> None:
+    p, out = beat_poller()
+    p._publish_new(SRC, "u", FeedState(), [("https://x.test/s1", None, None, None)])
+    assert len(out) == 1
+
+
+def test_a_skipped_entry_is_not_drawn_for_again() -> None:
+    p, out = beat_poller(rate=0.5)
+    p.poll_feed(SRC, "https://x.test/rss")
+    n = len(out)
+    p.poll_feed(SRC, "https://x.test/rss")
+    assert len(out) == n
+
+
+def test_replay_prefilter_check() -> None:
+    from evals.replay import prefilter_misses
+
+    rows = [
+        {"id": "a", "title": "Iran fires", "summary": ""},
+        {"id": "b", "title": "Talks resume", "summary": "no names"},
+    ]
+    assert prefilter_misses(rows, BEATS) == ["b"]

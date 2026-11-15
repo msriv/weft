@@ -406,6 +406,16 @@ def create_app(
             (min(limit, 1000),),
         )
 
+    @adm.get("/autoclean")
+    def autoclean_runs(limit: int = 100) -> list[dict[str, Any]]:
+        """What each autoclean rule matched and changed on its recent runs, newest first (#147)."""
+        return store.nodes(
+            db,
+            "AutocleanRun",
+            "MATCH (n:AutocleanRun) RETURN n ORDER BY n.started_at DESC LIMIT ?",
+            (min(limit, 500),),
+        )
+
     @adm.put("/stories/{story_id}/public")
     def set_public(story_id: str, body: Visibility) -> dict[str, Any]:
         if not store.set_public(db, story_id, body.public):

@@ -90,6 +90,14 @@ def score(
     return [{"threshold": t, **clustering.bcubed(replay(rows, nlp, cfg, t), gold)} for t in cuts]
 
 
+def prefilter_misses(rows: list[dict[str, Any]], beats: list[dict[str, Any]]) -> list[str]:
+    """Ids of placed reports the poller prefilter would not have fetched (#163). Every row in a
+    replay set was placed by the stream worker, so this must stay empty."""
+    from weft_core import prefilter
+
+    return [r["id"] for r in rows if not prefilter.on_beat(beats, r["title"], r["summary"])]
+
+
 def main() -> None:
     from weft_core import store
     from weft_core.nlp import default_nlp
@@ -101,6 +109,8 @@ def main() -> None:
     ex.add_argument("--since", required=True)
     ex.add_argument("--until", required=True)
     ex.add_argument("--out", required=True)
+    pf = sub.add_parser("prefilter", help="placed reports the poller prefilter would skip")
+    pf.add_argument("--rows", required=True)
     sc = sub.add_parser("score")
     sc.add_argument("--rows", required=True)
     sc.add_argument("--sweep", action="store_true")
@@ -110,6 +120,10 @@ def main() -> None:
         rows = export(store.from_env(), a.story, a.since, a.until)
         Path(a.out).write_text("".join(json.dumps(r) + "\n" for r in rows))
         print(f"{len(rows)} reports written to {a.out}")
+    elif a.cmd == "prefilter":
+        rows = [json.loads(x) for x in Path(a.rows).read_text().splitlines() if x.strip()]
+        missed = prefilter_misses(rows, store.beats(store.from_env()))
+        print(json.dumps({"rows": len(rows), "missed": len(missed), "ids": missed[:50]}))
     else:
         rows = [json.loads(x) for x in Path(a.rows).read_text().splitlines() if x.strip()]
         for line in score(rows, default_nlp(), cfg, a.sweep):
