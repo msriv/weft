@@ -135,7 +135,7 @@ class Poller:
         if got is None:
             return 0
         resp, st = got
-        entries = [
+        entries: list[tuple[str, Any, Any, str | None]] = [
             (el.text.strip(), None, None, None)
             for el in ET.fromstring(resp.content).iter()
             if el.tag.endswith("}loc") and el.text
