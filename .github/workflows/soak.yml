@@ -1,0 +1,58 @@
+# Nightly soak of the local stack (#173): `docker compose up` through the real discovery, poller,
+# fetcher and stream worker for 15 minutes. It would have caught the emulator crash and the retry
+# stall. Not run per pull request: the first start downloads the Hugging Face models.
+name: soak
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NEO4J_PASSWORD: weft-soak-pw
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      MODEL_NAME: ${{ vars.MODEL_NAME }}
+      MODEL_REVISION: ${{ vars.MODEL_REVISION }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Start the stack
+        run: docker compose up -d --build
+      - name: Wait for the fetcher and the stream worker to be healthy
+        run: |
+          for i in $(seq 1 120); do
+            bad=$(docker compose ps --format '{{.Service}} {{.Health}}' | grep -E '^(fetcher|stream-worker) ' | grep -v ' healthy' || true)
+            [ -z "$bad" ] && exit 0
+            sleep 15
+          done
+          echo "still not healthy after 30 minutes:"; echo "$bad"; exit 1
+      - name: Let the poller and fetcher run for 15 minutes
+        run: sleep 900
+      - name: No container restarted
+        run: |
+          ids=$(docker compose ps -a -q)
+          docker inspect -f '{{.Name}} restarts={{.RestartCount}}' $ids
+          if docker inspect -f '{{.RestartCount}}' $ids | grep -qv '^0$'; then echo "a container restarted"; exit 1; fi
+      - name: At least one report was stored
+        run: |
+          n=$(docker compose exec -T neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" --format plain "MATCH (r:Report) RETURN count(r)" | tail -n 1)
+          echo "reports: $n"
+          [ "$n" -ge 1 ]
+      - name: The nightly pipeline job exits 0
+        if: env.MODEL_API_KEY != ''
+        run: docker compose run --rm --no-deps --entrypoint "" pipeline uv run --no-sync python -m pipeline.run
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --no-color > soak-logs.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: soak-logs
+          path: soak-logs.txt
+          retention-days: 7
