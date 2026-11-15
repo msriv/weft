@@ -497,8 +497,16 @@ def create_app(
         return store.stories(db, public_only=False)
 
     @adm.get("/sources")
-    def admin_sources() -> list[dict[str, Any]]:
-        """Every source, rejected ones too, with when Weft last stored a report from it."""
+    def admin_sources(
+        response: Response,
+        q: Annotated[str, Query(max_length=80)] = "",
+        status: Annotated[str, Query(max_length=20)] = "",
+        country: Annotated[str, Query(max_length=2)] = "",
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> list[dict[str, Any]]:
+        """Sources, rejected ones too, with when Weft last stored a report from it. Filter by name
+        or domain (`q`), `status` and `country`; the match count is in the X-Total-Count header."""
         last = {
             r["id"]: r["last"]
             for r in db.execute(
@@ -517,9 +525,22 @@ def create_app(
             "status",
             "rejected_reason",
         )
+        needle = q.strip().lower()
+        rows = [
+            s
+            for s in sorted(store.all_sources(db), key=lambda s: (s["status"] != "active", s["id"]))
+            if (
+                not needle
+                or needle in (s.get("name") or "").lower()
+                or needle in (s.get("domain") or "").lower()
+            )
+            and (not status or s["status"] == status)
+            and (not country or (s.get("country") or "").upper() == country.upper())
+        ]
+        response.headers["X-Total-Count"] = str(len(rows))
         return [
             {**{k: s.get(k) for k in keys}, "last_report_at": last.get(s["id"])}
-            for s in sorted(store.all_sources(db), key=lambda s: (s["status"] != "active", s["id"]))
+            for s in rows[offset : offset + limit]
         ]
 
     @adm.post("/sources", status_code=202)
@@ -601,6 +622,13 @@ def create_app(
     @adm.get("/anomaly-precision")
     def anomaly_precision() -> list[dict[str, Any]]:
         return feedback.precision(db)
+
+    @adm.get("/status")
+    def status() -> dict[str, Any]:
+        """Is it working: ingest, nightly stages, silent sources, graph size. Cheap counts only."""
+        from weft_core import status as status_mod
+
+        return status_mod.collect(db)
 
     @adm.get("/runs")
     def runs(limit: int = 200) -> list[dict[str, Any]]:
