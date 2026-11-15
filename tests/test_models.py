@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import httpx
 import pytest
@@ -172,9 +173,14 @@ def test_daily_cap_refuses_without_a_request() -> None:
 def test_identical_call_is_answered_from_the_ledger() -> None:
     log: list[ModelCall] = []
     c, seen, _ = _scripted([_ok("first")], log, ledger=MemoryLedger())
-    args = dict(prompt_template="t@1", instructions="x", data="y", max_tokens=50)
-    assert c.complete(**args) == "first"  # type: ignore[arg-type]
-    assert c.complete(**args) == "first"  # type: ignore[arg-type]
+    args: dict[str, Any] = {
+        "prompt_template": "t@1",
+        "instructions": "x",
+        "data": "y",
+        "max_tokens": 50,
+    }
+    assert c.complete(**args) == "first"
+    assert c.complete(**args) == "first"
     assert len(seen) == 1 and len(log) == 1
 
 
@@ -196,7 +202,7 @@ def test_log_failure_keeps_the_paid_output() -> None:
         raise RuntimeError("bigquery down")
 
     c, _, _ = _scripted([_ok()], [])
-    c._log = flaky  # noqa: SLF001
+    c._log = flaky
     assert c.complete(prompt_template="t@1", instructions="x", data="y", max_tokens=50) == "ok"
     assert len(calls) == 3
 
