@@ -128,3 +128,21 @@ img, svg, video, canvas { max-width: 100%; }
 .tal { text-align: left; }
 .w100 { width: 100%; }
 th[scope="row"] { font-family: var(--sans); font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--text); }
+
+/* phones and small screens (#184) */
+.scroll-x { overflow-x: auto; }
+.graph-min { min-width: 720px; }
+.narrow-only { display: none; }
+.graph-mode { display: flex; flex-direction: column; }
+.graph-details summary { padding: var(--s3) 0; }
+table { display: block; overflow-x: auto; max-width: 100%; }
+@media (max-width: 900px) {
+  .story-layout, .globe-layout { grid-template-columns: minmax(0, 1fr); }
+  .side { width: 100%; }
+}
+@media (max-width: 640px) {
+  .wide-only { display: none; }
+  .narrow-only { display: block; }
+  .events-first { order: -1; }
+  .wrap { padding-left: 16px; padding-right: 16px; }
+}
