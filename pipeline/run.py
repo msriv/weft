@@ -29,7 +29,7 @@ from pipeline import (
     weights,
 )
 from pipeline.ctx import Ctx
-from weft_core import config, graph
+from weft_core import config, graph, graphsize
 
 STAGES: dict[str, Callable[[Ctx], int]] = {
     "regroup": regroup.run,
@@ -108,6 +108,8 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     ctx = production_ctx()
     run_stages(ctx, args.stage, args.start)
+    if args.stage in (None, list(STAGES)[-1]):  # once per nightly run
+        graphsize.log(ctx.db)
     return 0
 
 
