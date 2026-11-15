@@ -13,6 +13,10 @@ export function day(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
+/** "2026-11-08" -> "8 Nov". Fixed to UTC so server and browser agree. */
+export const shortDay = (iso: string): string =>
+  iso ? new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
+
 export function ago(iso: string | null, now = Date.now()): string {
   if (!iso) return "";
   const m = Math.round((now - Date.parse(iso)) / 60000);

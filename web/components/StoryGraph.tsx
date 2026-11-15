@@ -6,16 +6,12 @@ import { line, curveBasis } from "d3-shape";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
-import { day, perspectiveName, RULE_NAMES } from "@/lib/format";
+import { day, perspectiveName, RULE_NAMES, shortDay } from "@/lib/format";
 import { layout, type Placed } from "@/lib/layout";
 import type { Anomaly, GraphEdge, GraphNode } from "@/lib/types";
 import StoryCanvas from "./StoryCanvas";
 
 const CANVAS_ABOVE = 300;
-
-/** "2026-11-08" -> "8 Nov". Fixed to UTC so server and browser agree. */
-export const shortDay = (iso: string): string =>
-  iso ? new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
 
 const names = (label: string): string[] => {
   if (label.length <= 17) return [label];
