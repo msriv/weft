@@ -57,5 +57,5 @@ flowchart TD
 - A story is private (404) until the admin publishes it.
 - Raw copies live 30 days in GCS; Neo4j keeps summaries and links.
 
-## Not built (D23)
+## Not built (D24)
 Apache Beam on Dataflow and Memorystore Redis. The live story stream polls the graph.

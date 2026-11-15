@@ -22,7 +22,7 @@ These override convenience. If a task would break one, stop and say so.
 - **Frontend:** Next.js (App Router), React, TypeScript. Story graph drawn with SVG + `d3-scale`/`d3-shape` (PixiJS canvas above ~300 nodes). Layout is computed (x = day, perspective bands above/below a document spine), never force-directed.
 - **Data:** Neo4j (story graph and the app's own data, D19; vectors are stored as properties and compared in Python, no vector index yet), BigQuery (raw metadata, logs, analytics), GCS (raw files, snapshots), Firestore (user accounts and preferences only).
 - **Infra:** GCP. Cloud Run, Pub/Sub, Cloud Tasks, Cloud Scheduler, Cloud Workflows, Terraform, GitHub Actions.
-- **Planned, not built:** Apache Beam on Dataflow and Memorystore Redis. Deferred by D23, which says what brings each back.
+- **Planned, not built:** Apache Beam on Dataflow and Memorystore Redis. Deferred by D24, which says what brings each back.
 - **Models:** open-weight from Hugging Face. MVP calls them through a hosted OpenAI-compatible API (see `docs/decisions.md` D7). Small models (BGE-M3 embeddings, mDeBERTa NLI, spaCy/GLiNER, GlotLID) run on our own CPUs.
 
 ## Suggested repo layout

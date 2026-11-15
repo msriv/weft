@@ -111,7 +111,7 @@ We don't use GDELT's tone scores or its event codes as labels. Both are machine-
 
 ### Raw storage
 
-Raw HTML, PDFs and captions go to `gs://weft-raw/{source}/{yyyy-mm-dd}/{sha256}`, with a 30-day lifecycle (legal review pending). Metadata goes to the BigQuery `raw_items` table. The dedupe key is canonical URL plus text hash.
+Raw HTML, PDFs and captions go to `gs://weft-raw/{item_id}.{ext}` (refetched versions `{item_id}.v{n}.{ext}`), with a 30-day lifecycle (legal review pending). Metadata goes to the BigQuery `raw_items` table. The dedupe key is canonical URL plus text hash.
 
 Pub/Sub topics: `items.new`, `items.extracted`, `documents.new`, `graph.changed`.
 
@@ -132,7 +132,7 @@ Two paths share one graph. The stream path attaches each new item within minutes
 | 7 | Attach to event | Vector + entities → event ID or new event | Top-20 nearest open events from the last 72 h; score = cosine + entity overlap + time proximity; above threshold = attach, else new event |
 | 8 | Write | → `Report` node, provisional edges | Neo4j upsert; publish `graph.changed` |
 
-### Nightly path (plain Python stages in a Cloud Run job; Dataflow planned, not built, D23)
+### Nightly path (plain Python stages in a Cloud Run job; Dataflow planned, not built, D24)
 
 Runs in a 4-hour window. Each stage reads the previous stage's output table, so any stage can be re-run alone.
 
@@ -278,7 +278,7 @@ All backend code is Python 3.12, so the pipeline, the models and the API share o
 | `crawler` | Cloud Run job, daily | Portals, transcripts, PDFs |
 | `fetcher` | Cloud Run service on `items.new` | Fetch + extract; writes GCS and `raw_items` |
 | `stream-worker` | Cloud Run service on `items.extracted` | Stream stages 2–8 |
-| `nightly` | Cloud Run job running the stages in order (Dataflow planned, not built, D23), orchestrated by Cloud Workflows | Nightly stages 1–11 |
+| `nightly` | Cloud Run job running the stages in order (Dataflow planned, not built, D24), orchestrated by Cloud Workflows | Nightly stages 1–11 |
 | `api` | Cloud Run, FastAPI | Read API, live stream, accounts |
 | `ask` | Cloud Run, FastAPI | Ask agent loop |
 | `notifier` | Cloud Run on `graph.changed` | Digests, email, web push |
@@ -302,7 +302,7 @@ All backend code is Python 3.12, so the pipeline, the models and the API share o
 
 ### Live updates
 
-`GET /v1/stories/{id}/stream` is a server-sent events stream with `node.added`, `edge.added`, `anomaly.updated` and `event.merged` messages. `stream-worker` publishes to `graph.changed`; the API fans out to open connections by polling the graph (Memorystore Redis pub/sub is planned, not built, D23).
+`GET /v1/stories/{id}/stream` is a server-sent events stream with `node.added`, `edge.added`, `anomaly.updated` and `event.merged` messages. `stream-worker` publishes to `graph.changed`; the API fans out to open connections by polling the graph (Memorystore Redis pub/sub is planned, not built, D24).
 
 ### Ask agent
 
@@ -370,12 +370,12 @@ Everything runs on Google Cloud, serverless where possible. GKE is used only for
 | Scheduling | Cloud Scheduler; Cloud Workflows for the nightly run |
 | Queues | Pub/Sub; Cloud Tasks for delayed re-fetches |
 | Stateless compute | Cloud Run services and jobs |
-| Batch processing | Cloud Run job, plain Python stages (Dataflow planned, not built, D23) |
+| Batch processing | Cloud Run job, plain Python stages (Dataflow planned, not built, D24) |
 | Model serving | MVP: hosted OpenAI-compatible API. Later: GKE Standard, on-demand L4 pool for online jobs, spot L4 pool for batch |
 | Graph database | Neo4j AuraDB on GCP (managed), private endpoint |
 | Analytics and logs | BigQuery |
 | Files | Cloud Storage |
-| Cache and live fan-out | In-process caches; Memorystore for Redis planned, not built (D23) |
+| Cache and live fan-out | In-process caches; Memorystore for Redis planned, not built (D24) |
 | Accounts and preferences | Firebase Authentication, Firestore |
 | Edge | External HTTPS load balancer, Cloud CDN, Cloud Armor (rate limits, bot rules) |
 | Secrets | Secret Manager |

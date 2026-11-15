@@ -50,7 +50,7 @@ Exit: editors rate merge and claim quality on a labelled sample, and it beats th
 - [x] Firebase auth and Firestore prefs (optional sign-in; guests keep prefs in the browser; email/password via Identity Platform, prefs in `users/{uid}`)
 
 ## Phase 5: Live and Ask (v2)
-- [x] SSE stream (`/v1/stories/{id}/stream`, polls the graph; Pub/Sub + Redis is the upgrade, see D23) and live view
+- [x] SSE stream (`/v1/stories/{id}/stream`, polls the graph; Pub/Sub + Redis is the upgrade, see D24) and live view
 - [x] Ask: fixed retrieval, one model call, citation and no-verdict post-check, evidence panel
 - [x] World desk with Globe, person page
 - [ ] Ask is a single retrieval step, not a multi-tool agent; add tools if answers need more
