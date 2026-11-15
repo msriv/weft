@@ -309,3 +309,81 @@ def _extra_indexes_apply(env: Env) -> int:
 
 # Indexes `store.init` no longer creates. Dropping one loses no data; it only needs a rebuild.
 register(Rule("stale_indexes", 1, _extra_indexes_match, _extra_indexes_apply))
+
+# --- GCS (#154) --------------------------------------------------------------------------------
+
+
+def _stale_state(env: Env) -> list[str]:
+    """State blobs of a feed or portal that is gone or dead. The poller rewrites a feed's blob on
+    every poll; the crawler only when a page changes, so it gets a longer window. Losing one only
+    costs one unconditional fetch."""
+    assert env.snapshots, "orphan_state needs the snapshots bucket"
+    out = []
+    for prefix, days in env.conf["prefix_days"].items():
+        cutoff = env.now - timedelta(days=days)
+        out += [b.name for b in env.snapshots.list(prefix) if b.updated < cutoff]
+    return sorted(out)
+
+
+def _state_match(env: Env) -> Match:
+    found = _stale_state(env)
+    return Match(len(found), None, found)
+
+
+def _state_apply(env: Env) -> int:
+    assert env.snapshots
+    found = _stale_state(env)
+    for name in found:
+        env.snapshots.delete(name)
+    return len(found)
+
+
+register(Rule("orphan_state", 1, _state_match, _state_apply))
+
+_DAY = re.compile(r"^(\d{4}-\d{2}-\d{2})/")
+
+
+def _partial_snapshots(env: Env) -> list[str]:
+    """Dated folders older than 2 days with no `_SUCCESS` (written last by the export)."""
+    assert env.snapshots, "partial_snapshots needs the snapshots bucket"
+    days: dict[str, bool] = {}
+    for b in env.snapshots.list():
+        if m := _DAY.match(b.name):
+            days[m.group(1)] = days.get(m.group(1), False) or b.name.endswith("/_SUCCESS")
+    cutoff = (env.now - timedelta(days=2)).date().isoformat()
+    return sorted(d for d, ok in days.items() if not ok and d < cutoff)
+
+
+def _partial_match(env: Env) -> Match:
+    found = _partial_snapshots(env)
+    return Match(len(found), None, found)
+
+
+# Report only: a half-written day must be looked at, not tidied. Nothing deletes a snapshot.
+register(Rule("partial_snapshots", 1, _partial_match, lambda env: 0))
+
+
+def _raw_without_row(env: Env) -> list[str]:
+    """Raw objects older than an hour with no `raw_items` row: the fetcher failed between the
+    upload and the insert. The bucket lifecycle removes them anyway. Looks at the oldest
+    `limit` objects per run."""
+    assert env.raw and env.warehouse, "raw_without_row needs the raw bucket and the warehouse"
+    cutoff = env.now - timedelta(hours=1)
+    blobs = [b for b in env.raw.list(limit=env.conf["limit"]) if b.updated < cutoff]
+    ids = sorted({b.name.split(".")[0] for b in blobs})
+    have: set[str] = set()
+    for i in range(0, len(ids), 5000):
+        rows = env.warehouse.query(
+            "SELECT DISTINCT item_id FROM `{ds}.raw_items` WHERE item_id IN UNNEST(@ids)",
+            {"ids": ids[i : i + 5000]},
+        )
+        have |= {r["item_id"] for r in rows}
+    return [i for i in ids if i not in have]
+
+
+def _raw_match(env: Env) -> Match:
+    found = _raw_without_row(env)
+    return Match(len(found), None, found)
+
+
+register(Rule("raw_without_row", 1, _raw_match, lambda env: 0))

@@ -9,9 +9,9 @@ export default function AnomalyFeedback({ id }: { id: string }) {
   const [done, setDone] = useState("");
   useEffect(() => { setToken(sessionStorage.getItem("weft:admin") ?? ""); }, []);
   if (!token) return null;
-  if (done) return <span className="muted" style={{ fontSize: 12 }}>Labelled {done.replace("_", " ")}</span>;
+  if (done) return <span className="muted fs12">Labelled {done.replace("_", " ")}</span>;
   return (
-    <span className="row" style={{ gap: 6, fontSize: 12 }} aria-label="Label this anomaly">
+    <span className="row gap6 fs12" aria-label="Label this anomaly">
       {LABELS.map(([v, l]) => (
         <button key={v} className="pill" onClick={async () => {
           const r = await fetch(`/api/admin/anomalies/${id}/feedback`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: v }) });

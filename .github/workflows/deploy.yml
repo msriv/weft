@@ -1,0 +1,106 @@
+name: deploy
+# Merge to main: build every image tagged with the commit, terraform apply with those tags,
+# smoke-check the site, and put the previous tags back if the check fails. No keys: the job
+# authenticates with Workload Identity Federation (infra/bootstrap).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/weft
+
+jobs:
+  build:
+    if: vars.WIF_PROVIDER != ''  # skipped until the one-time bootstrap is done (infra/README.md)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: poller, file: services/poller/Dockerfile, context: . }
+          - { name: fetcher, file: services/fetcher/Dockerfile, context: . }
+          - { name: crawler, file: services/crawler/Dockerfile, context: . }
+          - { name: discovery, file: services/discovery/Dockerfile, context: . }
+          - { name: stream_worker, file: services/stream_worker/Dockerfile, context: . }
+          - { name: api, file: services/api/Dockerfile, context: . }
+          - { name: nightly, file: pipeline/Dockerfile, context: . }
+          - { name: web, file: web/Dockerfile, context: web }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - id: auth
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA }}
+          token_format: access_token
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+  apply:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production  # add required reviewers to this environment to gate deploys
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_wrapper: false
+      - name: Write variables
+        run: |
+          printf '%s\n' '${{ vars.TFVARS }}' > infra/terraform.tfvars
+          for n in poller fetcher crawler discovery stream_worker api nightly web; do
+            echo "${n}_image = \"$REGISTRY/$n:${{ github.sha }}\""
+          done > infra/images.auto.tfvars
+          gsutil cp "gs://${{ vars.TF_STATE_BUCKET }}/deploy/images.auto.tfvars" infra/previous.tfvars || true
+      - run: terraform -chdir=infra init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+      - run: terraform -chdir=infra apply -input=false -auto-approve
+      - id: url
+        run: echo "web=$(terraform -chdir=infra output -raw web_url)" >> "$GITHUB_OUTPUT"
+      - name: Smoke check
+        id: smoke
+        run: |
+          set -e
+          base=${{ steps.url.outputs.web }}
+          for path in / /api/openapi.json /api/v1/stories; do
+            for try in 1 2 3 4 5 6; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base$path" || true)
+              [ "$code" = 200 ] && break
+              sleep 20
+            done
+            echo "$path -> $code"
+            [ "$code" = 200 ]
+          done
+      - name: Remember these tags
+        if: success()
+        run: gsutil cp infra/images.auto.tfvars "gs://${{ vars.TF_STATE_BUCKET }}/deploy/images.auto.tfvars"
+      - name: Roll back
+        if: failure() && steps.smoke.outcome == 'failure' && hashFiles('infra/previous.tfvars') != ''
+        run: |
+          cp infra/previous.tfvars infra/images.auto.tfvars
+          terraform -chdir=infra apply -input=false -auto-approve

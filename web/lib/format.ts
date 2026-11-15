@@ -5,13 +5,17 @@ countries.registerLocale(en);
 
 /** Perspective code (usually an ISO 3166 country) to a readable name. */
 export function perspectiveName(code: string): string {
-  if (code === "unattributed") return "Country not known";
+  if (code === "unattributed") return "No country recorded";
   return countries.getName(code, "en") ?? code;
 }
 
 export function day(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
+
+/** "2026-11-08" -> "8 Nov". Fixed to UTC so server and browser agree. */
+export const shortDay = (iso: string): string =>
+  iso ? new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
 
 export function ago(iso: string | null, now = Date.now()): string {
   if (!iso) return "";
