@@ -11,10 +11,12 @@ from google.cloud import pubsub_v1  # type: ignore[attr-defined]
 from services.stream_worker.worker import Deps, process, process_document
 from weft_core import config, graph, store
 from weft_core.nlp import default_nlp
+from weft_core.probes import add_probes
 
 
 def create_app(deps: Deps) -> FastAPI:
     app = FastAPI()
+    add_probes(app, deps.db)
 
     @app.post("/")
     async def push(request: Request) -> Response:

@@ -20,6 +20,7 @@ from weft_core import store
 from weft_core import store as store_mod
 from weft_core.gcp import bigquery_client
 from weft_core.polite import PoliteClient
+from weft_core.probes import add_probes
 
 
 class GcpStore:
@@ -64,6 +65,7 @@ def create_app(
     queue_for: Callable[[str], refetch_mod.Enqueue] | None = None,
 ) -> FastAPI:
     app = FastAPI()
+    add_probes(app, db)
 
     @app.post("/")
     async def push(request: Request) -> Response:

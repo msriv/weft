@@ -47,9 +47,11 @@ module "fetcher" {
 }
 
 module "monitoring" {
-  source      = "./modules/monitoring"
-  project_id  = var.project_id
-  alert_email = var.alert_email
+  source             = "./modules/monitoring"
+  project_id         = var.project_id
+  alert_email        = var.alert_email
+  billing_account_id = var.billing_account_id
+  graph_node_limit   = var.graph_node_limit
 }
 
 module "crawler" {

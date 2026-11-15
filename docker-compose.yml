@@ -38,9 +38,9 @@ x-deps: &deps
   neo4j: { condition: service_healthy }
   init: { condition: service_completed_successfully }
 
-# Ready = the FastAPI app answers (stream-worker loads its models before it does).
+# Ready = /readyz answers (the app is up and Neo4j is reachable; stream-worker loads its models first).
 x-ready: &ready
-  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/openapi.json')"]
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/readyz')"]
   interval: 10s
   timeout: 5s
   retries: 6

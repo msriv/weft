@@ -32,6 +32,7 @@ from weft_core import (
     store,
 )
 from weft_core.models import ModelRefused
+from weft_core.probes import add_probes
 
 STREAM_POLL_SECONDS = 5
 
@@ -123,6 +124,7 @@ def create_app(
     project: str = "",
 ) -> FastAPI:
     app = FastAPI(title="Weft API")
+    add_probes(app, db)
 
     @app.exception_handler(ModelRefused)
     def _model_refused(_: Request, exc: ModelRefused) -> JSONResponse:
