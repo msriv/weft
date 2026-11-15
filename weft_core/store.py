@@ -339,6 +339,7 @@ NODES: dict[str, dict[str, Any]] = {
         "perspectives": "[]",
     },
     "SeriesPoint": {"series_id": None, "day": None, "value": None, "source": None},
+    "MinhashBand": {"report_id": None, "band": None, "at": None},  # LSH index of Report.minhash
     "ModelSpend": {
         "key": None,
         "day": None,
@@ -385,7 +386,16 @@ UNIQUE = {
     "Lock": "key",
     "Seen": "key",
 }
-INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
+INDEXED = [
+    "band",
+    "id",
+    "event_id",
+    "story_id",
+    "report_id",
+    "source_id",
+    "document_id",
+    "actor_id",
+]
 
 
 class Db(Protocol):

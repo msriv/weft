@@ -4,7 +4,6 @@ The admin toggle is the only human gate (D15): a story is invisible here until i
 is set. `GET /stories` and the /admin/stories routes predate /v1 and are kept.
 """
 
-import asyncio
 import hmac
 import json
 import os
@@ -15,10 +14,11 @@ from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from services.api.limits import Limiter, Streams, client_key
+from services.api.streams import ChangeHub
 from weft_core import (
     accounts,
     config,
@@ -33,9 +33,12 @@ from weft_core import (
     review,
     store,
 )
+from weft_core.cache import TtlCache
 from weft_core.models import BudgetExceeded, ModelRefused
 
 STREAM_POLL_SECONDS = 5
+PUBLIC_TTL_SECONDS = 30
+REPLAY_TTL_SECONDS = 600
 
 
 class Visibility(BaseModel):
@@ -163,6 +166,40 @@ def create_app(
                 )
 
         return dep
+
+    hub = ChangeHub(lambda sid, since: readmodel.changes(db, sid, since), STREAM_POLL_SECONDS)
+    public = TtlCache(PUBLIC_TTL_SECONDS)
+
+    @app.middleware("http")
+    async def public_cache(request: Request, call_next: Callable[[Request], Any]) -> Any:
+        """Public GET responses are reused for 30 s (a replay `at=` for 10 min: the past does not
+        change). Any successful write clears the cache of this instance, so an admin publish or
+        unpublish shows at once here; other instances catch up within the TTL."""
+        path = request.url.path
+        if request.method != "GET":
+            resp = await call_next(request)
+            if resp.status_code < 400:
+                public.clear()
+            return resp
+        if (
+            request.headers.get("authorization")
+            or not path.startswith("/v1/")
+            or path.startswith(("/v1/me", "/v1/unsubscribe"))
+            or path.endswith("/stream")
+        ):
+            return await call_next(request)
+        key = (path, request.url.query)
+        if (hit := public.peek(key)) is not None:
+            status, body, ctype = hit
+            return Response(body, status, {"content-type": ctype, "x-cache": "hit"})
+        resp = await call_next(request)
+        body = b"".join([c async for c in resp.body_iterator])
+        ctype = resp.headers.get("content-type", "application/json")
+        if resp.status_code == 200:
+            ttl = REPLAY_TTL_SECONDS if "at=" in request.url.query else PUBLIC_TTL_SECONDS
+            public.put(key, (resp.status_code, body, ctype), ttl)
+        headers = {"content-type": ctype, "cache-control": f"public, max-age={PUBLIC_TTL_SECONDS}"}
+        return Response(body, resp.status_code, headers)
 
     @app.exception_handler(ModelRefused)
     def _model_refused(_: Request, exc: ModelRefused) -> JSONResponse:
@@ -311,13 +348,13 @@ def create_app(
 
         async def events() -> AsyncIterator[str]:
             try:
-                cursor = datetime.now(UTC).isoformat()
-                while not await request.is_disconnected():
-                    for m in await asyncio.to_thread(readmodel.changes, db, story_id, cursor):
-                        cursor = max(cursor, m["at"])
+                async for m in hub.subscribe(story_id):  # one poll per story, shared by all readers
+                    if await request.is_disconnected():
+                        break
+                    if m is None:
+                        yield ": keepalive\n\n"
+                    else:
                         yield f"event: {m['type']}\ndata: {json.dumps(m['data'])}\n\n"
-                    yield ": keepalive\n\n"
-                    await asyncio.sleep(STREAM_POLL_SECONDS)
             finally:
                 streams.release(key)
 
