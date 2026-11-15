@@ -23,23 +23,23 @@ export default async function Stories({ searchParams }: { searchParams: Promise<
     <>
       <Kicker>{all?.length ?? 0} stories tracked</Kicker>
       <h1>All stories</h1>
-      <div className="row" style={{ margin: "16px 0" }}>
+      <div className="row my16">
         <span className="kicker">Sort</span>
         {[["recent", "Recent"], ["anomalies", "Most anomalies"], ["reports", "Most reports"]].map(([k, l]) => (
-          <Link key={k} className={`pill${(q.sort ?? "recent") === k ? " on" : ""}`} href={link({ sort: k })}>{l}</Link>
+          <Link key={k} scroll={false} className={`pill${(q.sort ?? "recent") === k ? " on" : ""}`} href={link({ sort: k })}>{l}</Link>
         ))}
       </div>
       <div className="row">
         <span className="kicker">Region</span>
-        <Link className={`pill${!q.region ? " on" : ""}`} href={link({ region: "" })}>Everywhere</Link>
-        {regions.map((r) => <Link key={r} className={`pill${q.region === r ? " on" : ""}`} href={link({ region: r })}>{perspectiveName(r)}</Link>)}
+        <Link scroll={false} className={`pill${!q.region ? " on" : ""}`} href={link({ region: "" })}>Everywhere</Link>
+        {regions.map((r) => <Link key={r} scroll={false} className={`pill${q.region === r ? " on" : ""}`} href={link({ region: r })}>{perspectiveName(r)}</Link>)}
       </div>
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="row mt8">
         <span className="kicker">Topic</span>
-        <Link className={`pill${!q.topic ? " on" : ""}`} href={link({ topic: "" })}>All</Link>
-        {topics.map(([beat, title]) => <Link key={beat} className={`pill${q.topic === beat ? " on" : ""}`} href={link({ topic: beat })}>{title}</Link>)}
+        <Link scroll={false} className={`pill${!q.topic ? " on" : ""}`} href={link({ topic: "" })}>All</Link>
+        {topics.map(([beat, title]) => <Link key={beat} scroll={false} className={`pill${q.topic === beat ? " on" : ""}`} href={link({ topic: beat })}>{title}</Link>)}
       </div>
-      <div style={{ marginTop: 16 }}>
+      <div className="mt16">
         {shown?.length ? shown.map((s) => <StoryRow key={s.id} s={s} />) : <Empty>{all?.length ? "No public stories match these filters." : "No public stories yet. Stories appear here once collected and published."}</Empty>}
       </div>
     </>

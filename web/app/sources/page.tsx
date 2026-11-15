@@ -12,7 +12,7 @@ export default async function Sources() {
       <h1>Sources</h1>
       <p>Sorted by weight, which only changes the order. No report is hidden because of it.</p>
       {s.length ? s.map((x) => (
-        <Link href={`/sources/${x.id}`} className="card" style={{ display: "block" }} key={x.id}>
+        <Link href={`/sources/${x.id}`} className="card block" key={x.id}>
           <div className="row"><h3>{x.name}</h3><span className="pill">{x.type}</span><span className="pill">{perspectiveName(x.perspective)}</span><span className="pill">{STATE_LABEL[x.state_run]}</span></div>
           <div className="muted">{x.weight_insufficient ? "Not enough reports to weigh yet" : `Weight ${x.weight?.toFixed(2)}`}{x.healthy ? "" : " · feed currently unhealthy"}</div>
         </Link>

@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import { storyTitle } from "@/lib/crumbs";
 import { AnomalyDetail, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
 import { perspectiveName } from "@/lib/format";
@@ -12,7 +14,7 @@ function Evidence({ links }: { links: Link[] }) {
       {links.map((l, i) => (
         <li key={i}>
           {l.url ? <a href={l.url} rel="noopener noreferrer">{l.label} ↗</a> : <a href={`/nodes/${l.id}`}>{l.label}</a>}
-          {l.quote && <blockquote style={{ margin: "4px 0" }}>{l.quote}</blockquote>}
+          {l.quote && <blockquote className="my4">{l.quote}</blockquote>}
         </li>
       ))}
     </ul>
@@ -29,8 +31,12 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
   const carrying = ids("carrying");
   const without = ids("perspective_reports");
   const omission = x.rule === "omission" && (carrying.size > 0 || without.size > 0);
+  const sid = typeof x.story_id === "string" ? x.story_id : null;
+  const eid = typeof x.event_id === "string" ? x.event_id : null;
+  const title = sid ? await storyTitle(sid) : null;
   return (
     <>
+      {sid && title && <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: title, href: `/s/${sid}` }, ...(eid ? [{ label: "Event", href: `/s/${sid}/e/${eid}` }] : []), { label: "Evidence" }]} />}
       <Kicker>{n.kind.replace("_", " ")}</Kicker>
       <h1>{String(x.title ?? x.summary ?? x.label ?? x.text ?? x.id)}</h1>
       {n.kind === "anomaly" && (
@@ -55,13 +61,13 @@ export default async function NodePage({ params }: { params: Promise<{ id: strin
           )}
           <details>
             <summary className="muted">Thresholds the rule used</summary>
-            <pre className="card" style={{ overflow: "auto", fontSize: 12 }}>{JSON.stringify(x.inputs ?? {}, null, 2)}</pre>
+            <pre className="card oauto fs12">{JSON.stringify(x.inputs ?? {}, null, 2)}</pre>
           </details>
         </>
       )}
       {n.kind !== "anomaly" && (
         <>
-          {x.detail != null && <pre className="card" style={{ overflow: "auto", fontSize: 12 }}>{JSON.stringify(x.detail, null, 2)}</pre>}
+          {x.detail != null && <pre className="card oauto fs12">{JSON.stringify(x.detail, null, 2)}</pre>}
           <Evidence links={n.links} />
         </>
       )}
