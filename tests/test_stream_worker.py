@@ -349,6 +349,85 @@ def test_one_report_costs_a_bounded_number_of_queries() -> None:
     assert len(runs) < 40  # 30 entities would be 30+ queries one by one
 
 
+def test_one_message_among_2000_stored_reports_reads_few_rows() -> None:
+    import random
+
+    db, d, _ = setup()
+    process(msg("seed", "a-il", T, L, "2026-11-06T00:00:00+00:00"), d)  # makes the story
+    rng = random.Random(1)
+    rows = [
+        {
+            "id": f"old{i}",
+            "story_id": "iran-israel-war",
+            "event_id": f"ev{i % 40}",
+            "published_at": "2026-11-06T00:30:00+00:00",
+            "valid_from": "x",
+            "minhash": json.dumps([rng.randrange(2**61) for _ in range(64)]),
+            "embedding": json.dumps([rng.random() for _ in range(64)]),
+        }
+        for i in range(2000)
+    ]
+    db.execute("UNWIND ? AS r CREATE (n:Report) SET n = r", (rows,))
+    counted = {"rows": 0, "queries": 0}
+    inner = db.execute
+
+    def counting(q: str, a: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        out = inner(q, a)
+        counted["queries"] += 1
+        if ":Report" in q or "(n:Report" in q:
+            counted["rows"] += len(out)
+        return out
+
+    db.execute = counting  # type: ignore[method-assign,assignment]
+    process(msg("new", "b-ir", T + " again", L, "2026-11-06T01:00:00+00:00"), d)
+    assert counted["rows"] < 50 and counted["queries"] < 60
+
+
+def test_a_copy_at_085_jaccard_is_found_through_the_band_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from weft_core.textutil import bands
+
+    db, d, _ = setup()
+    sig = minhash(shingles(" ".join(f"word{i}" for i in range(80))))
+    other = [v + 1 if i % 7 == 0 else v for i, v in enumerate(sig)]  # 54 of 64 agree: 0.84
+    assert 0.84 <= minhash_similarity(sig, other) < 0.86
+    db.execute(
+        "CREATE (:Report {id: 'stored', valid_from: 'x', published_at: ?, minhash: ?})",
+        ("2026-11-06T00:30:00+00:00", json.dumps(other)),
+    )
+    db.execute(
+        "UNWIND ? AS k CREATE (:MinhashBand {report_id: 'stored', band: k, at: ?})",
+        (bands(other), "2026-11-06T00:30:00+00:00"),
+    )
+    monkeypatch.setattr("services.stream_worker.worker.minhash", lambda _: sig)
+    process(msg("c2", "b-ir", T, L, "2026-11-06T01:00:00+00:00"), d)
+    (row,) = db.execute("MATCH (c:Copy {report_id: 'c2', copy_of: 'stored'}) RETURN c.jaccard AS j")
+    assert 0.84 <= row["j"] < 0.86
+
+
+def test_a_source_registered_after_start_is_seen_without_waiting_for_the_ttl() -> None:
+    db, d, _ = setup()
+    process(msg("s1", "a-il", T, L, "2026-11-06T01:00:00+00:00"), d)  # warms the cache
+    assert process(msg("s2", "d-org", T, L, "2026-11-06T01:10:00+00:00"), d) == "unknown_source"
+    store.register_source(
+        db, domain="d.org", name="d", homepage="https://d.org", feeds=["f"], via="t"
+    )
+    assert process(msg("s3", "d-org", T, L, "2026-11-06T01:20:00+00:00"), d) == "attached"
+
+
+def test_cache_expires_after_the_ttl() -> None:
+    from weft_core.cache import TtlCache
+
+    now = [0.0]
+    c = TtlCache(60, clock=lambda: now[0])
+    n = [0]
+    load = lambda: n.__setitem__(0, n[0] + 1) or n[0]
+    assert (c.get("k", load), c.get("k", load)) == (1, 1)
+    now[0] = 61
+    assert c.get("k", load) == 2
+
+
 def test_push_unknown_source_is_retried_not_dropped() -> None:
     _, d, sent = setup()
     c = TestClient(create_app(d))
