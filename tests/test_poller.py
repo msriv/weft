@@ -187,7 +187,7 @@ def test_prefilter_publishes_only_entries_that_match_a_beat() -> None:
     p, out = beat_poller()
     p.poll_feed(SRC, "https://x.test/rss")
     assert [m["url"] for m in out] == ["https://x.test/0", "https://x.test/2", "https://x.test/8"]
-    assert p.stats["x"] == {"published": 3, "skipped": 7, "sampled": 0}
+    assert p.stats["x"] == {"published": 3, "skipped": 7, "sampled": 0, "foreign": 0}
 
 
 def test_prefilter_sample_still_flows_and_is_counted() -> None:
@@ -223,3 +223,28 @@ def test_replay_prefilter_check() -> None:
         {"id": "b", "title": "Talks resume", "summary": "no names"},
     ]
     assert prefilter_misses(rows, BEATS) == ["b"]
+
+
+def test_link_to_another_registered_source_is_reported_under_that_source() -> None:
+    a = {**SRC, "id": "a", "domain": "a.test"}
+    b = {**SRC, "id": "b", "domain": "b.test"}
+    feed = (
+        b'<rss version="2.0"><channel><item><title>x</title><link>https://a.test/1</link></item>'
+        b"<item><title>y</title><link>https://news.b.test/2</link></item>"
+        b"<item><title>z</title><link>https://www.a.test/3</link></item>"
+        b"<item><title>w</title><link>https://unknown.example/4</link></item></channel></rss>"
+    )
+    out: list[dict[str, Any]] = []
+    foreign: list[str] = []
+    polite = PoliteClient(
+        httpx.Client(transport=httpx.MockTransport(site(httpx.Response(200, content=feed)))),
+        sleep=lambda s: None,
+    )
+    p = Poller(polite, Mem(), out.append, on_foreign=lambda d, u: foreign.append(d))
+    p.run([{**a, "feeds": ["https://a.test/rss"]}, b])
+    assert [(m["url"], m["source_id"]) for m in out] == [
+        ("https://a.test/1", "a"),
+        ("https://news.b.test/2", "b"),
+        ("https://www.a.test/3", "a"),
+    ]
+    assert foreign == ["unknown.example"] and p.stats["a"]["foreign"] == 1
