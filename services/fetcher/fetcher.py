@@ -18,11 +18,12 @@ from typing import Any, Protocol
 import pdfplumber
 import trafilatura
 
-from weft_core import domains, portals, quality, rules
-from weft_core.polite import PoliteClient
+from weft_core import config, domains, portals, quality, rules
+from weft_core.polite import PoliteClient, Refused
 from weft_core.urls import normalize_url
 
 LEDE_CHARS = 500
+MAX_PDF_PAGES = config.pipeline()["fetch"]["max_pdf_pages"]  # shortcut: no time limit on extraction
 MAX_OCR_PAGES = 30  # shortcut: scans longer than this are cut, raise when a portal needs it
 
 
@@ -65,7 +66,7 @@ def seen_keys(url: str | None, text_hash: str) -> list[str]:
 
 @dataclass
 class Result:
-    # stored | duplicate | skipped | blocked | extract_failed | foreign | thin | stub | title | boilerplate
+    # refused | too_large | unsupported | stored | duplicate | skipped | blocked | extract_failed | foreign | thin | stub | title | boilerplate
     status: str
     item_id: str | None = None
     message: dict[str, Any] | None = None  # `items-extracted` payload, set when stored
@@ -81,7 +82,10 @@ def fetch_item(
 ) -> Result:
     if store.seen(msg["url"], ""):
         return Result("duplicate")  # feeds repeat entries every poll: never re-download them
-    resp = http.get(msg["url"], interval(source), {})
+    try:
+        resp = http.get(msg["url"], interval(source), {})
+    except Refused as exc:  # permanent: the log says why, and Pub/Sub must not retry
+        return Result(exc.reason if exc.reason in ("too_large", "unsupported") else "refused")
     if resp is None:
         if not http.allowed(msg["url"]):
             return Result("blocked")  # robots.txt: permanent, so the caller must not retry
@@ -106,7 +110,7 @@ def _extract(content: bytes, url: str, content_type: str) -> tuple[dict[str, Any
     """Return (metadata, file extension). PDFs via pdfplumber, everything else via trafilatura."""
     if "pdf" in content_type or url.lower().endswith(".pdf"):
         with pdfplumber.open(io.BytesIO(content)) as pdf:
-            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+            text = "\n".join(page.extract_text() or "" for page in pdf.pages[:MAX_PDF_PAGES])
             if not text.strip():  # scanned PDF: no text layer, so OCR the page images
                 text = "\n".join(ocr_page(page) for page in pdf.pages[:MAX_OCR_PAGES])
         return {"text": text, "title": (pdf.metadata or {}).get("Title")}, "pdf"

@@ -18,6 +18,14 @@ prefilter:
   enabled: true
   sample_rate: 0.02
 
+# Fetching untrusted URLs (#164).
+fetch:
+  max_html_bytes: 10000000         # pages, feeds, sitemaps, robots.txt
+  max_pdf_bytes: 50000000
+  max_redirects: 5
+  deadline_seconds: 60             # total per request, not per read
+  max_pdf_pages: 100               # pages read for text (OCR has its own cap)
+
 # Source yield, cadence, dormancy and ceilings (#171).
 sources:
   window_days: 14
