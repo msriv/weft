@@ -72,3 +72,54 @@ jobs:
       - run: terraform -chdir=infra fmt -check -recursive
       - run: terraform -chdir=infra init -backend=false
       - run: terraform -chdir=infra validate
+
+  # A pull request that breaks any Dockerfile fails here, not at deploy time.
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: poller, file: services/poller/Dockerfile, context: . }
+          - { name: fetcher, file: services/fetcher/Dockerfile, context: . }
+          - { name: crawler, file: services/crawler/Dockerfile, context: . }
+          - { name: discovery, file: services/discovery/Dockerfile, context: . }
+          - { name: stream_worker, file: services/stream_worker/Dockerfile, context: . }
+          - { name: api, file: services/api/Dockerfile, context: . }
+          - { name: nightly, file: pipeline/Dockerfile, context: . }
+          - { name: web, file: web/Dockerfile, context: web }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+  # Read-only plan against the real state, for pull requests from this repository.
+  plan:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.WIF_PROVIDER != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SA }}
+      - uses: hashicorp/setup-terraform@v3
+      - name: Plan
+        run: |
+          printf '%s\n' '${{ vars.TFVARS }}' > infra/terraform.tfvars
+          reg="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/weft"
+          for n in poller fetcher crawler discovery stream_worker api nightly web; do
+            echo "${n}_image = \"$reg/$n:plan\""
+          done > infra/images.auto.tfvars
+          terraform -chdir=infra init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+          terraform -chdir=infra plan -input=false -lock=false -no-color | tee plan.txt
+          grep -E '^(Plan:|No changes)' plan.txt >> "$GITHUB_STEP_SUMMARY" || true

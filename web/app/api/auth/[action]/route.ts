@@ -7,8 +7,27 @@ const URLS: Record<string, [host: string, path: string]> = {
   refresh: ["securetoken.googleapis.com", "/v1/token"],
 };
 
+// shortcut: per-instance memory (max 5 instances), upgrade to a shared counter if abused (#158).
+const LIMIT = { perMinute: 10, perDay: 200 };
+const hits = new Map<string, number[]>();
+function wait(ip: string): number | null {
+  const now = Date.now();
+  const q = (hits.get(ip) ?? []).filter((t) => now - t < 86_400_000);
+  const recent = q.filter((t) => now - t < 60_000);
+  if (recent.length >= LIMIT.perMinute) return Math.ceil((60_000 - (now - recent[0])) / 1000);
+  if (q.length >= LIMIT.perDay) return Math.ceil((86_400_000 - (now - q[0])) / 1000);
+  q.push(now);
+  hits.set(ip, q);
+  if (hits.size > 20_000) hits.delete(hits.keys().next().value as string);
+  return null;
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ action: string }> }) {
   const { action } = await params;
+  // Cloud Run appends the real peer last in x-forwarded-for
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",").at(-1)?.trim() || "local";
+  const w = wait(ip);
+  if (w !== null) return Response.json({ error: "Too many attempts. Try again later." }, { status: 429, headers: { "retry-after": String(w) } });
   const target = URLS[action];
   if (!target) return new Response("not found", { status: 404 });
   const [host, path] = target;
