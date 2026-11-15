@@ -45,17 +45,28 @@ for path in topics.values():
         pub.create_topic(name=path)
     except AlreadyExists:
         pass
+# Same limit as infra/modules/{fetcher,run_service}; tests/test_local_parity.py checks it.
+MAX_DELIVERY_ATTEMPTS = 10
 for name, topic, url in (
     ("fetcher", "items-new", "http://fetcher:8080/"),
     ("stream-worker", "items-extracted", "http://stream-worker:8080/"),
     ("stream-worker-documents", "documents-new", "http://stream-worker:8080/documents"),
 ):
+    dead = pub.topic_path(PROJECT, f"{name}-dead")
+    for path in (dead,):
+        try:
+            pub.create_topic(name=path)
+        except AlreadyExists:
+            pass
     try:
         sub.create_subscription(
             name=sub.subscription_path(PROJECT, name),
             topic=topics[topic],
             push_config=pubsub_v1.types.PushConfig(push_endpoint=url),
             ack_deadline_seconds=120,
+            dead_letter_policy=pubsub_v1.types.DeadLetterPolicy(
+                dead_letter_topic=dead, max_delivery_attempts=MAX_DELIVERY_ATTEMPTS
+            ),
         )
     except AlreadyExists:
         pass
