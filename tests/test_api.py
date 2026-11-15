@@ -1,5 +1,7 @@
 """API tests over a graph built by the real stream worker and nightly stages."""
 
+from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -402,3 +404,89 @@ def test_open_questions_come_from_rules_and_leave_when_answered() -> None:
     ctx.db.execute("MATCH (n:Conflict) DETACH DELETE n")
     later = questions.open_questions(ctx.db, "iran-israel-war", datetime(2026, 11, 6, tzinfo=UTC))
     assert not any(q["kind"] == "conflict" for q in later)
+
+
+def test_story_graph_reads_only_the_window_and_no_vectors() -> None:
+    from weft_core import readmodel
+
+    c, ctx = build()
+    c.put("/admin/stories/iran-israel-war/public", json={"public": True}, headers=H)
+    rows = [
+        {
+            "id": f"bulk{i}",
+            "story_id": "iran-israel-war",
+            "event_id": "evbulk",
+            "perspective": "IL",
+            "source_id": "a-il",
+            "published_at": f"2026-09-{1 + i % 28:02d}T00:00:00+00:00",  # ~60 days before the story
+            "valid_from": "x",
+            "embedding": "[" + ",".join(["0.1"] * 256) + "]",
+            "minhash": "[1,2,3]",
+        }
+        for i in range(3000)
+    ]
+    ctx.db.execute("UNWIND ? AS r CREATE (n:Report) SET n = r", (rows,))
+    seen: list[str] = []
+    inner = ctx.db.execute
+
+    def spy(q: str, a: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        out = inner(q, a)
+        seen.extend(k for r in out for v in r.values() if isinstance(v, dict) for k in v)
+        seen.append(f"#{len(out)}")
+        return out
+
+    ctx.db.execute = spy  # type: ignore[method-assign,assignment]
+    g = readmodel.story_graph(ctx.db, "iran-israel-war")
+    assert g is not None
+    assert "embedding" not in seen and "minhash" not in seen and "centroid" not in seen
+    assert max(int(x[1:]) for x in seen if x.startswith("#")) < 100  # no 3,000-row read
+    assert g["window"]["older"] is True
+
+
+def test_public_get_is_cached_and_a_write_clears_it() -> None:
+    c, ctx = build()
+    c.put("/admin/stories/iran-israel-war/public", json={"public": True}, headers=H)
+    calls = {"n": 0}
+    inner = ctx.db.execute
+
+    def counting(q: str, a: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        calls["n"] += 1
+        return inner(q, a)
+
+    ctx.db.execute = counting  # type: ignore[method-assign,assignment]
+    r1 = c.get("/v1/stories/iran-israel-war")
+    first = calls["n"]
+    r2 = c.get("/v1/stories/iran-israel-war")
+    assert r1.status_code == r2.status_code == 200 and r1.json() == r2.json()
+    assert calls["n"] == first and r2.headers["x-cache"] == "hit"
+    assert "max-age=30" in r1.headers["cache-control"]
+    # unpublishing clears it: the next request is 404, not stale public data
+    c.put("/admin/stories/iran-israel-war/public", json={"public": False}, headers=H)
+    assert c.get("/v1/stories/iran-israel-war").status_code == 404
+    # requests with credentials are never served from the shared cache
+    assert "x-cache" not in c.get("/v1/stories/iran-israel-war", headers=H).headers
+
+
+def test_ten_streams_on_one_story_make_one_change_query_per_interval() -> None:
+    import asyncio
+
+    from services.api.streams import ChangeHub
+
+    calls: list[str] = []
+
+    def changes(story: str, since: str) -> list[dict[str, Any]]:
+        calls.append(story)
+        return []
+
+    async def run() -> None:
+        hub = ChangeHub(changes, 0.05)
+
+        async def reader() -> None:
+            async for _ in hub.subscribe("s"):
+                return
+
+        await asyncio.gather(*(reader() for _ in range(10)))
+        await asyncio.sleep(0.12)
+
+    asyncio.run(run())
+    assert 1 <= len(calls) <= 3  # not 10 per interval

@@ -58,6 +58,14 @@ def _dec(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+HEAVY = {"embedding", "minhash", "centroid"}  # vectors: about 20 KB a row, read only by writers
+
+
+def light(table: str) -> list[str]:
+    """Every declared property of `table` except the vectors, for `select(props=...)`."""
+    return [p for p in store.NODES[LABELS[table]] if p not in HEAVY]
+
+
 def put(db: Db, table: str, row: dict[str, Any], at: str | None = None) -> None:
     """Close the current version of row['id'] and open a new one, in one query, so a reader never
     sees an id with no current version."""
@@ -84,11 +92,14 @@ def select(
     args: tuple[Any, ...] = (),
     at: str | None = None,
     tail: str = "",
+    props: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Versioned nodes valid at `at`. `where` and `tail` are Cypher over `n`."""
+    """Versioned nodes valid at `at`. `where` and `tail` are Cypher over `n`. `props` limits
+    what is read: hot paths leave out `embedding`, `centroid` and `minhash` (about 20 KB a row)."""
     clause, cargs = asof(at)
     label = LABELS[table]
-    q = f"MATCH (n:{label}) WHERE {clause} AND ({where}) RETURN n {tail}"
+    ret = "n {" + ", ".join(f".{p}" for p in props) + "} AS n" if props else "n"
+    q = f"MATCH (n:{label}) WHERE {clause} AND ({where}) RETURN {ret} {tail}"
     return [_dec(r) for r in store.nodes(db, label, q, cargs + args)]
 
 
@@ -97,8 +108,10 @@ def get(db: Db, table: str, id: str, at: str | None = None) -> dict[str, Any] | 
     return rows[0] if rows else None
 
 
-def reports_of_event(db: Db, event_id: str, at: str | None = None) -> list[dict[str, Any]]:
-    return select(db, "reports", "n.event_id=?", (event_id,), at, "ORDER BY n.published_at")
+def reports_of_event(
+    db: Db, event_id: str, at: str | None = None, props: list[str] | None = None
+) -> list[dict[str, Any]]:
+    return select(db, "reports", "n.event_id=?", (event_id,), at, "ORDER BY n.published_at", props)
 
 
 def open_events(db: Db, story_id: str, since: str) -> list[dict[str, Any]]:

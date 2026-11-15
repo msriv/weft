@@ -5,6 +5,8 @@ import DirectionsLink from "@/components/DirectionsLink";
 import { IBM_Plex_Mono, Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
+// Rendered per request: the build has no API to read. api() still reuses responses for 30 s.
+export const dynamic = "force-dynamic";
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", variable: "--font-serif", display: "swap" });
 const sans = Inter({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-sans", display: "swap" });
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });

@@ -7,6 +7,9 @@ stream:
   attach_threshold: 0.55         # score = w_cos*cos + w_ent*entity_jaccard + w_time*time_proximity
   weights: {cosine: 0.60, entities: 0.25, time: 0.15}
   time_decay_hours: 24           # from the event's last report (#104)
+  member_events: 5               # re-score only the best 5 candidates against member reports
+  member_cap: 6                  # newest member embeddings read per event
+  cache_ttl_seconds: 60          # sources, beats, profiles and story IDF held in process
   member_top_k: 3                # also score against the 3 nearest member reports
   veto_min_reports: 20           # entity veto once the story has this many reports in 30 days
   near_dup_jaccard: 0.80
