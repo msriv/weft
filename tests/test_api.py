@@ -423,7 +423,7 @@ def test_story_graph_reads_only_the_window_and_no_vectors() -> None:
         seen.append(f"#{len(out)}")
         return out
 
-    ctx.db.execute = spy  # type: ignore[method-assign]
+    ctx.db.execute = spy  # type: ignore[method-assign,assignment]
     g = readmodel.story_graph(ctx.db, "iran-israel-war")
     assert g is not None
     assert "embedding" not in seen and "minhash" not in seen and "centroid" not in seen
@@ -441,7 +441,7 @@ def test_public_get_is_cached_and_a_write_clears_it() -> None:
         calls["n"] += 1
         return inner(q, a)
 
-    ctx.db.execute = counting  # type: ignore[method-assign]
+    ctx.db.execute = counting  # type: ignore[method-assign,assignment]
     r1 = c.get("/v1/stories/iran-israel-war")
     first = calls["n"]
     r2 = c.get("/v1/stories/iran-israel-war")

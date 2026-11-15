@@ -3,6 +3,9 @@ import Link from "next/link";
 import DirectionsLink from "@/components/DirectionsLink";
 import "./globals.css";
 
+// Rendered per request: the build has no API to read. api() still reuses responses for 30 s.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Weft",
   description: "Who reported what, when, and from where. Weft never claims what is true.",

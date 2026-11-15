@@ -151,7 +151,7 @@ def create_app(
             status, body, ctype = hit
             return Response(body, status, {"content-type": ctype, "x-cache": "hit"})
         resp = await call_next(request)
-        body = b"".join([c async for c in resp.body_iterator])  # type: ignore[attr-defined]
+        body = b"".join([c async for c in resp.body_iterator])
         ctype = resp.headers.get("content-type", "application/json")
         if resp.status_code == 200:
             ttl = REPLAY_TTL_SECONDS if "at=" in request.url.query else PUBLIC_TTL_SECONDS
