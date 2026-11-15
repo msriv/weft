@@ -1,5 +1,10 @@
 variable "project_id" { type = string }
 variable "region" { type = string }
+variable "bot_contact_url" {
+  description = "Public page that says what the bot does and how to opt out; goes in the User-Agent."
+  type        = string
+  default     = ""
+}
 variable "image" {
   description = "Poller container image in Artifact Registry. Build and push it before applying with a real value."
   type        = string
@@ -50,6 +55,10 @@ resource "google_cloud_run_v2_job" "poller" {
         env {
           name  = "PROJECT_ID"
           value = var.project_id
+        }
+        env {
+          name  = "BOT_CONTACT_URL"
+          value = var.bot_contact_url
         }
         env {
           name  = "STATE_BUCKET"
