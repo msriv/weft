@@ -22,7 +22,7 @@ from jsonschema import ValidationError, validate
 
 from weft_core import config, detective, graph, store
 from weft_core.ask import VERDICT
-from weft_core.models import ModelClient
+from weft_core.models import ModelClient, ModelRefused
 from weft_core.nlp import Embedder, Nli
 from weft_core.store import Db
 from weft_core.textutil import cosine
@@ -497,9 +497,16 @@ def propose(
     )
     if allow is not None and not allow(data):
         return None
-    out = model.complete(
-        prompt_template=PROMPT, instructions=INSTRUCTIONS, data=data, json_schema=SCHEMA
-    )
+    try:
+        out = model.complete(
+            prompt_template=PROMPT,
+            instructions=INSTRUCTIONS,
+            data=data,
+            max_tokens=3000,
+            json_schema=SCHEMA,
+        )
+    except ModelRefused:
+        return None
     try:
         obj = json.loads(out)
         validate(obj, SCHEMA)
