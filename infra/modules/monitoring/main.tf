@@ -439,3 +439,65 @@ resource "google_monitoring_dashboard" "operations" {
     }
   })
 }
+
+# Autoclean logs one ERROR line when a rule aborts (over its cap) or fails.
+resource "google_logging_metric" "autoclean_problem" {
+  project = var.project_id
+  name    = "weft_autoclean_problem"
+  filter  = "resource.type=\"cloud_run_job\" AND jsonPayload.event=(\"autoclean_aborted\" OR \"autoclean_failed\")"
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    labels {
+      key        = "rule"
+      value_type = "STRING"
+    }
+  }
+  label_extractors = { rule = "EXTRACT(jsonPayload.rule)" }
+}
+
+resource "google_monitoring_alert_policy" "autoclean_problem" {
+  project      = var.project_id
+  display_name = "Weft: an autoclean rule aborted or failed"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "autoclean_aborted or autoclean_failed in the logs"
+    condition_threshold {
+      filter          = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.autoclean_problem.name}\" AND resource.type=\"cloud_run_job\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "0s"
+      aggregations {
+        alignment_period   = "900s"
+        per_series_aligner = "ALIGN_SUM"
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email.id]
+}
+
+# Messages that failed delivery 10 times wait in a `*-dead-pull` subscription (modules/dead_letter).
+resource "google_monitoring_alert_policy" "dead_letter" {
+  project      = var.project_id
+  display_name = "Weft: messages in a dead-letter queue"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "A dead-letter subscription holds messages"
+    condition_threshold {
+      filter          = "metric.type=\"pubsub.googleapis.com/subscription/num_undelivered_messages\" AND resource.type=\"pubsub_subscription\" AND resource.label.subscription_id=monitoring.regex.full_match(\".*-dead-pull\")"
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "300s"
+      aggregations {
+        alignment_period   = "300s"
+        per_series_aligner = "ALIGN_MAX"
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email.id]
+}

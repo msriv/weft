@@ -33,3 +33,8 @@ The GCP budget passed 50%, 90% or 100% of `budget_usd`. Check Billing reports by
 
 ### Graph size
 The nightly `graph_size` line passed 70% of `graph_node_limit`. AuraDB writes fail at the tier limit. Upgrade the tier or prune (see the auto-clean issues); relationship counts are in the same log line.
+
+
+## Nightly stage list
+
+The stage order lives in `config/pipeline.yaml` under `stages` (name and `needs`). `pipeline/run.py` and the Terraform in `infra/modules/nightly` both read it; `tests/test_stage_list.py` checks it against `pipeline/run.py` `STAGES`. The workflow runs every stage as its own job execution, skips a stage only when a stage in its `needs` failed, and ends the execution as failed if any stage failed or was skipped.
