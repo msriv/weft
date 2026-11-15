@@ -24,6 +24,7 @@ module "platform" {
 
 module "poller" {
   source                = "./modules/poller"
+  bot_contact_url       = var.bot_contact_url
   neo4j_secret_ids      = module.discovery.neo4j_secret_ids
   project_id            = var.project_id
   region                = var.region
@@ -36,6 +37,7 @@ module "poller" {
 
 module "fetcher" {
   source                = "./modules/fetcher"
+  bot_contact_url       = var.bot_contact_url
   neo4j_secret_ids      = module.discovery.neo4j_secret_ids
   project_id            = var.project_id
   region                = var.region
@@ -54,6 +56,7 @@ module "monitoring" {
 
 module "crawler" {
   source                = "./modules/crawler"
+  bot_contact_url       = var.bot_contact_url
   project_id            = var.project_id
   region                = var.region
   image                 = var.crawler_image
@@ -67,6 +70,7 @@ module "crawler" {
 
 module "discovery" {
   source                = "./modules/discovery"
+  bot_contact_url       = var.bot_contact_url
   project_id            = var.project_id
   region                = var.region
   image                 = var.discovery_image
