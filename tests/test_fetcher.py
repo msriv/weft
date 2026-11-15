@@ -7,8 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from services.fetcher.app import create_app
-from services.fetcher.fetcher import fetch_item, normalize_url, published_at
+from services.fetcher.fetcher import fetch_item, published_at
 from weft_core.polite import PoliteClient
+from weft_core.urls import normalize_url
 
 BODY = " ".join(f"Sentence number {i} of the report." for i in range(60))
 HTML = f"""<html><head><title>Port closed</title>
