@@ -20,6 +20,15 @@ model_budget:
   daily_cost_usd: 4.0
   shares: {pipeline: 0.70, stream: 0.15, ask: 0.15}
 
+# Public API limits (#158). Per client (browser address, or user id when signed in), per instance.
+limits:
+  ask: {per_minute: 5, per_day: 60}
+  problem: {per_minute: 3, per_day: 20}
+  subscription: {per_minute: 3, per_day: 10}
+  auth: {per_minute: 10, per_day: 200}          # web sign-up/sign-in proxy
+  streams: {per_client: 3, total: 100}          # open /stories/{id}/stream connections
+  max_body_bytes: 20000
+
 nightly:
   regroup_days: 14
   split_days: 3                  # re-cluster this many days from scratch; older events frozen (#105)
