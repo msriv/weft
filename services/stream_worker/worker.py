@@ -5,17 +5,19 @@ raw copy. Reports that match no beat are still written, with no story or event.
 """
 
 import hashlib
+import json
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from weft_core import beats as beats_mod
 from weft_core import clustering, graph, portals, relevance, store
+from weft_core.cache import TtlCache
 from weft_core.models import ModelClient, ModelRefused
 from weft_core.nlp import Nlp
-from weft_core.textutil import minhash, minhash_similarity, shingles
+from weft_core.textutil import bands, minhash, minhash_similarity, shingles
 
 OPINION = ("/opinion/", "/op-ed/", "/oped/", "/comment/", "/commentisfree/", "/views/", "/column")
 ANALYSIS = ("/analysis/", "/explainer/", "/explained/", "/long-read/", "/feature/")
@@ -32,6 +34,22 @@ class Deps:
     cfg: dict[str, Any]  # config/pipeline.yaml
     publish: Callable[[dict[str, Any]], None] = lambda m: None
     model: ModelClient | None = None
+    # config stream.cache_ttl_seconds
+    cache: TtlCache = field(default_factory=lambda: TtlCache(60.0))
+
+
+def _source(d: "Deps", source_id: str) -> dict[str, Any] | None:
+    """A source from the cached list; a miss reloads once, so a source registered after the
+    worker started is found without waiting for the TTL."""
+    for refresh in (False, True):
+        by_id = d.cache.get(
+            "sources",
+            lambda: {s["id"]: s for s in store.active_sources(d.db)},
+            refresh=refresh,
+        )
+        if source_id in by_id:
+            return by_id[source_id]
+    return None
 
 
 def classify_type(url: str, section: str, title: str, lede: str, model: ModelClient | None) -> str:
@@ -90,9 +108,41 @@ def story_idf(db: store.Db, story_id: str, since: str) -> tuple[dict[str, float]
     return clustering.idf_table(df, len(rows)), len(rows)
 
 
-def _members(db: store.Db, event_id: str) -> list[list[float]]:
-    # shortcut: reads every member's embedding; cap or cache per event past ~200 reports
-    return [r["embedding"] for r in graph.reports_of_event(db, event_id) if r.get("embedding")]
+def _members(db: store.Db, event_ids: list[str], keep: int) -> dict[str, list[list[float]]]:
+    """Embeddings of the newest `keep` member reports of each event, in one query."""
+    rows = db.execute(
+        "UNWIND ? AS eid MATCH (r:Report {event_id: eid}) WHERE r.valid_to IS NULL "
+        "AND r.embedding IS NOT NULL WITH eid, r ORDER BY r.published_at DESC "
+        "WITH eid, collect(r.embedding)[..?] AS embs RETURN eid, embs",
+        (event_ids, keep),
+    )
+    return {r["eid"]: [json.loads(e) for e in r["embs"]] for r in rows}
+
+
+def _rank(
+    db: store.Db,
+    cands: list[dict[str, Any]],
+    vec: list[float],
+    ents: set[str],
+    published: str,
+    cfg: dict[str, Any],
+    idf: dict[str, float],
+    veto: bool,
+) -> list[tuple[float, dict[str, Any]]]:
+    """Score candidate events by centroid, then re-score the best few with their newest member
+    embeddings (one query). Reading every member of every candidate was the cost per message
+    (#162); shortcut: an event outside the best few is not helped by its members."""
+    base = sorted(
+        ((attach_score(vec, ents, published, e, cfg, idf, None, veto), e) for e in cands),
+        key=lambda x: -x[0],
+    )[: cfg["candidate_limit"]]
+    top = base[: cfg.get("member_events", 5)]
+    members = _members(db, [e["id"] for _, e in top], cfg.get("member_cap", 6)) if top else {}
+    rescored = [
+        (attach_score(vec, ents, published, e, cfg, idf, members.get(e["id"]), veto), e)
+        for _, e in top
+    ]
+    return sorted(rescored + base[len(top) :], key=lambda x: -x[0])
 
 
 def place(
@@ -112,7 +162,13 @@ def place(
     story_id = event_id = None
     confidence = None
     blob = f"{text} {' '.join(ent_names)}"
-    beat, rel = relevance.best(store.beats(d.db), relevance.load(d.db), blob, vec, ent_names)
+    beat, rel = relevance.best(
+        d.cache.get("beats", lambda: store.beats(d.db)),
+        d.cache.get("profiles", lambda: relevance.load(d.db)),
+        blob,
+        vec,
+        ent_names,
+    )
     if beat is not None and relevance.MAYBE <= rel < relevance.ACCEPT:
         # held for the owner to label (#107); placed only when the beat's terms match
         relevance.record_maybe(d.db, rid, beat["id"], rel, published)
@@ -128,27 +184,15 @@ def place(
             datetime.fromisoformat(published) - timedelta(hours=cfg["candidate_window_hours"])
         ).isoformat()
         cands = graph.open_events(d.db, story_id, window)
-        idf, n_docs = story_idf(
-            d.db, story_id, (datetime.fromisoformat(published) - IDF_WINDOW).isoformat()
-        )
+        since_idf = (datetime.fromisoformat(published) - IDF_WINDOW).isoformat()
+        idf, n_docs = d.cache.get(("idf", story_id), lambda: story_idf(d.db, story_id, since_idf))
         veto = n_docs >= cfg.get("veto_min_reports", 20)
         by_id = {e["id"]: e for e in cands}
         linked = next((by_id[e] for e in must_link if e in by_id), None)
         scored = (
             [(1.0, linked)]  # a near-identical copy of a member: must-link
             if linked
-            else sorted(
-                (
-                    (
-                        attach_score(
-                            vec, ent_names, published, e, cfg, idf, _members(d.db, e["id"]), veto
-                        ),
-                        e,
-                    )
-                    for e in cands
-                ),
-                key=lambda x: -x[0],
-            )[: cfg["candidate_limit"]]
+            else _rank(d.db, cands, vec, ent_names, published, cfg, idf, veto)
         )
         if scored and scored[0][0] >= cfg["attach_threshold"]:
             confidence, ev = scored[0]
@@ -197,7 +241,7 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
     rid = msg["item_id"]
     if graph.get(d.db, "reports", rid):
         return "duplicate"  # Pub/Sub redelivery
-    src = {s["id"]: s for s in store.active_sources(d.db)}.get(msg["source_id"])
+    src = _source(d, msg["source_id"])
     if src is None:
         return "unknown_source"
     title, lede = msg.get("title") or "", msg.get("summary") or ""
@@ -236,18 +280,30 @@ def _write_report(
     published = msg.get("published_at") or now
     ent_names = {n for n, _ in ents}
 
-    # near-duplicate: a copy-candidate edge to every recent report above the threshold
+    # near-duplicate: a copy-candidate edge to every recent report above the threshold. Only
+    # reports sharing an LSH band with this one are read and compared (#162).
     since = (
         datetime.fromisoformat(published) - timedelta(hours=cfg["near_dup_window_hours"])
     ).isoformat()
     copies = []
     copy_events: list[str] = []
-    for r in graph.select(
-        d.db,
-        "reports",
-        "coalesce(n.published_at, n.fetched_at) >= ? AND n.minhash IS NOT NULL",
-        (since,),
+    band_keys = bands(sig)
+    near = {
+        r["rid"]
+        for r in d.db.execute(
+            "MATCH (b:MinhashBand) WHERE b.band IN ? AND b.at >= ? RETURN DISTINCT b.report_id AS rid",
+            (band_keys, since),
+        )
+    }
+    for r in (
+        graph.select(
+            d.db, "reports", "n.id IN ?", (sorted(near),), props=["id", "event_id", "minhash"]
+        )
+        if near
+        else []
     ):
+        if r.get("minhash") is None:
+            continue
         j = minhash_similarity(sig, r["minhash"])
         if j >= cfg["near_dup_jaccard"]:
             copies.append((r["id"], j))
@@ -287,6 +343,10 @@ def _write_report(
             (rid, now, msg["text_hash"]),
         )
     # one query each for entities, copies and cited links, however many there are
+    d.db.execute(
+        "UNWIND ? AS k CREATE (:MinhashBand {report_id: ?, band: k, at: ?})",
+        (band_keys, rid, published),
+    )
     if ents:
         d.db.execute(
             "UNWIND ? AS x MERGE (e:ReportEntity {report_id: ?, name: x[0]}) ON CREATE SET e.kind = x[1]",
@@ -324,7 +384,7 @@ def process_document(msg: dict[str, Any], d: Deps, now: str | None = None) -> st
     did = msg["item_id"]
     if graph.get(d.db, "documents", did):
         return "duplicate"
-    src = {s["id"]: s for s in store.active_sources(d.db)}.get(msg["source_id"])
+    src = _source(d, msg["source_id"])
     if src is None:
         return "unknown_source"
     title, lede = msg.get("title") or "", msg.get("summary") or ""
