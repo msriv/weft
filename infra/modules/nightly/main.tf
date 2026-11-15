@@ -13,13 +13,21 @@ variable "secret_env" {
   default = {}
 }
 variable "stages" {
-  description = "Stage names in run order; must match pipeline/run.py STAGES."
-  type        = list(string)
+  description = "Stages in run order, from config/pipeline.yaml (the single source of truth). needs = stages whose failure skips this one."
+  type = list(object({
+    name  = string
+    needs = list(string)
+  }))
 }
 variable "schedule" {
   description = "Cron (UTC). The nightly window is 4 hours; start in the reader-quiet hours."
   type        = string
   default     = "0 1 * * *"
+}
+
+locals {
+  job_timeout_s       = 7200
+  connector_timeout_s = local.job_timeout_s + 300 # never shorter than the job
 }
 
 module "job" {
@@ -31,7 +39,7 @@ module "job" {
   service_account_email = var.service_account_email
   env                   = var.env
   secret_env            = var.secret_env
-  timeout               = "7200s"
+  timeout               = "${local.job_timeout_s}s"
   memory                = "8Gi"
   cpu                   = "4"
 }
@@ -58,19 +66,68 @@ resource "google_workflows_workflow" "nightly" {
   source_contents = <<-EOT
     main:
       steps:
+        - init:
+            assign:
+              - failed: []
         - each_stage:
             for:
               value: stage
               in: ${jsonencode(var.stages)}
               steps:
+                - reset:
+                    assign:
+                      - blocked: false
+                - check_needs:
+                    for:
+                      value: dep
+                      in: $${stage.needs}
+                      steps:
+                        - is_failed:
+                            switch:
+                              - condition: $${dep in failed}
+                                assign:
+                                  - blocked: true
+                - gate:
+                    switch:
+                      - condition: $${blocked}
+                        steps:
+                          - mark_skipped:
+                              assign:
+                                - failed: $${list.concat(failed, stage.name)}
+                          - log_skipped:
+                              call: sys.log
+                              args:
+                                severity: WARNING
+                                text: $${"stage skipped, a needed stage failed - " + stage.name}
+                          - skip:
+                              next: continue
                 - run_stage:
-                    call: googleapis.run.v2.projects.locations.jobs.run
-                    args:
-                      name: projects/${var.project_id}/locations/${var.region}/jobs/${module.job.name}
-                      body:
-                        overrides:
-                          containerOverrides:
-                            - args: ["--stage", "$${stage}"]
+                    try:
+                      call: googleapis.run.v2.projects.locations.jobs.run
+                      args:
+                        name: projects/${var.project_id}/locations/${var.region}/jobs/${module.job.name}
+                        body:
+                          overrides:
+                            containerOverrides:
+                              - args: ["--stage", "$${stage.name}"]
+                      # Connector default is 1800 s; the job itself may run 7200 s (module.job timeout).
+                      connector_params:
+                        timeout: ${local.connector_timeout_s}
+                    except:
+                      as: e
+                      steps:
+                        - mark_failed:
+                            assign:
+                              - failed: $${list.concat(failed, stage.name)}
+                        - log_failed:
+                            call: sys.log
+                            args:
+                              severity: ERROR
+                              text: $${"stage failed - " + stage.name}
+        - finish:
+            switch:
+              - condition: $${len(failed) > 0}
+                raise: $${"nightly stages failed or skipped - " + json.encode_to_string(failed)}
   EOT
   depends_on      = [google_project_service.workflows]
 }

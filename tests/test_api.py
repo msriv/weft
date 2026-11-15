@@ -241,6 +241,18 @@ def test_admin_sees_pipeline_runs() -> None:
     assert runs[0]["ended_at"] and runs[0]["rows_out"] is not None
 
 
+def test_admin_sees_autoclean_runs() -> None:
+    from weft_core import autoclean
+
+    c, ctx = build()
+    ctx.db.execute("MATCH (n:AutocleanRun) DELETE n")
+    autoclean.run_all(ctx.db, warehouse=None)  # rules that need BigQuery are recorded as failed
+    assert c.get("/admin/autoclean").status_code == 401
+    rows = c.get("/admin/autoclean", headers=H).json()
+    assert {r["rule"] for r in rows} == set(autoclean.RULES)
+    assert {"rule_version", "mode", "matched", "changed", "status"} <= rows[0].keys()
+
+
 def test_admin_edits_source_country_and_reports_follow() -> None:
     c, ctx = build()
     rows = c.get("/admin/sources", headers=H).json()
