@@ -85,7 +85,8 @@ class Subscription(BaseModel):
 class ReaderPrefs(BaseModel):
     regions: list[str] = []
     topics: list[str] = []
-    follows: list[str] = []
+    email: str | None = None
+    last_visit: str | None = None  # Today shows what is new since this
     frequency: str = "daily"
     email: str | None = None
 
