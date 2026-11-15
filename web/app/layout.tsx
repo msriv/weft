@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import AdminLink from "@/components/AdminLink";
 import DirectionsLink from "@/components/DirectionsLink";
 import Nav from "@/components/Nav";
 import { IBM_Plex_Mono, Inter, Instrument_Serif } from "next/font/google";
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="row">
             <Link href="/method">How we weigh</Link>
             <Link href="/method#corrections">Corrections</Link>
-            <Link href="/admin">Admin</Link>
+            <AdminLink />
           </div>
         </footer>
       </body>

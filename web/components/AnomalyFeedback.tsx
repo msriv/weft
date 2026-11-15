@@ -1,20 +1,21 @@
 "use client";
-// Owner labels for the anomaly eval set (#114). Shown only when the admin token is in this tab.
+// Owner labels for the anomaly eval set (#114). Shown only to a signed-in admin.
 import { useEffect, useState } from "react";
+import { adminHeaders } from "@/lib/account";
 
 const LABELS = [["useful", "Useful"], ["not_useful", "Not useful"], ["wrong_grouping", "Wrong grouping"]] as const;
 
 export default function AnomalyFeedback({ id }: { id: string }) {
-  const [token, setToken] = useState("");
+  const [auth, setAuth] = useState<Record<string, string> | null>(null);
   const [done, setDone] = useState("");
-  useEffect(() => { setToken(sessionStorage.getItem("weft:admin") ?? ""); }, []);
-  if (!token) return null;
+  useEffect(() => { void adminHeaders().then(setAuth); }, []);
+  if (!auth) return null;
   if (done) return <span className="muted fs12">Owner label: {done.replace("_", " ")}</span>;
   return (
     <span className="row gap6 fs12" aria-label="Owner label"><span className="muted">Owner label</span>
       {LABELS.map(([v, l]) => (
         <button key={v} className="pill" onClick={async () => {
-          const r = await fetch(`/api/admin/anomalies/${id}/feedback`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: v }) });
+          const r = await fetch(`/api/admin/anomalies/${id}/feedback`, { method: "POST", headers: { "Content-Type": "application/json", ...auth }, body: JSON.stringify({ label: v }) });
           if (r.ok) setDone(v);
         }}>{l}</button>
       ))}

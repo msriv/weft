@@ -41,3 +41,12 @@ export async function pushPrefs(p: Prefs): Promise<void> {
   const t = await token();
   if (t) await fetch("/api/v1/me/prefs", { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${t}` }, body: JSON.stringify(p) });
 }
+
+// Admin = a signed-in user the API accepts on /admin/me. Nothing admin-related is stored in the browser.
+export async function adminHeaders(): Promise<Record<string, string> | null> {
+  const t = await token();
+  if (!t) return null;
+  const h = { authorization: `Bearer ${t}` };
+  const r = await fetch("/api/admin/me", { headers: h });
+  return r.ok ? h : null;
+}

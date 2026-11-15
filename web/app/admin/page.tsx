@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Kicker } from "@/components/bits";
+import { adminHeaders } from "@/lib/account";
 import { Fields } from "@/components/Fields";
 
 type Story = { id: string; beat_id: string; title: string; public: boolean };
@@ -15,7 +17,8 @@ type Run = { run_id: string; stage: string; started_at: string; ended_at: string
 type Clean = { run_id: string; rule: string; rule_version: number; mode: string; matched: number; changed: number; status: string; started_at: string; note: string | null };
 
 export default function Admin() {
-  const [token, setToken] = useState("");
+  const [auth, setAuth] = useState<Record<string, string> | null>(null);
+  const [log, setLog] = useState<{ at: string; actor: string; method: string; route: string; target: string }[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [review, setReview] = useState<{ open: Item[] } | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -27,34 +30,32 @@ export default function Admin() {
   const [clean, setClean] = useState<Clean[]>([]);
   const [err, setErr] = useState("");
   const call = useCallback(async (path: string, init: RequestInit = {}) => {
-    const r = await fetch(`/api/admin${path}`, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
+    const r = await fetch(`/api/admin${path}`, { ...init, headers: { "Content-Type": "application/json", ...auth } });
     if (!r.ok) throw new Error(`${r.status}`);
     return r.json();
-  }, [token]);
+  }, [auth]);
   const load = useCallback(async () => {
     try {
       setErr("");
-      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs")); setSources(await call("/sources")); setBeats(await call("/beats")); setUnplaced(await call("/unplaced")); setMaybes(await call("/beat-maybes")); setClean(await call("/autoclean"));
-    } catch { setErr("Could not load. Check the token."); }
+      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs")); setSources(await call("/sources")); setBeats(await call("/beats")); setUnplaced(await call("/unplaced")); setMaybes(await call("/beat-maybes")); setLog(await call("/log")); setClean(await call("/autoclean"));
+    } catch { setErr("Could not load."); }
   }, [call]);
-  useEffect(() => { setToken(sessionStorage.getItem("weft:admin") ?? ""); }, []);
-  useEffect(() => { if (token) void load(); }, [token, load]);
+  useEffect(() => { void adminHeaders().then(setAuth); }, []);
+  useEffect(() => { if (auth) void load(); }, [auth, load]);
   // Refresh pipeline runs while a stage is running, so progress shows without reloading.
   const live = runs.some((r) => r.status === "running");
   useEffect(() => {
-    if (!token || !live) return;
+    if (!auth || !live) return;
     const t = setInterval(() => { call("/runs").then(setRuns).catch(() => {}); }, 10000);
     return () => clearInterval(t);
-  }, [token, live, call]);
+  }, [auth, live, call]);
   const byRun = [...new Set(runs.map((r) => r.run_id))].slice(0, 5).map((id) => runs.filter((r) => r.run_id === id).reverse());
   const act = (p: string, body: unknown, method = "POST") => call(p, { method, body: JSON.stringify(body) }).then(load).catch(() => setErr("Action failed."));
   return (
     <>
       <Kicker>Editors</Kicker>
       <h1>Admin</h1>
-      <form onSubmit={(e) => { e.preventDefault(); const t = new FormData(e.currentTarget).get("t") as string; sessionStorage.setItem("weft:admin", t); setToken(t); }}>
-        <label className="kicker" htmlFor="t">Admin token</label> <input id="t" name="t" type="password" /> <button>Use</button>
-      </form>
+      {!auth && <p>Admin needs a signed-in editor account. <Link href="/welcome">Sign in</Link>, then reload.</p>}
       {err && <p role="alert">{err}</p>}
       <hr /><Kicker>Pipeline runs (nightly batch, last 5){live ? " · running, refreshing every 10s" : ""}</Kicker>
       {byRun.map((stages) => (
@@ -71,7 +72,7 @@ export default function Admin() {
           ))}
         </div>
       ))}
-      {token && runs.length === 0 && <p className="muted">No pipeline runs yet. The first starts about 30 minutes after startup, then daily.</p>}
+      {auth && runs.length === 0 && <p className="muted">No pipeline runs yet. The first starts about 30 minutes after startup, then daily.</p>}
       <hr /><Kicker>Autoclean (last runs). A rule in dry_run only counts; it changes nothing.</Kicker>
       {clean.slice(0, 30).map((r) => (
         <div className="row" key={`${r.run_id}:${r.rule}`}>
@@ -83,7 +84,7 @@ export default function Admin() {
           {r.note && <code>{r.note}</code>}
         </div>
       ))}
-      {token && clean.length === 0 && <p className="muted">No autoclean runs yet.</p>}
+      {auth && clean.length === 0 && <p className="muted">No autoclean runs yet.</p>}
       <hr /><Kicker>Stories. Public stories appear on the site; the rest return 404.</Kicker>
       {stories.map((s) => (
         <div className="row" key={s.id}>
@@ -153,6 +154,14 @@ export default function Admin() {
         </div>
       ))}
       {review && review.open.length === 0 && <p className="muted">Nothing to review.</p>}
+      <hr /><Kicker>Admin log (last 50 changes)</Kicker>
+      {log.map((l, i) => (
+        <div className="row" key={i}>
+          <span className="muted">{new Date(l.at).toLocaleString()}</span><b>{l.actor}</b>
+          <span>{l.method} {l.route}</span><code>{l.target}</code>
+        </div>
+      ))}
+      {log.length === 0 && <p className="muted">No changes yet.</p>}
       <hr /><Kicker>Reader reports</Kicker>
       {problems.map((p) => (
         <div className="card" key={p.id}>

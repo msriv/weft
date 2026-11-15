@@ -113,11 +113,11 @@ def test_story_toggle_gates_public_list() -> None:
     ok = c.put(
         "/admin/stories/s1/public",
         json={"public": True},
-        headers={"Authorization": "Bearer secret"},
+        headers={"X-Admin-Token": "secret"},
     )
     assert ok.status_code == 200
     assert [s["id"] for s in c.get("/stories").json()] == ["s1"]
-    off = {"Authorization": "Bearer secret"}
+    off = {"X-Admin-Token": "secret"}
     c.put("/admin/stories/s1/public", json={"public": False}, headers=off)
     assert c.get("/stories").json() == []
     assert (

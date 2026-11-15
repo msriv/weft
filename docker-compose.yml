@@ -23,7 +23,8 @@ x-env: &env
   MODEL_NAME: ${MODEL_NAME:-}
   MODEL_REVISION: ${MODEL_REVISION:-}
   MODEL_PROVIDER: ${MODEL_PROVIDER:-}
-  ADMIN_TOKEN: ${ADMIN_TOKEN:-local-admin-token}
+  ADMIN_TOKEN: ${ADMIN_TOKEN:-local-admin-token}  # scripts only: sent as the X-Admin-Token header
+  ADMIN_EMAILS: ${ADMIN_EMAILS:-owner@weft.local}  # signed-in editors, comma separated
   SMTP_HOST: ${SMTP_HOST:-}
   SMTP_PORT: ${SMTP_PORT:-587}
   SMTP_USER: ${SMTP_USER:-}
