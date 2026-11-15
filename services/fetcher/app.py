@@ -107,6 +107,10 @@ class GcpStore:
         )
 
 
+def _all(sources: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    return sources.all() if hasattr(sources, "all") else list(sources.values())
+
+
 def create_app(
     store: Store,
     http: PoliteClient,
@@ -128,7 +132,7 @@ def create_app(
         except (KeyError, ValueError):
             return Response(status_code=204)  # malformed or unknown source: drop, don't retry
         try:
-            result = fetch_item(msg, source, http, store)
+            result = fetch_item(msg, source, http, store, _all(sources))
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         # structured line; log-based metrics for the dashboards count these (infra/modules/monitoring)
@@ -137,6 +141,12 @@ def create_app(
                 {"event": "item_processed", "source_id": msg["source_id"], "status": result.status}
             )
         )
+        if result.status == "foreign" and db is not None and result.message:
+            from weft_core import domains, portals
+
+            canonical = result.message["canonical"]
+            portals.record_candidates(db, {domains.host_of(canonical)}, canonical)
+            result.message = None
         if result.message and publish:
             publish(result.message)  # stream worker picks it up
         if result.message and queue_for:

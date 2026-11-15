@@ -7,7 +7,7 @@ raw copy. Reports that match no beat are still written, with no story or event.
 import hashlib
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -123,6 +123,7 @@ def place(
     status = "no_beat"
     if beat is not None:
         story_id = beats_mod.ensure_story(d.db, beat)
+        store.lock(d.db, f"story:{story_id}")  # one placement per story at a time (#160)
         window = (
             datetime.fromisoformat(published) - timedelta(hours=cfg["candidate_window_hours"])
         ).isoformat()
@@ -190,8 +191,8 @@ def place(
 
 
 def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
-    """Handle one `items-extracted` message. Returns what happened, for logs and tests."""
-    cfg = d.cfg["stream"]
+    """Handle one `items-extracted` message. Returns what happened, for logs and tests.
+    Everything read and written for one report is one transaction, serialised per story."""
     now = now or datetime.now(UTC).isoformat()
     rid = msg["item_id"]
     if graph.get(d.db, "reports", rid):
@@ -201,14 +202,39 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
         return "unknown_source"
     title, lede = msg.get("title") or "", msg.get("summary") or ""
     text = f"{title}. {lede}".strip()
-    published = msg.get("published_at") or now
-
+    # slow, pure work first, outside the transaction (a retry must not repeat model calls)
     rtype = classify_type(msg["url"], msg.get("section") or "", title, lede, d.model)
     lang = d.nlp.langid.detect(text)
     sig = minhash(shingles(text))
     ents = d.nlp.entities.extract(text)
-    ent_names = {n for n, _ in ents}
     vec = d.nlp.embedder.embed(text)
+
+    def write(tx: store.Db) -> tuple[str, dict[str, Any] | None]:
+        return _write_report(replace(d, db=tx), msg, src, now, (rtype, lang, sig, ents, vec))
+
+    status, event = store.atomic(d.db, write)
+    if event is not None:  # after commit: a retried transaction never publishes twice
+        d.publish(event)
+    return status
+
+
+def _write_report(
+    d: Deps,
+    msg: dict[str, Any],
+    src: dict[str, Any],
+    now: str,
+    computed: tuple[str, str, Any, list[tuple[str, str]], list[float]],
+) -> tuple[str, dict[str, Any] | None]:
+    cfg = d.cfg["stream"]
+    rtype, lang, sig, ents, vec = computed
+    rid = msg["item_id"]
+    store.lock(d.db, f"item:{rid}")  # the same message delivered twice at once writes one report
+    if graph.get(d.db, "reports", rid):
+        return "duplicate", None
+    title, lede = msg.get("title") or "", msg.get("summary") or ""
+    text = f"{title}. {lede}".strip()
+    published = msg.get("published_at") or now
+    ent_names = {n for n, _ in ents}
 
     # near-duplicate: a copy-candidate edge to every recent report above the threshold
     since = (
@@ -260,21 +286,22 @@ def process(msg: dict[str, Any], d: Deps, now: str | None = None) -> str:
             "MERGE (v:ReportVersion {report_id: ?, n: 0}) ON CREATE SET v.fetched_at=?, v.text_hash=?",
             (rid, now, msg["text_hash"]),
         )
-    for name, kind in ents:
+    # one query each for entities, copies and cited links, however many there are
+    if ents:
         d.db.execute(
-            "MERGE (e:ReportEntity {report_id: ?, name: ?}) ON CREATE SET e.kind=?",
-            (rid, name, kind),
+            "UNWIND ? AS x MERGE (e:ReportEntity {report_id: ?, name: x[0]}) ON CREATE SET e.kind = x[1]",
+            ([[n, k] for n, k in ents], rid),
         )
-    for other, j in copies:
+    if copies:
         d.db.execute(
-            "MERGE (c:Copy {report_id: ?, copy_of: ?}) ON CREATE SET c.jaccard=?", (rid, other, j)
+            "UNWIND ? AS x MERGE (c:Copy {report_id: ?, copy_of: x[0]}) ON CREATE SET c.jaccard = x[1]",
+            ([[o, j] for o, j in copies], rid),
         )
-    for key in msg.get("gov_links") or []:  # resolved to documents by the nightly links stage
-        d.db.execute("MERGE (:Cites {report_id: ?, url_key: ?})", (rid, key))
+    if keys := msg.get("gov_links") or []:  # resolved to documents by the nightly links stage
+        d.db.execute("UNWIND ? AS k MERGE (:Cites {report_id: ?, url_key: k})", (keys, rid))
     if story_id and msg.get("gov_domains"):  # only on-beat reports suggest portals worth crawling
         portals.record_candidates(d.db, set(msg["gov_domains"]), msg["url"])
-    d.publish({"report_id": rid, "event_id": event_id, "story_id": story_id, "status": status})
-    return status
+    return status, {"report_id": rid, "event_id": event_id, "story_id": story_id, "status": status}
 
 
 KINDS = (
@@ -302,11 +329,34 @@ def process_document(msg: dict[str, Any], d: Deps, now: str | None = None) -> st
         return "unknown_source"
     title, lede = msg.get("title") or "", msg.get("summary") or ""
     text = f"{title}. {lede}".strip()
-    published = msg.get("published_at") or now
     ents = {n for n, _ in d.nlp.entities.extract(text)}
-    story_id, event_id, _, status = place(
-        d, did, text, ents, d.nlp.embedder.embed(text), published, document=True
-    )
+    vec, lang = d.nlp.embedder.embed(text), d.nlp.langid.detect(text)
+
+    def write(tx: store.Db) -> tuple[str, dict[str, Any] | None]:
+        return _write_document(replace(d, db=tx), msg, now, text, ents, vec, lang)
+
+    status, event = store.atomic(d.db, write)
+    if event is not None:
+        d.publish(event)
+    return status
+
+
+def _write_document(
+    d: Deps,
+    msg: dict[str, Any],
+    now: str,
+    text: str,
+    ents: set[str],
+    vec: list[float],
+    lang: str,
+) -> tuple[str, dict[str, Any] | None]:
+    did = msg["item_id"]
+    store.lock(d.db, f"item:{did}")
+    if graph.get(d.db, "documents", did):
+        return "duplicate", None
+    title, lede = msg.get("title") or "", msg.get("summary") or ""
+    published = msg.get("published_at") or now
+    story_id, event_id, _, status = place(d, did, text, ents, vec, published, document=True)
     graph.put(
         d.db,
         "documents",
@@ -318,11 +368,15 @@ def process_document(msg: dict[str, Any], d: Deps, now: str | None = None) -> st
             "story_id": story_id,
             "event_id": event_id,
             "published_at": published,
-            "lang": d.nlp.langid.detect(text),
+            "lang": lang,
             "title": title,
             "summary": lede,
             "text_hash": msg.get("text_hash"),
         },
     )
-    d.publish({"document_id": did, "event_id": event_id, "story_id": story_id, "status": status})
-    return status
+    return status, {
+        "document_id": did,
+        "event_id": event_id,
+        "story_id": story_id,
+        "status": status,
+    }

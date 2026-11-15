@@ -56,6 +56,7 @@ class SourcePatch(BaseModel):
     state_run_source: str | None = None
     owner_id: str | None = None
     ownership_source: str | None = None
+    link_domains: list[str] | None = None
 
 
 class NewSource(BaseModel):
@@ -439,6 +440,8 @@ def create_app(
         if "country" in data:  # also re-tags the source's reports
             store.set_country(db, source_id, data.pop("country"), "admin")
         for col, val in data.items():  # col is a SourcePatch field name, never user text
+            if isinstance(val, list):  # stored as JSON text, like feeds and sitemaps
+                val = json.dumps(val)
             db.execute(
                 f"MATCH (n:Source {{id: ?}}) SET n.{col}=?",
                 (source_id, int(val) if isinstance(val, bool) else val),

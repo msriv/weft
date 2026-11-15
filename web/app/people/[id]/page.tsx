@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
+import { meta } from "@/lib/meta";
 import { day } from "@/lib/format";
 
 type Actor = {
@@ -9,6 +10,12 @@ type Actor = {
   statements: { id: string; document_id: string; text: string; title: string; published_at: string | null; story_id: string }[];
   reported_as: { report_id: string; quote: string; event_id: string }[];
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const p = await params;
+  const x = await api<Actor>(`/v1/actors/${p.id}`);
+  return meta(x?.actor.name, "Statements attributed to this person, with the reports that quote them.");
+}
 
 export default async function Person({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

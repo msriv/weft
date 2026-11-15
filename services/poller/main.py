@@ -9,7 +9,7 @@ import httpx
 from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.poller.poller import FeedState, Poller
-from weft_core import config, store
+from weft_core import config, portals, store
 from weft_core.gcp import bigquery_client
 from weft_core.health import unhealthy
 from weft_core.polite import PoliteClient
@@ -33,6 +33,13 @@ class GcsState:
         self._blob(url).upload_from_string(json.dumps(state.__dict__))
 
 
+def health_rows(results: dict[str, str | None], now: datetime) -> list[dict[str, object]]:
+    return [
+        {"source_id": sid, "checked_at": now.isoformat(), "ok": err is None, "error": err}
+        for sid, err in results.items()
+    ]
+
+
 HEALTH_WINDOW_DAYS = 30  # far longer than the 6 h health age; keeps the scan to recent partitions
 
 
@@ -49,10 +56,7 @@ def record_and_report(project: str, results: dict[str, str | None]) -> list[str]
     bq = bigquery_client(project)
     table = f"{project}.weft.source_health"
     now = datetime.now(UTC)
-    rows = [
-        {"source_id": sid, "checked_at": now.isoformat(), "ok": err is None, "error": err}
-        for sid, err in results.items()
-    ]
+    rows = health_rows(results, now)
     if errs := bq.insert_rows_json(table, rows):
         raise RuntimeError(f"insert into source_health failed: {errs}")
     q = health_query(table)
@@ -85,6 +89,7 @@ def main() -> int:
             publish,
             store.beats(db) if pf["enabled"] else None,
             pf["sample_rate"],
+            on_foreign=lambda domain, url: portals.record_candidates(db, {domain}, url),
         )
         results = poller.run(store.active_sources(db))
     for sid, st in sorted(poller.stats.items()):
