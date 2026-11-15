@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 from pipeline import (
     anomalies,
+    autoclean,
     claims,
     detective,
     directions,
@@ -51,6 +52,9 @@ STAGES: dict[str, Callable[[Ctx], int]] = {
     "profiles": profiles.run,
     "review_sample": review_sample.run,
     "notify": notify.run,
+    # Not in the Terraform nightly list: it has its own scheduler job (#147). Last, so a local
+    # `python -m pipeline.run` cleans after the nightly.
+    "autoclean": autoclean.run,
 }
 
 
@@ -110,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
 def production_ctx() -> Ctx:
     import os
 
-    from pipeline.gcp import GcsText, bq_sink, versions_of
+    from pipeline.gcp import BqWarehouse, GcsText, bq_sink, pubsub_publish, versions_of
     from weft_core import store
     from weft_core.models import ModelClient
     from weft_core.nlp import default_nlp
@@ -133,6 +137,8 @@ def production_ctx() -> Ctx:
         GcsText(raw).text,
         model,
         versions_of=versions_of(raw, db),
+        warehouse=BqWarehouse(project),
+        publish=pubsub_publish(project),
     )
 
 
