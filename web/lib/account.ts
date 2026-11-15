@@ -10,6 +10,12 @@ function load(): Session | null {
   try { return JSON.parse(localStorage.getItem(KEY) ?? "null") as Session | null; } catch { return null; }
 }
 export const signedInAs = (): string | null => load()?.email ?? null;
+/** True once after a refresh failure signed the reader out, so the page can say syncing stopped. */
+export function takeLapsed(): boolean {
+  const v = localStorage.getItem("weft:lapsed") === "1";
+  localStorage.removeItem("weft:lapsed");
+  return v;
+}
 export const signOut = (): void => localStorage.removeItem(KEY);
 
 async function auth(action: string, body: object): Promise<Session> {
@@ -26,7 +32,7 @@ export async function token(): Promise<string | null> {
   let s = load();
   if (!s) return null;
   if (Date.now() > s.expiresAt) {
-    try { s = await auth("refresh", { refreshToken: s.refreshToken, email: s.email }); } catch { signOut(); return null; }
+    try { s = await auth("refresh", { refreshToken: s.refreshToken, email: s.email }); } catch { signOut(); localStorage.setItem("weft:lapsed", "1"); return null; }
   }
   return s.idToken;
 }

@@ -46,7 +46,10 @@ export default function Admin() {
   const [srcTotal, setSrcTotal] = useState(0);
   const call = useCallback(async (path: string, init: RequestInit = {}) => {
     const r = await fetch(`/api/admin${path}`, { ...init, headers: { "Content-Type": "application/json", ...auth } });
-    if (!r.ok) throw new Error(`${r.status}`);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(typeof j.detail === "string" ? j.detail : r.status === 401 ? "Not signed in as an editor." : `The server answered ${r.status}.`);
+    }
     return r.json();
   }, [auth]);
   // Each section loads on its own: one failing endpoint shows its own error and retry.
@@ -84,7 +87,7 @@ export default function Admin() {
     return () => clearInterval(t);
   }, [auth, live, call]);
   const byRun = [...new Set(runs.map((r) => r.run_id))].slice(0, 5).map((id) => runs.filter((r) => r.run_id === id).reverse());
-  const act = (p: string, body: unknown, method = "POST") => call(p, { method, body: JSON.stringify(body) }).then(load).catch(() => setErr("Action failed."));
+  const act = (p: string, body: unknown, method = "POST") => call(p, { method, body: JSON.stringify(body) }).then(load).then(() => setErr("")).catch((e: Error) => setErr(`Action failed: ${e.message}`));
   return (
     <>
       <Kicker>Editors</Kicker>
