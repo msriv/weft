@@ -98,6 +98,7 @@ class ModelClient:
         self._model, self._revision, self._log = model, revision, log
         self._ledger, self._caller, self._sleep = ledger, caller, sleep
         self._daily_tokens, self._daily_cost = daily_tokens, daily_cost_usd
+        self._warned: tuple[str, bool] | None = None
         self._ask_cost = "openrouter" in base_url  # OpenRouter reports cost when asked
         self._http = httpx.Client(
             base_url=base_url,
@@ -186,6 +187,15 @@ class ModelClient:
         if not self._ledger:
             return
         tokens, cost = self._ledger.spent(day, self._caller)
+        used = max(
+            tokens / self._daily_tokens if self._daily_tokens else 0.0,
+            cost / self._daily_cost if self._daily_cost else 0.0,
+        )
+        if used >= 0.8 and self._warned != (day, used >= 1):
+            self._warned = (day, used >= 1)  # one line when 80% is crossed, one at the cap
+            event = "budget_exceeded" if used >= 1 else "budget_high"
+            line = {"event": event, "severity": "WARNING", "caller": self._caller, "used": used}
+            print(json.dumps(line), file=sys.stderr)
         if self._daily_tokens is not None and tokens >= self._daily_tokens:
             raise BudgetExceeded(f"{self._caller}: daily token cap {self._daily_tokens} reached")
         if self._daily_cost is not None and cost >= self._daily_cost:
