@@ -10,7 +10,8 @@ import OpenQuestions from "@/components/OpenQuestions";
 import StoryGraph from "@/components/StoryGraph";
 import { api } from "@/lib/api";
 import Time from "@/components/Time";
-import { beatLabel, count, day, dateShort, num, perspectiveName } from "@/lib/format";
+import { beatLabel, count, day, dateShort, num, perspectiveName, ruleName } from "@/lib/format";
+import { groupByEvent, kindCounts } from "@/lib/anomaly";
 import { meta } from "@/lib/meta";
 import { TABS, carriedByAll, conflicts, plural, storyHref, tabOf, type StoryQuery } from "@/lib/story";
 import type { StoryGraph as SG } from "@/lib/types";
@@ -144,7 +145,18 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
       {tab === "anomalies" && (
         <section aria-label="Anomalies">
           <Kicker anomaly>Anomalies</Kicker>
-          {g.anomalies.length ? g.anomalies.map((a) => <AnomalyCard key={a.id} a={a} />)
+          {g.anomalies.length > 0 && (
+            <nav className="row fs13" aria-label="Filter by rule">
+              <Link scroll={false} className={`pill${q.kind ? "" : " on"}`} href={href({ tab: "anomalies", kind: "" })}>All {g.anomalies.length}</Link>
+              {kindCounts(g.anomalies).map(([k, n]) => <Link scroll={false} key={k} className={`pill${q.kind === k ? " on" : ""}`} href={href({ tab: "anomalies", kind: k })}>{ruleName(k)} {n}</Link>)}
+            </nav>
+          )}
+          {g.anomalies.length ? groupByEvent(g.anomalies, q.kind).map(([eid, list]) => (
+            <div key={eid} className="stack">
+              <h3 className="m0">{g.events.find((e) => e.id === eid)?.label ?? "Story-wide"}</h3>
+              {list.map((a) => <AnomalyCard key={a.id} a={a} />)}
+            </div>
+          ))
             : <Empty>No anomalies. Every flag comes from a written rule you can read on <Link href="/method">How we weigh</Link>.</Empty>}
           <p className="muted fs13">Weight changes the order sources appear in. No report is hidden.</p>
         </section>

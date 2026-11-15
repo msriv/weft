@@ -30,6 +30,7 @@ for (const [w, h] of [[390, 844], [1280, 900]]) {
     const own = errs.filter((e) => !/favicon|Failed to load resource/.test(e));
     if (own.length) bad.push(`${w}px ${path}: console errors ${own.join(" | ").slice(0, 200)}`);
     const text = await p.evaluate(() => document.body.innerText);
+    if (/could not load this page/.test(text)) bad.push(`${w}px ${path}: error page shown`);
     for (const [re, what] of [[/\d{4}-\d{2}-\d{2}/, "ISO date"], [/\b(AL|VE|KE)\b/, "country code"], [/kessar-strait/i, "beat id"]]) {
       const m = text.match(re);
       if (m) bad.push(`${w}px ${path}: visible ${what} "${m[0]}"`);

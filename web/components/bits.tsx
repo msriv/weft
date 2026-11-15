@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AnomalyFeedback from "@/components/AnomalyFeedback";
 import Time from "@/components/Time";
+import { FOOTER, chips, sentence } from "@/lib/anomaly";
 import { STATE_LABEL, count, perspectiveName, ruleName } from "@/lib/format";
 import type { Anomaly, Issuer, SourceLabel, StoryCard } from "@/lib/types";
 
@@ -28,17 +29,32 @@ export function IssuerTag({ i }: { i: Issuer }) {
 }
 
 export function AnomalyCard({ a }: { a: Anomaly }) {
+  const prov = a.status === "provisional";
+  const { shown, more } = chips(a.evidence ?? []);
   return (
-    <div className="card anomaly">
-      <Kicker anomaly>
-        Anomaly · {ruleName(a.rule)}
-        {a.status === "provisional" ? " · provisional" : ""}
-      </Kicker>
-      <p className="c-anomaly-light my6">{a.summary}</p>
-      <AnomalyDetail a={a} />
-      <div className="muted fs12">
-        Rule: {ruleName(a.rule)}, version {a.rule_version} · {count(a.evidence_ids.length, "piece")} of evidence ·{" "}
-        <Link href={`/nodes/${a.id}`}>See the rule and evidence</Link>
+    <div className="stack">
+      <div className={`card anomaly${prov ? " provisional" : ""}`}>
+        <Kicker anomaly>
+          Anomaly · {ruleName(a.rule)}
+          {prov && <span className="pill ml8">Provisional</span>}
+        </Kicker>
+        {prov && a.provisional_reason && <p className="muted fs13 my6">{a.provisional_reason} It may change as more reports arrive.</p>}
+        <p className="c-anomaly-light my6">{sentence(a)}</p>
+        <AnomalyDetail a={a} />
+        {shown.length > 0 && (
+          <div className="row fs13" aria-label="Evidence">
+            {shown.map((e) => (
+              <Link key={e.id} className="pill" href={`/nodes/${e.id}`}>
+                {e.outlet} · {perspectiveName(e.perspective)}{e.published_at ? <> · <Time iso={e.published_at} /></> : null}
+              </Link>
+            ))}
+            {more > 0 && <span className="muted">and {more} more</span>}
+          </div>
+        )}
+        <div className="muted fs12 my6">
+          {FOOTER} Rule: {ruleName(a.rule)}, version {a.rule_version} · {count(a.evidence_ids.length, "piece")} of evidence ·{" "}
+          <Link href={`/nodes/${a.id}`}>See the rule and evidence</Link>
+        </div>
       </div>
       <AnomalyFeedback id={a.id} />
     </div>

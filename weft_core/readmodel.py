@@ -134,6 +134,51 @@ def anomalies_for(
     ]
 
 
+def provisional_reason(db: Db, a: dict[str, Any]) -> str:
+    """Why an anomaly is still provisional, in words. Same tests as `rules.evaluate_event`."""
+    p = config.rules()["provisional"]
+    ev = graph.get(db, "events", a["event_id"]) if a.get("event_id") else None
+    reps = graph.select(db, "reports", "n.event_id=?", (a["event_id"],)) if ev else []
+    sources = len({r["source_id"] for r in reps})
+    persp = len({r["perspective"] for r in reps if r["perspective"] != "unattributed"})
+    if ev and sources < p["min_sources"]:
+        return f"Only {sources} {'source has' if sources == 1 else 'sources have'} reported so far; needs {p['min_sources']}."
+    if ev and persp < p["min_perspectives"]:
+        return f"Only {persp} {'perspective has' if persp == 1 else 'perspectives have'} reported so far; needs {p['min_perspectives']}."
+    if ev and datetime.now(UTC) - datetime.fromisoformat(ev["first_seen"]) < timedelta(
+        hours=p["min_hours_since_first_report"]
+    ):
+        return f"The first report was under {p['min_hours_since_first_report']} hours ago."
+    return "Owner labels have not yet shown this rule's flags to be useful."
+
+
+def with_evidence(db: Db, views: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Resolve each anomaly's evidence to outlet, country, time and link, and give the reason a
+    provisional one is provisional, so the card needs no further request."""
+    srcs = sources_by_id(db)
+    for v in views:
+        out = []
+        for eid in v["evidence_ids"]:
+            fig = graph.get(db, "figures", eid)
+            r = graph.get(db, "reports", fig["report_id"] if fig else eid)
+            if r is None:
+                continue
+            s = srcs.get(r["source_id"], {})
+            out.append(
+                {
+                    "id": r["id"],
+                    "outlet": s.get("name", r["source_id"]),
+                    "perspective": r["perspective"],
+                    "published_at": r["published_at"] or r["fetched_at"],
+                }
+            )
+        v["evidence"] = out
+        v["provisional_reason"] = (
+            provisional_reason(db, v) if v["status"] == "provisional" else None
+        )
+    return views
+
+
 # --- stories ----------------------------------------------------------------------------------
 
 
@@ -286,7 +331,7 @@ def story_graph(
             groups[(r["event_id"], r["perspective"])].append(r)
     anomalies = [
         a
-        for a in anomalies_for(db, "n.story_id=?", (story_id,), at)
+        for a in with_evidence(db, anomalies_for(db, "n.story_id=?", (story_id,), at))
         if a["event_id"] in in_window or rep_ids & set(a["evidence_ids"])
     ]
     flagged = defaultdict(list)
@@ -582,7 +627,7 @@ def event_page(db: Db, event_id: str, at: str | None = None) -> dict[str, Any] |
         ],
         "figures": figs,
         "documents": docs,
-        "anomalies": anomalies_for(db, "n.event_id=?", (event_id,), at),
+        "anomalies": with_evidence(db, anomalies_for(db, "n.event_id=?", (event_id,), at)),
         "short_version": _split_sv(db, sv["payload"]) if sv else None,
         "parties": plist,
     }
