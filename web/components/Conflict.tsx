@@ -14,7 +14,7 @@ const Col = ({ s }: { s: Side }) => (
 
 /** One conflict as two columns, claim A against claim B, with a link to the event. Reports
  * disagree here; Weft does not say which is right. */
-export default function Conflict({ a, b, href }: { a: Side; b: Side; href: string }) {
+export default function Conflict({ a, b, href, linkLabel = "Open this event" }: { a: Side; b: Side; href: string; linkLabel?: string }) {
   return (
     <div className="card anomaly conflict">
       <div className="kicker anomaly">Reports conflict on</div>
@@ -23,7 +23,7 @@ export default function Conflict({ a, b, href }: { a: Side; b: Side; href: strin
         <div className="muted conflict-vs" aria-hidden="true">versus</div>
         <Col s={b} />
       </div>
-      <Link href={href}>Open this event</Link>
+      <Link href={href}>{linkLabel}</Link>
     </div>
   );
 }
