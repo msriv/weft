@@ -85,10 +85,10 @@ class Subscription(BaseModel):
 class ReaderPrefs(BaseModel):
     regions: list[str] = []
     topics: list[str] = []
-    email: str | None = None
-    last_visit: str | None = None  # Today shows what is new since this
+    follows: list[str] = []
     frequency: str = "daily"
     email: str | None = None
+    last_visit: str | None = None  # Today shows what is new since this
 
 
 class Question(BaseModel):
