@@ -245,6 +245,11 @@
   "hash",
   "key"
  ],
+ "Host": [
+  "cooldown_until",
+  "name",
+  "strikes"
+ ],
  "Lock": [
   "at",
   "key"

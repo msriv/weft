@@ -1,5 +1,10 @@
 variable "project_id" { type = string }
 variable "region" { type = string }
+variable "bot_contact_url" {
+  description = "Public page that says what the bot does and how to opt out; goes in the User-Agent."
+  type        = string
+  default     = ""
+}
 variable "image" {
   description = "Crawler container image in Artifact Registry."
   type        = string
@@ -82,6 +87,10 @@ resource "google_cloud_run_v2_job" "crawler" {
         env {
           name  = "PROJECT_ID"
           value = var.project_id
+        }
+        env {
+          name  = "BOT_CONTACT_URL"
+          value = var.bot_contact_url
         }
         env {
           name  = "RAW_BUCKET"

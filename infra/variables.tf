@@ -130,3 +130,9 @@ variable "firebase_api_key" {
   type        = string
   default     = ""
 }
+
+variable "bot_contact_url" {
+  description = "Public URL of the /bot page (what the crawler is and how to opt out), for example https://weft.example/bot. Sent in the User-Agent."
+  type        = string
+  default     = ""
+}

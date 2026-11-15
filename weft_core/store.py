@@ -359,6 +359,7 @@ NODES: dict[str, dict[str, Any]] = {
         "calls": 0,
     },
     "ModelOutput": {"key": None, "output": None, "at": None},
+    "Host": {"name": None, "cooldown_until": None, "strikes": None},  # per-host back-off (#179)
     "Lock": {"key": None, "at": None},  # write-lock rows for placement (#160)
     "Seen": {
         "key": None,
@@ -406,6 +407,7 @@ UNIQUE = {
     "ModelSpend": "key",
     "ModelOutput": "key",
     "Lock": "key",
+    "Host": "name",
     "Seen": "key",
     "HashUrl": "key",
     "SourceDay": "key",

@@ -1,5 +1,10 @@
 variable "project_id" { type = string }
 variable "region" { type = string }
+variable "bot_contact_url" {
+  description = "Public page that says what the bot does and how to opt out; goes in the User-Agent."
+  type        = string
+  default     = ""
+}
 variable "image" {
   description = "Discovery container image in Artifact Registry. Build and push it before applying with a real value."
   type        = string
@@ -51,6 +56,10 @@ resource "google_cloud_run_v2_job" "discovery" {
       max_retries     = 0
       containers {
         image = var.image
+        env {
+          name  = "BOT_CONTACT_URL"
+          value = var.bot_contact_url
+        }
         dynamic "env" {
           for_each = { NEO4J_URI = "neo4j-uri", NEO4J_PASSWORD = "neo4j-password" }
           content {
