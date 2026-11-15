@@ -144,6 +144,7 @@ services:
     <<: *job
     build: { context: ., dockerfile: pipeline/Dockerfile }
     # first nightly run waits 30 min so the first poll has been extracted and grouped
+    # `pipeline.run` ends with the autoclean stage, so local data is cleaned after a patch too
     environment: { <<: *env, DELAY: "1800", EVERY: "86400", JOB: "python -m pipeline.run" }
 
 volumes:

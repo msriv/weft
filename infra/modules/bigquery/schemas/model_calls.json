@@ -37,7 +37,7 @@
   {
     "name": "input",
     "type": "STRING",
-    "mode": "REQUIRED"
+    "mode": "NULLABLE"
   },
   {
     "name": "output",
