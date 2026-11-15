@@ -4,6 +4,7 @@ back off on 429, never bypass paywalls. Shared by the poller and the fetcher."""
 import ipaddress
 import os
 import socket
+import threading
 import time
 import urllib.robotparser
 from collections.abc import Callable
@@ -129,6 +130,10 @@ class PoliteClient:
         self._http = http
         self._sleep, self._clock = sleep, clock
         self._last_request: dict[str, float] = {}  # host -> time of last request
+        # One request at a time per host (one connection per domain), though hosts run in
+        # parallel threads (#159).
+        self._host_locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
         # origin -> (parsed robots or None when unknown, time to look again)
         self._robots: dict[str, tuple[urllib.robotparser.RobotFileParser | None, float]] = {}
 
@@ -161,9 +166,22 @@ class PoliteClient:
         rp = self._rules(url)
         return rp is not None and rp.can_fetch(USER_AGENT, url)
 
+    def ready_at(self, url: str) -> datetime | None:
+        """When the URL's host leaves its cooldown, or None if it is not cooling down."""
+        until = self._cool.get(urlsplit(url).netloc)[0]
+        return datetime.fromtimestamp(until, UTC) if until > self._wall().timestamp() else None
+
     def get(self, url: str, min_interval: float, headers: dict[str, str]) -> httpx.Response | None:
         """One polite GET. Returns None when skipped (robots, cooldown) or rate limited."""
         host = urlsplit(url).netloc
+        with self._locks_guard:
+            lock = self._host_locks.setdefault(host, threading.Lock())
+        with lock:
+            return self._get(url, host, min_interval, headers)
+
+    def _get(
+        self, url: str, host: str, min_interval: float, headers: dict[str, str]
+    ) -> httpx.Response | None:
         until, strikes = self._cool.get(host)
         if until > self._wall().timestamp():
             return None

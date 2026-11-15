@@ -49,7 +49,7 @@ resource "google_cloud_run_v2_service" "fetcher" {
 
   template {
     service_account                  = var.service_account_email
-    max_instance_request_concurrency = 1
+    max_instance_request_concurrency = 8
     scaling {
       min_instance_count = 0
       max_instance_count = 1

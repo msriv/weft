@@ -35,6 +35,20 @@ for (const [w, h] of [[390, 844], [1280, 900]]) {
       const m = text.match(re);
       if (m) bad.push(`${w}px ${path}: visible ${what} "${m[0]}"`);
     }
+    if (path === "/") {
+      await p.waitForSelector(".globe-svg g[role=button]");
+      const h0 = await p.evaluate(() => document.documentElement.scrollHeight);
+      const n = await p.$$eval(".globe-svg g[role=button]", (g) => g.length);
+      for (let i = 0; i < n; i++) {
+        const box = await (await p.$$(".globe-svg g[role=button] circle:last-child"))[i].boundingBox();
+        const [cx, cy] = [box.x + box.width / 2, box.y + box.height / 2];
+        await p.mouse.move(cx, cy);
+        const top = await p.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest("g[role=button]")?.getAttribute("aria-label"), [cx, cy]);
+        const own = await p.$$eval(".globe-svg g[role=button]", (g, k) => g[k].getAttribute("aria-label"), i);
+        if (top !== own) bad.push(`${w}px /: marker ${i} is covered by "${top}"`);
+        if ((await p.evaluate(() => document.documentElement.scrollHeight)) !== h0) bad.push(`${w}px /: hover changed page height`);
+      }
+    }
     if (path === "/s/kessar-strait") {
       const boxes = await p.$$eval(".card", (els) => els.filter((e) => e.offsetParent).map((e) => { const r = e.getBoundingClientRect(); return [r.left, r.top + scrollY, r.right, r.bottom + scrollY]; }));
       for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
