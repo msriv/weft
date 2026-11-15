@@ -113,6 +113,10 @@ resource "google_pubsub_subscription" "fetcher" {
     minimum_backoff = "10s"
     maximum_backoff = "600s"
   }
+  dead_letter_policy {
+    dead_letter_topic     = module.dead.topic_id
+    max_delivery_attempts = 10
+  }
 
   push_config {
     push_endpoint = google_cloud_run_v2_service.fetcher.uri
@@ -120,6 +124,12 @@ resource "google_pubsub_subscription" "fetcher" {
       service_account_email = google_service_account.push.email
     }
   }
+}
+
+module "dead" {
+  source     = "../dead_letter"
+  project_id = var.project_id
+  name       = "fetcher"
 }
 
 variable "neo4j_secret_ids" {

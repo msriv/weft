@@ -241,6 +241,19 @@ NODES: dict[str, dict[str, Any]] = {
         "last_sent": None,
     },
     "DailyDiff": {"day": None, "payload": None},
+    "AutocleanRun": {  # one per rule per autoclean run (#147)
+        "run_id": None,
+        "rule": None,
+        "rule_version": None,
+        "mode": None,
+        "matched": 0,
+        "changed": 0,
+        "sample_ids": "[]",
+        "started_at": None,
+        "ended_at": None,
+        "status": None,  # ok / dry_run / aborted / skipped / failed
+        "note": None,
+    },
     "Prediction": {
         "id": None,
         "story_id": None,
@@ -292,6 +305,7 @@ NODES: dict[str, dict[str, Any]] = {
         "perspectives": "[]",
     },
     "SeriesPoint": {"series_id": None, "day": None, "value": None, "source": None},
+    "Seen": {"key": None, "at": None},  # fetched URL / text hash keys (#161)
     "BatchRun": {
         "run_id": None,
         "stage": None,
@@ -317,6 +331,7 @@ UNIQUE = {
     "EntityLink": "name",
     "ReaderReport": "id",
     "Prediction": "id",
+    "Seen": "key",
 }
 INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
 
