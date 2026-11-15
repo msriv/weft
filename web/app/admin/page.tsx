@@ -11,6 +11,8 @@ type Maybe = { report_id: string; beat_id: string; score: number; title: string 
 type Unplaced = { id: string; title: string | null; url: string | null; source_id: string; fetched_at: string };
 type Run = { run_id: string; stage: string; started_at: string; ended_at: string | null; rows_out: number | null; status: string; error: string | null };
 
+type Clean = { run_id: string; rule: string; rule_version: number; mode: string; matched: number; changed: number; status: string; started_at: string; note: string | null };
+
 export default function Admin() {
   const [token, setToken] = useState("");
   const [stories, setStories] = useState<Story[]>([]);
@@ -21,6 +23,7 @@ export default function Admin() {
   const [beats, setBeats] = useState<Beat[]>([]);
   const [unplaced, setUnplaced] = useState<Unplaced[]>([]);
   const [maybes, setMaybes] = useState<Maybe[]>([]);
+  const [clean, setClean] = useState<Clean[]>([]);
   const [err, setErr] = useState("");
   const call = useCallback(async (path: string, init: RequestInit = {}) => {
     const r = await fetch(`/api/admin${path}`, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
@@ -30,7 +33,7 @@ export default function Admin() {
   const load = useCallback(async () => {
     try {
       setErr("");
-      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs")); setSources(await call("/sources")); setBeats(await call("/beats")); setUnplaced(await call("/unplaced")); setMaybes(await call("/beat-maybes"));
+      setStories(await call("/stories")); setReview(await call("/review")); setProblems(await call("/reader-reports")); setRuns(await call("/runs")); setSources(await call("/sources")); setBeats(await call("/beats")); setUnplaced(await call("/unplaced")); setMaybes(await call("/beat-maybes")); setClean(await call("/autoclean"));
     } catch { setErr("Could not load. Check the token."); }
   }, [call]);
   useEffect(() => { setToken(sessionStorage.getItem("weft:admin") ?? ""); }, []);
@@ -68,6 +71,18 @@ export default function Admin() {
         </div>
       ))}
       {token && runs.length === 0 && <p className="muted">No pipeline runs yet. The first starts about 30 minutes after startup, then daily.</p>}
+      <hr /><Kicker>Autoclean (last runs). A rule in dry_run only counts; it changes nothing.</Kicker>
+      {clean.slice(0, 30).map((r) => (
+        <div className="row" key={`${r.run_id}:${r.rule}`}>
+          <b>{r.rule}</b> <span className="muted">v{r.rule_version}</span>
+          <span className={r.status === "ok" || r.status === "dry_run" ? "muted" : undefined}>{r.status}</span>
+          <span className="muted">{r.mode}</span>
+          <span>{r.matched} matched · {r.changed} changed</span>
+          <span className="muted">{new Date(r.started_at).toLocaleString()}</span>
+          {r.note && <code>{r.note}</code>}
+        </div>
+      ))}
+      {token && clean.length === 0 && <p className="muted">No autoclean runs yet.</p>}
       <hr /><Kicker>Stories. Public stories appear on the site; the rest return 404.</Kicker>
       {stories.map((s) => (
         <div className="row" key={s.id}>
