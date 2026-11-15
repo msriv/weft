@@ -305,6 +305,7 @@ NODES: dict[str, dict[str, Any]] = {
         "perspectives": "[]",
     },
     "SeriesPoint": {"series_id": None, "day": None, "value": None, "source": None},
+    "Seen": {"key": None, "at": None},  # fetched URL / text hash keys (#161)
     "BatchRun": {
         "run_id": None,
         "stage": None,
@@ -330,6 +331,7 @@ UNIQUE = {
     "EntityLink": "name",
     "ReaderReport": "id",
     "Prediction": "id",
+    "Seen": "key",
 }
 INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
 

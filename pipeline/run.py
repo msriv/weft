@@ -1,5 +1,6 @@
 """Nightly runner. `python -m pipeline.run` runs every stage in order; `--stage NAME` re-runs one;
-`--from NAME` resumes. Each stage's start, end, row count and status go to `BatchRun` nodes in Neo4j."""
+`--from NAME` resumes. Stage order lives in config/pipeline.yaml `stages`. Each stage's start, end,
+row count and status go to `BatchRun` nodes."""
 
 import argparse
 import sys
@@ -28,7 +29,7 @@ from pipeline import (
     weights,
 )
 from pipeline.ctx import Ctx
-from weft_core import graph
+from weft_core import config, graph
 
 STAGES: dict[str, Callable[[Ctx], int]] = {
     "regroup": regroup.run,
@@ -57,6 +58,10 @@ STAGES: dict[str, Callable[[Ctx], int]] = {
 }
 
 
+def stage_names() -> list[str]:
+    return [s["name"] for s in config.pipeline()["stages"]]
+
+
 def _sink() -> snapshot.Sink | None:
     import os
 
@@ -65,7 +70,7 @@ def _sink() -> snapshot.Sink | None:
 
 
 def run_stages(ctx: Ctx, only: str | None = None, start: str | None = None) -> dict[str, int]:
-    names = list(STAGES)
+    names = stage_names()
     if only:
         names = [only]
     elif start:
@@ -98,8 +103,8 @@ def run_stages(ctx: Ctx, only: str | None = None, start: str | None = None) -> d
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage", choices=list(STAGES))
-    ap.add_argument("--from", dest="start", choices=list(STAGES))
+    ap.add_argument("--stage", choices=list(STAGES))  # includes autoclean, which has its own job
+    ap.add_argument("--from", dest="start", choices=stage_names())
     args = ap.parse_args(argv)
     ctx = production_ctx()
     run_stages(ctx, args.stage, args.start)
@@ -110,7 +115,7 @@ def production_ctx() -> Ctx:
     import os
 
     from pipeline.gcp import BqWarehouse, GcsText, bq_sink, pubsub_publish, versions_of
-    from weft_core import config, store
+    from weft_core import store
     from weft_core.models import ModelClient
     from weft_core.nlp import default_nlp
 
