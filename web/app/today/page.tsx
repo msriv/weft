@@ -58,7 +58,7 @@ export default async function TodayPage() {
           {b.no_source_published.length > 0 && <p className="muted">No source from {b.no_source_published.join(", ")} has published on this event.</p>}
           {b.untracked.length > 0 && <p className="muted">Weft tracks no source from {b.untracked.join(", ")}.</p>}
         </div>
-      )) : <Empty>Nothing to show.</Empty>}
+      )) : <Empty>No public stories yet. Stories appear here once collected and published.</Empty>}
       <hr />
       <Kicker>Branches you follow</Kicker>
       <FollowedBranches stories={all ?? []} />

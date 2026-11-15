@@ -20,3 +20,26 @@ rules:
   # Both null one column past raw_retention_days and lose nothing rule 4 needs, so no cap applies.
   model_call_inputs: {max_rows: 1000000000, max_fraction: 1.0}
   raw_uri_expired: {max_rows: 1000000000, max_fraction: 1.0}
+  # Applies config/schema_retired.yaml. Deleting a retired label is the point, so no cap.
+  retired_schema: {max_rows: 1000000000, max_fraction: 1.0}
+  # Report only: leftover labels and properties that nothing declares or retires.
+  undeclared_schema: {max_rows: 1000000000, max_fraction: 1.0}
+  stale_indexes: {max_rows: 100}
+  # Graph integrity (#149): repairs first, then deletes of children whose parent is in no version.
+  duplicate_current: {max_rows: 1000}
+  event_counts: {}
+  empty_event: {min_age_hours: 1}
+  dangling_event_ref: {max_rows: 5000}
+  missing_version0: {max_rows: 5000}
+  stale_perspective: {}
+  subscription_follows: {}
+  dangling_group_ref: {max_rows: 5000}
+  orphan_report_children: {}
+  orphan_group_children: {}
+  orphan_story_children: {}
+  orphan_event_children: {}
+  orphan_source_children: {}
+  orphan_document_children: {}
+  orphan_beat_children: {}
+  orphan_domain_children: {}
+  broken_references: {max_rows: 1000000000, max_fraction: 1.0}  # report only

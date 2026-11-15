@@ -1,0 +1,10 @@
+# Labels and properties that left `store.NODES` (#148). A PR that removes or renames one adds an
+# entry here, or CI fails (tests/test_schema.py). Autoclean's `retired_schema` rule applies each
+# entry to old data; an entry stays after it has run, and the rule is then a no-op.
+#
+#   - {label: Foo, property: bar, action: rename_to, to: baz, pr: 150}   # copy, then remove
+#   - {label: Foo, property: bar, action: delete, pr: 150}               # remove the property
+#   - {label: OldThing, action: delete, pr: 151}                         # delete the label's nodes
+version: 1
+retired:
+  - {label: EntityLink, action: delete, pr: 148}  # declared, never written

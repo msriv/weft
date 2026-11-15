@@ -1,6 +1,6 @@
 """Nightly runner. `python -m pipeline.run` runs every stage in order; `--stage NAME` re-runs one;
 `--from NAME` resumes. Stage order lives in config/pipeline.yaml `stages`. Each stage's start, end,
-row count and status go to `BatchRun` nodes."""
+row count and status go to `BatchRun` nodes in the graph."""
 
 import argparse
 import sys
