@@ -6,6 +6,8 @@ published per feed (#161). The fetcher still dedupes (canonical URL + text hash)
 """
 
 import hashlib
+import random
+import re
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -14,6 +16,7 @@ from typing import Any, Protocol
 import feedparser
 import httpx
 
+from weft_core import prefilter
 from weft_core.polite import PoliteClient
 from weft_core.urls import normalize_url
 
@@ -45,8 +48,20 @@ Publish = Callable[[dict[str, Any]], None]
 
 
 class Poller:
-    def __init__(self, http: PoliteClient, state: State, publish: Publish) -> None:
+    def __init__(
+        self,
+        http: PoliteClient,
+        state: State,
+        publish: Publish,
+        beats: list[dict[str, Any]] | None = None,
+        sample_rate: float = 0.02,
+        rng: random.Random | None = None,
+    ) -> None:
         self._http, self._state, self._publish = http, state, publish
+        self._beats, self._sample_rate = beats, sample_rate
+        self._rng = rng or random.Random()
+        # per source: how many entries were published, skipped as off-beat, or kept as a sample
+        self.stats: dict[str, dict[str, int]] = {}
 
     def _conditional_get(
         self, url: str, interval: float
@@ -65,18 +80,33 @@ class Poller:
         return resp, FeedState(resp.headers.get("ETag"), resp.headers.get("Last-Modified"), st.seen)
 
     def _publish_new(
-        self, source: dict[str, Any], url: str, st: FeedState, entries: list[tuple[str, Any, Any]]
+        self,
+        source: dict[str, Any],
+        url: str,
+        st: FeedState,
+        entries: list[tuple[str, Any, Any, str | None]],
     ) -> int:
         """Publish entries not published before, then save the state (etag and the seen set)."""
         known = set(st.seen)
         n = 0
-        for link, title, published in entries:
+        stats = self.stats.setdefault(source["id"], {"published": 0, "skipped": 0, "sampled": 0})
+        fresh = [e for e in entries if key(e[0]) not in known]
+        verdicts = {
+            link: "publish"
+            if self._beats is None
+            else prefilter.decide(self._beats, title, summary, self._sample_rate, self._rng)
+            for link, title, _, summary in fresh
+        }
+        # on-beat entries first, so they are not queued behind the sampled ones
+        for link, title, published, _ in sorted(fresh, key=lambda e: verdicts[e[0]] != "publish"):
             k = key(link)
-            if k in known:
+            st.seen.append(k)  # decided once: a skipped entry is not drawn for again next poll
+            known.add(k)
+            if verdicts[link] == "skip":
+                stats["skipped"] += 1
                 continue
             self._emit(source, link, title, published)
-            known.add(k)
-            st.seen.append(k)
+            stats["sampled" if verdicts[link] == "sample" else "published"] += 1
             n += 1
         cap = max(MIN_SEEN, 2 * len(entries))
         st.seen = st.seen[-cap:]
@@ -89,7 +119,12 @@ class Poller:
             return 0
         resp, st = got
         entries = [
-            (str(e["link"]), e.get("title"), e.get("published") or e.get("updated"))
+            (
+                str(e["link"]),
+                e.get("title"),
+                e.get("published") or e.get("updated"),
+                _plain(e.get("summary")),
+            )
             for e in feedparser.parse(resp.content).entries
             if e.get("link")
         ]
@@ -101,7 +136,7 @@ class Poller:
             return 0
         resp, st = got
         entries = [
-            (el.text.strip(), None, None)
+            (el.text.strip(), None, None, None)
             for el in ET.fromstring(resp.content).iter()
             if el.tag.endswith("}loc") and el.text
         ]
@@ -125,6 +160,13 @@ class Poller:
             except (httpx.HTTPError, ET.ParseError, PollSkipped) as exc:
                 out[s["id"]] = str(exc)
         return out
+
+
+_TAGS = re.compile(r"<[^>]+>")
+
+
+def _plain(html: Any) -> str | None:
+    return _TAGS.sub(" ", str(html)) if html else None
 
 
 def _interval(source: dict[str, Any]) -> float:
