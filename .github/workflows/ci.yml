@@ -43,6 +43,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
+      - run: npm run gen:types:check # api.gen.ts must match api.openapi.json (tests/test_openapi.py checks the JSON)
       - run: npx tsc --noEmit
       - run: npx vitest run
       - run: npm run build
