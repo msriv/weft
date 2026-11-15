@@ -18,6 +18,12 @@ class Prefs(Protocol):
 
 def verify_token(token: str, project: str) -> str | None:
     """Firebase user id for a valid ID token, else None."""
+    claims = verify_claims(token, project)
+    return str(claims["sub"]) if claims else None
+
+
+def verify_claims(token: str, project: str) -> dict[str, Any] | None:
+    """Claims of a valid Firebase ID token (sub, email, custom claims), else None."""
     try:
         if os.environ.get("FIREBASE_AUTH_EMULATOR_HOST"):
             # emulator tokens are unsigned (alg none); local runs only
@@ -31,7 +37,7 @@ def verify_token(token: str, project: str) -> str | None:
                 token, grequests.Request(), audience=project
             )
             ok = claims is not None
-        return str(claims["sub"]) if ok else None
+        return dict(claims) if ok and claims.get("sub") else None
     except (ValueError, KeyError, IndexError):
         return None
 
