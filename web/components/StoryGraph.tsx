@@ -6,7 +6,7 @@ import { line, curveBasis } from "d3-shape";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
-import { day, perspectiveName, RULE_NAMES, shortDay } from "@/lib/format";
+import { count, dateShort, perspectiveName, RULE_NAMES, shortDay } from "@/lib/format";
 import { layout, type Placed } from "@/lib/layout";
 import type { Anomaly, GraphEdge, GraphNode } from "@/lib/types";
 import StoryCanvas from "./StoryCanvas";
@@ -100,7 +100,7 @@ export default function StoryGraph(props: Props) {
                 const party = doc && n.issuer?.is_party;
                 const flagged = n.anomalies.some((id) => anomalyById.get(id)?.status === "active");
                 const prov = n.anomalies.some((id) => anomalyById.get(id)?.status === "provisional");
-                const label = doc ? `${n.title ?? "Document"}, issued by ${n.issuer?.name ?? "unknown"}` : `${eventLabel(n.event_id)}: ${n.count} reports from ${perspectiveName(n.perspective ?? "")}, ${day(n.at)}`;
+                const label = doc ? `${n.title ?? "Document"}, issued by ${n.issuer?.name ?? "unknown"}` : `${eventLabel(n.event_id)}: ${count(n.count ?? 0, "report")} from ${perspectiveName(n.perspective ?? "")}, ${dateShort(n.at ?? "")}`;
                 const dim = shown != null && n.event_id !== shown;
                 return (
                   <g
@@ -134,7 +134,7 @@ export default function StoryGraph(props: Props) {
             <div className="tip card" role="status" style={{ left: `${(hot.n.x / L.width) * 100}%`, top: `${(hot.n.y / L.height) * 100}%` }}>
               <strong>{hot.n.kind === "document" ? hot.n.title : eventLabel(hot.n.event_id)}</strong>
               <div className="muted fs12">
-                {hot.n.kind === "document" ? `Issued by ${hot.n.issuer?.name ?? "unknown"}` : `${perspectiveName(hot.n.perspective ?? "")} · ${hot.n.count} reports · ${(hot.n.sources ?? []).join(", ")}`}
+                {hot.n.kind === "document" ? `Issued by ${hot.n.issuer?.name ?? "unknown"}` : `${perspectiveName(hot.n.perspective ?? "")} · ${count(hot.n.count ?? 0, "report")} · ${(hot.n.sources ?? []).join(", ")}`}
               </div>
               {hot.n.anomalies.map((id) => anomalyById.get(id)).filter(Boolean).map((a) => (
                 <div key={a!.id} className="c-anomaly-light fs12">Anomaly: {RULE_NAMES[a!.rule] ?? a!.rule}</div>
@@ -194,7 +194,7 @@ function Detail({ n, storyId, eventLabel, anomalies, onClose }: { n: Placed; sto
         <>
           <div className="kicker">{perspectiveName(n.perspective ?? "")} · {shortDay(n.at ?? "")}</div>
           <h3>{eventLabel}</h3>
-          <p>{n.count} reports from {(n.sources ?? []).join(", ") || "outlets not named"}</p>
+          <p>{count(n.count ?? 0, "report")} from {(n.sources ?? []).join(", ") || "outlets not named"}</p>
           {n.event_id && <Link href={`/s/${storyId}/e/${n.event_id}`}>Open this event</Link>}
         </>
       )}

@@ -1,4 +1,5 @@
 // Pure helpers for the story page: tab links, conflict pairing, merged claim lists.
+import { count } from "@/lib/format";
 import type { GraphEdge, GraphNode, ShortVersion, StoryGraph } from "./types";
 
 export const TABS = [["overview", "Overview"], ["timeline", "Timeline"], ["network", "Network"], ["anomalies", "Anomalies"], ["questions", "Questions"]] as const;
@@ -54,4 +55,4 @@ export const beatName = (beat: string): string => {
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 
-export const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+export const plural = count;

@@ -9,9 +9,10 @@ import LiveFeed from "@/components/LiveFeed";
 import OpenQuestions from "@/components/OpenQuestions";
 import StoryGraph from "@/components/StoryGraph";
 import { api } from "@/lib/api";
-import { ago, day, perspectiveName, shortDay } from "@/lib/format";
+import Time from "@/components/Time";
+import { beatLabel, count, day, dateShort, num, perspectiveName } from "@/lib/format";
 import { meta } from "@/lib/meta";
-import { TABS, beatName, carriedByAll, conflicts, plural, storyHref, tabOf, type StoryQuery } from "@/lib/story";
+import { TABS, carriedByAll, conflicts, plural, storyHref, tabOf, type StoryQuery } from "@/lib/story";
 import type { StoryGraph as SG } from "@/lib/types";
 
 const shift = (iso: string, d: number) => new Date(Date.parse(iso) + d * 86400000).toISOString().slice(0, 10);
@@ -43,30 +44,30 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
     <>
       <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: st.title }]} />
       <Kicker>
-        {beatName(st.beat)} · {st.status === "quiet" ? "Quiet" : "Developing"}
-        {g.as_of ? ` · Replay of ${shortDay(g.as_of)}` : ""}
+        {beatLabel(st.beat_name, st.beat)} · {st.status === "quiet" ? "Quiet" : "Developing"}
+        {g.as_of ? ` · Replay of ${dateShort(g.as_of)}` : ""}
       </Kicker>
       <h1>{st.title}</h1>
       <p className="figures fs13 m0" aria-label="Story figures">
-        <span><b>{st.reports}</b> reports</span>
+        <span><b>{num(st.reports)}</b> {st.reports === 1 ? "report" : "reports"}</span>
         <span><b>{st.sources}</b> {st.sources === 1 ? "outlet" : "outlets"}</span>
         <span><b>{st.perspectives.length}</b> {st.perspectives.length === 1 ? "perspective" : "perspectives"}</span>
         <span><b>{st.events}</b> {st.events === 1 ? "event" : "events"}</span>
-        {st.last_report_at && <span>last report {ago(st.last_report_at)}</span>}
+        {st.last_report_at && <span>last report <Time iso={st.last_report_at} relative /></span>}
         <span className={active || prov ? "c-anomaly-light" : ""}>{active} active{prov ? `, ${prov} provisional` : ""} {active + prov === 1 ? "anomaly" : "anomalies"}</span>
       </p>
       <div className="row my12">
         <Link className={`btn small switch`} aria-pressed={!!q.live} href={href({ live: q.live ? "" : "1" })}>{q.live ? "Live: on" : "Go live"}</Link>
         <FollowButton beat={st.beat} />
         <nav className="row muted fs13" aria-label="Story window">
-          <span>{w.from ? `${shortDay(w.from)} to ${shortDay(w.to)}` : "Whole story"}</span>
+          <span>{w.from ? `${dateShort(w.from)} to ${dateShort(w.to)}` : "Whole story"}</span>
           {w.from && w.older && <Link scroll={false} className="btn small" href={href({ until: shift(w.from, -1) })}>Previous week</Link>}
           {q.until && w.from && <Link scroll={false} className="btn small" href={href({ until: shift(w.to, w.days) })}>Next week</Link>}
           {(q.until || q.days) && <Link scroll={false} className="btn small" href={href({ until: "", days: "" })}>Latest</Link>}
           {w.from && <Link scroll={false} className="btn small" href={href({ days: "0", until: "" })}>Whole story</Link>}
         </nav>
       </div>
-      {g.as_of && <p className="c-anomaly-light">You are looking at a replay of {shortDay(g.as_of)}. <Link scroll={false} href={href({ at: "" })}>Back to now</Link></p>}
+      {g.as_of && <p className="c-anomaly-light">You are looking at a replay of {dateShort(g.as_of)}. <Link scroll={false} href={href({ at: "" })}>Back to now</Link></p>}
 
       <nav className="tabs" aria-label="Story sections">
         {TABS.map(([k, label]) => <Link key={k} scroll={false} href={href({ tab: k })} aria-current={tab === k ? "page" : undefined}>{label}</Link>)}
@@ -106,7 +107,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
         <section aria-label="Events, newest first">
           {days.length ? days.map((d) => (
             <div key={d}>
-              <h3>{shortDay(d)}</h3>
+              <h3>{dateShort(d)}</h3>
               {g.events.filter((e) => day(e.first_seen) === d).map((e) => (
                 <div className="card" id={`event-${e.id}`} key={e.id}>
                   <h3 className="m0"><Link href={`/s/${id}/e/${e.id}`}>{e.label ?? "Event"}</Link></h3>

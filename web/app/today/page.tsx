@@ -2,7 +2,8 @@ import Link from "next/link";
 import { AnomalyCard, Empty, Kicker, StoryRow } from "@/components/bits";
 import FollowedBranches from "@/components/FollowedBranches";
 import { api } from "@/lib/api";
-import { ago, perspectiveName } from "@/lib/format";
+import Time from "@/components/Time";
+import { count, num, perspectiveName } from "@/lib/format";
 import type { NewEvent, StoryCard, Today } from "@/lib/types";
 
 function byBeat(events: NewEvent[]): [string, NewEvent[]][] {
@@ -15,11 +16,11 @@ export default async function TodayPage() {
   const [t, all] = await Promise.all([api<Today>("/v1/today"), api<StoryCard[]>("/v1/stories")]);
   return (
     <>
-      <Kicker>Overnight batch{t?.day ? ` · ${t.day}` : ""}</Kicker>
+      <Kicker>Overnight batch{t?.day ? <> · <Time iso={t.day} /></> : ""}</Kicker>
       <h1>Today</h1>
       <p>Who reported what, when, and from where. Weft shows coverage; it never says what is true.</p>
       <hr />
-      <Kicker>New since {t ? ago(t.since) : "yesterday"}</Kicker>
+      <Kicker>New since {t ? <Time iso={t.since} relative /> : "yesterday"}</Kicker>
       {t?.new_events.length ? byBeat(t.new_events).map(([beat, evs]) => (
         <section key={beat}>
           <h3>{evs[0].title}</h3>
@@ -27,8 +28,8 @@ export default async function TodayPage() {
             <Link key={e.id} href={`/s/${e.story_id}/e/${e.id}`} className="card block">
               <div>{e.thread_label && e.follows ? <span className="muted">Thread {e.thread_label} advanced: </span> : null}{e.label ?? "Untitled event"}</div>
               <div className="muted fs13">
-                {e.label_source && `Headline from ${e.label_source} · `}{e.outlets} outlets · {e.perspectives.map(perspectiveName).join(", ")}
-                {e.new_documents > 0 && ` · ${e.new_documents} new documents`} · first seen {ago(e.first_seen)}
+                {e.label_source && `Headline from ${e.label_source} · `}{count(e.outlets, "outlet")} · {e.perspectives.map(perspectiveName).join(", ")}
+                {e.new_documents > 0 && ` · ${count(e.new_documents, "new document")}`} · first seen <Time iso={e.first_seen} relative />
               </div>
             </Link>
           ))}
@@ -45,7 +46,7 @@ export default async function TodayPage() {
       {t && t.new_anomalies.map((a) => <AnomalyCard key={a.id} a={a} />)}
       {t?.directions && <p className="muted fs13"><Link href="/directions">{t.directions}</Link> (model speculation, not reporting).</p>}
       {t && t.changes.length > 0 && (
-        <p className="muted fs13">Last nightly run: {t.changes.map((c) => `${c.count} ${c.label.toLowerCase()}`).join(" · ")}.</p>
+        <p className="muted fs13">Last nightly run: {t.changes.map((c) => `${num(c.count)} ${c.label.toLowerCase()}`).join(" · ")}.</p>
       )}
       <hr />
       <Kicker>Stories with something new</Kicker>
@@ -55,8 +56,8 @@ export default async function TodayPage() {
       {t?.blind_spots.length ? t.blind_spots.map((b) => (
         <div className="card" key={b.event_id}>
           <Link href={`/s/${b.story_id}/e/${b.event_id}`}>{b.title}</Link>
-          {b.no_source_published.length > 0 && <p className="muted">No source from {b.no_source_published.join(", ")} has published on this event.</p>}
-          {b.untracked.length > 0 && <p className="muted">Weft tracks no source from {b.untracked.join(", ")}.</p>}
+          {b.no_source_published.length > 0 && <p className="muted">No source from {b.no_source_published.map(perspectiveName).join(", ")} has published on this event.</p>}
+          {b.untracked.length > 0 && <p className="muted">Weft tracks no source from {b.untracked.map(perspectiveName).join(", ")}.</p>}
         </div>
       )) : <Empty>No public stories yet. Stories appear here once collected and published.</Empty>}
       <hr />

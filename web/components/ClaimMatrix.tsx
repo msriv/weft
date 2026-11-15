@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { day, perspectiveName } from "@/lib/format";
+import Time from "@/components/Time";
+import { perspectiveName } from "@/lib/format";
 import { columns, coverage, filterRows, rows, type Filter } from "@/lib/matrix";
 import type { EventPage } from "@/lib/types";
 
@@ -88,7 +89,7 @@ export default function ClaimMatrix({ e }: { e: EventPage }) {
       <p className="muted fs12">Filled: the outlet's own sentence is in this claim group. Empty: Weft found no sentence from that outlet in it.</p>
       {sel?.col && hit && rep && (
         <div className="card" role="region" aria-label="Sentence behind the selected cell" aria-live="polite">
-          <div className="row"><b>{sel.col.name}</b><span className="muted fs13">{rep.published_at ? day(rep.published_at) : "Publish time not recorded"}</span><button className="small" onClick={() => setOpen(null)}>Close</button></div>
+          <div className="row"><b>{sel.col.name}</b><span className="muted fs13">{rep.published_at ? <Time iso={rep.published_at} /> : "Publish time not recorded"}</span><button className="small" onClick={() => setOpen(null)}>Close</button></div>
           <blockquote>{hit.text}</blockquote>
           <div className="row fs13">
             <a href={rep.url} rel="noopener noreferrer">Source article</a>

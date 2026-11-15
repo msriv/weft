@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
-import { day } from "@/lib/format";
+import Time from "@/components/Time";
 
 type Prediction = {
   id: string; text: string; probability: number | null; expected_by: string; confirm_if: string; refute_if: string;
@@ -45,7 +45,7 @@ export default async function DetectivePanel({ storyId }: { storyId: string }) {
             </div>
           )}
           <p className="muted fs13">
-            Guessed {day(p.made_at)}, expected by {day(p.expected_by)} · {STATUS[p.status]}
+            Guessed <Time iso={p.made_at} />, expected by <Time iso={p.expected_by} /> · {STATUS[p.status]}
           </p>
           <p className="muted fs13">Would confirm: {p.confirm_if} · Would refute: {p.refute_if}</p>
           {p.evidence.length > 0 && (

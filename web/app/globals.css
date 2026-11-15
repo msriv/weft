@@ -206,3 +206,10 @@ details.report summary { padding: var(--s2) 0; cursor: pointer; }
 .crumbs li + li::before { content: "›"; margin-right: 8px; color: var(--muted); }
 .footer { border-top: 1px solid var(--hair); padding: var(--s5) 24px; max-width: 1160px; margin: 0 auto; color: var(--muted); font-size: 13px; }
 .footer .row { margin-top: var(--s2); }
+
+/* labelled rows for stored objects (components/Fields.tsx) */
+.fields { display: grid; gap: 6px; }
+.fields > div { display: grid; grid-template-columns: minmax(8rem, 14rem) 1fr; gap: 12px; }
+.fields dt { color: var(--muted); font-size: 13px; }
+.fields dd { margin: 0; }
+@media (max-width: 640px) { .fields > div { grid-template-columns: 1fr; gap: 0; } }

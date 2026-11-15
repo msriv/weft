@@ -6,7 +6,7 @@ import ReportProblem from "@/components/ReportProblem";
 import { IssuerTag, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
 import { meta } from "@/lib/meta";
-import { day } from "@/lib/format";
+import Time from "@/components/Time";
 import type { Issuer } from "@/lib/types";
 
 type Doc = {
@@ -31,7 +31,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   return (
     <>
       <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: title, href: `/s/${d.document.story_id}` }, ...(d.event ? [{ label: d.event.label ?? "Event", href: `/s/${d.document.story_id}/e/${d.event.id}` }] : []), { label: d.document.title }]} />
-      <Kicker>Official document · {d.document.kind} · {day(d.document.published_at)}</Kicker>
+      <Kicker>Official document · {d.document.kind} · <Time iso={d.document.published_at} /></Kicker>
       <h1>{d.document.title}</h1>
       <div className="row my10">{d.issuer && <IssuerTag i={d.issuer} />}</div>
       {d.label && <p>{d.label}</p>}
@@ -43,8 +43,8 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       <div className="row">{speakers.map((s) => <Link key={s.actor_id} className="pill on" href={`/people/${s.actor_id}`}>{s.actor}{s.role ? ` · ${s.role}` : ""}</Link>)}</div>
       <Kicker>Statements</Kicker>
       {d.statements.map((s) => (
-        <div className="card" key={s.id}>
-          <div className="kicker">{s.actor} · character {s.start}</div>
+        <div className="card" id={`st-${s.id}`} key={s.id}>
+          <div className="kicker">{s.actor}</div>
           <p>“{s.text}”</p>
         </div>
       ))}

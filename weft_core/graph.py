@@ -10,7 +10,7 @@ graph size makes property joins or brute-force cosine slow.
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from weft_core import store
@@ -76,6 +76,28 @@ def put(db: Db, table: str, row: dict[str, Any], at: str | None = None) -> None:
         f"WITH count(o) AS closed CREATE (n:{label}) SET n = ?",
         (row["id"], at, store._clean({**row, "valid_from": at, "valid_to": None})),
     )
+
+
+def put_recent(
+    db: Db, table: str, row: dict[str, Any], minutes: int, at: str | None = None
+) -> None:
+    """Like `put`, but when the current version was opened less than `minutes` ago, on the same
+    UTC day, update it in place instead of writing a new version. Every stream attach rewrote a
+    full event (with its centroid) as a new node; this stops most of that churn (#151). Replay
+    resolves to the end of a day, so a same-day rewrite changes nothing it can show."""
+    at = at or now()
+    if minutes > 0:
+        since = (datetime.fromisoformat(at) - timedelta(minutes=minutes)).isoformat()
+        label = LABELS[table]
+        done = db.execute(
+            f"MATCH (o:{label} {{id: ?}}) WHERE o.valid_to IS NULL AND o.valid_from >= ? "
+            "AND substring(o.valid_from, 0, 10) = substring(?, 0, 10) "
+            "WITH o, o.valid_from AS vf SET o = ? SET o.valid_from = vf RETURN count(o) AS n",
+            (row["id"], since, at, store._clean({**row, "valid_to": None})),
+        )
+        if done and done[0]["n"]:
+            return
+    put(db, table, row, at)
 
 
 def asof(at: str | None) -> tuple[str, tuple[Any, ...]]:

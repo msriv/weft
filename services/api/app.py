@@ -58,7 +58,7 @@ class Problem(BaseModel):
 class SourcePatch(BaseModel):
     country: str | None = None
     paywalled: bool | None = None
-    status: Literal["active", "rejected"] | None = None
+    status: Literal["active", "rejected", "dormant"] | None = None
     state_run: bool | None = None
     state_run_source: str | None = None
     owner_id: str | None = None
@@ -511,6 +511,8 @@ def create_app(
             "country",
             "country_source",
             "paywalled",
+            "yield_14d",
+            "dormant_at",
             "status",
             "rejected_reason",
         )
@@ -641,6 +643,11 @@ def create_app(
         request.state.before = {k: current[0].get(k) for k in data}
         if "country" in data:  # also re-tags the source's reports
             store.set_country(db, source_id, data.pop("country"), "admin")
+        if data.get("status") == "active":
+            data["dormant_at"] = (
+                None  # an admin reactivation; discovery will not re-dorm it for 30 days
+            )
+            data["discovered_at"] = datetime.now(UTC).isoformat()
         if "paywalled" in data:
             data["paywalled_source"] = "admin"  # the fetcher never overrides a hand-set flag
         for col, val in data.items():  # col is a SourcePatch field name, never user text

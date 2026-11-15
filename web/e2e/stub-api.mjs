@@ -12,7 +12,7 @@ const S = {
   rev: src("kessar-review", "Kessar Review", "KE", "KE"),
 };
 const STORY = {
-  id: "kessar-strait", title: "Vessels detained in the Kessar Strait", beat: "kessar", status: "developing", reports: 14, events: 3, sources: 3,
+  id: "kessar-strait", title: "Vessels detained in the Kessar Strait", beat: "kessar", beat_name: "Kessar Strait", status: "developing", reports: 14, events: 3, sources: 3,
   perspectives: ["AL", "VE", "KE"], anomalies: 1, provisional_anomalies: 1, last_report_at: "2026-11-14T09:30:00Z",
   parties: [{ party: "AL", cited: true, citation: "Ministry of Maritime Affairs" }, { party: "VE", cited: false, citation: null }],
 };
