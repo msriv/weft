@@ -28,7 +28,7 @@ const anomaly = { id: "a1", rule: "number_mismatch", rule_version: 1, status: "p
   summary: "Reports differ on the number of vessels detained: 12 in The Aldoria Post, 9 in Veymar Wire.", inputs: { a: 12, b: 9 }, evidence_ids: ["r1", "r2"], detail: {}, since: iso(13) };
 const graph = {
   story: STORY, as_of: null, summary: [], perspectives: ["AL", "VE", "KE"], nodes, anomalies: [anomaly],
-  edges: [{ kind: "conflict", event_id: "e1", groups: ["g1", "g2"], between: [["n1"], ["n2"]], nli_score: 0.91 }],
+  edges: [{ kind: "conflict", event_id: "e1", groups: ["g1", "g2"], between: [["AL"], ["VE"]], nli_score: 0.91 }],
   events: [
     { id: "e1", label: "Vessels detained near the strait", first_seen: iso(10), reports: 7, perspectives: ["AL", "VE"] },
     { id: "e2", label: "Talks announced", first_seen: iso(12), reports: 7, perspectives: ["KE", "AL"] },
