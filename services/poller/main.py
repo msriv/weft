@@ -9,7 +9,7 @@ import httpx
 from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.poller.poller import FeedState, Poller
-from weft_core import config, store
+from weft_core import config, portals, store
 from weft_core.gcp import bigquery_client
 from weft_core.health import unhealthy
 from weft_core.polite import PoliteClient
@@ -74,6 +74,7 @@ def main() -> int:
             publish,
             store.beats(db) if pf["enabled"] else None,
             pf["sample_rate"],
+            on_foreign=lambda domain, url: portals.record_candidates(db, {domain}, url),
         )
         results = poller.run(store.active_sources(db))
     for sid, st in sorted(poller.stats.items()):

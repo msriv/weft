@@ -16,7 +16,7 @@ from typing import Any, Protocol
 import feedparser
 import httpx
 
-from weft_core import prefilter
+from weft_core import domains, prefilter
 from weft_core.polite import PoliteClient
 from weft_core.urls import normalize_url
 
@@ -56,10 +56,13 @@ class Poller:
         beats: list[dict[str, Any]] | None = None,
         sample_rate: float = 0.02,
         rng: random.Random | None = None,
+        on_foreign: Callable[[str, str], None] = lambda domain, url: None,
     ) -> None:
         self._http, self._state, self._publish = http, state, publish
         self._beats, self._sample_rate = beats, sample_rate
         self._rng = rng or random.Random()
+        self._on_foreign = on_foreign
+        self._sources: list[dict[str, Any]] = []
         # per source: how many entries were published, skipped as off-beat, or kept as a sample
         self.stats: dict[str, dict[str, int]] = {}
 
@@ -89,8 +92,23 @@ class Poller:
         """Publish entries not published before, then save the state (etag and the seen set)."""
         known = set(st.seen)
         n = 0
-        stats = self.stats.setdefault(source["id"], {"published": 0, "skipped": 0, "sampled": 0})
-        fresh = [e for e in entries if key(e[0]) not in known]
+        stats = self.stats.setdefault(
+            source["id"], {"published": 0, "skipped": 0, "sampled": 0, "foreign": 0}
+        )
+        fresh = []
+        owner: dict[str, str] = {}
+        for e in entries:
+            if key(e[0]) in known:
+                continue
+            sid = domains.attribute(e[0], source, self._sources or [source])
+            if sid is None:  # a site we do not track: not this feed's report; remember the domain
+                st.seen.append(key(e[0]))
+                known.add(key(e[0]))
+                stats["foreign"] += 1
+                self._on_foreign(domains.host_of(e[0]), e[0])
+                continue
+            owner[e[0]] = sid
+            fresh.append(e)
         verdicts = {
             link: "publish"
             if self._beats is None
@@ -105,7 +123,7 @@ class Poller:
             if verdicts[link] == "skip":
                 stats["skipped"] += 1
                 continue
-            self._emit(source, link, title, published)
+            self._emit({**source, "id": owner[link]}, link, title, published)
             stats["sampled" if verdicts[link] == "sample" else "published"] += 1
             n += 1
         cap = max(MIN_SEEN, 2 * len(entries))
@@ -150,6 +168,7 @@ class Poller:
     def run(self, sources: list[dict[str, Any]]) -> dict[str, str | None]:
         """Poll every source once. Returns {source_id: error}, with None for a healthy source."""
         out: dict[str, str | None] = {}
+        self._sources = sources
         for s in sources:
             try:
                 for u in s.get("feeds", []):

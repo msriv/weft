@@ -160,3 +160,32 @@ def test_seen_check_uses_the_graph_not_a_bigquery_job() -> None:
         and s.seen(None, "abc")
         and not s.seen("https://x.test/b", "zzz")
     )
+
+
+def test_domain_matching() -> None:
+    from weft_core import domains
+
+    ex = {"id": "ex", "domain": "example.com"}
+    assert domains.owner_of("https://news.example.com/a", [ex]) == ex
+    assert domains.owner_of("https://www.example.com/a", [ex]) == ex
+    assert domains.owner_of("https://example.org/a", [ex]) is None
+    co = {"id": "co", "domain": "bbc.co.uk"}
+    assert domains.owner_of("https://www.bbc.co.uk/n", [co]) == co
+    wired = {"id": "w", "domain": "x.test", "link_domains": ["cdn.partner.test"]}
+    assert domains.owner_of("https://cdn.partner.test/p", [wired]) == wired
+
+
+def test_redirect_to_the_feeds_own_article_is_stored_and_a_foreign_one_is_not() -> None:
+    src = {**SRC, "domain": "x.test"}
+    store = MemStore()
+    r = fetch_item(MSG, src, client(httpx.Response(200, text=HTML)), store, [src])
+    assert r.status == "stored" and store.rows[0][0]["source_id"] == "x"
+    other = {**SRC, "id": "y", "domain": "y.test"}
+    foreign = HTML.replace("https://x.test/story/1/", "https://elsewhere.example/story/1/")
+    store2 = MemStore()
+    r2 = fetch_item(MSG, src, client(httpx.Response(200, text=foreign)), store2, [src, other])
+    assert r2.status == "foreign" and store2.rows == []
+    moved = HTML.replace("https://x.test/story/1/", "https://y.test/story/1/")
+    store3 = MemStore()
+    r3 = fetch_item(MSG, src, client(httpx.Response(200, text=moved)), store3, [src, other])
+    assert r3.status == "stored" and store3.rows[0][0]["source_id"] == "y"
