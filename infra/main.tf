@@ -150,10 +150,9 @@ module "nightly" {
   region                = var.region
   image                 = var.nightly_image
   service_account_email = module.platform.service_account_emails["nightly"]
-  # must match pipeline/run.py STAGES, minus autoclean (tests/test_infra_stages.py checks)
-  stages     = ["regroup", "threads", "origins", "claims", "figures", "claim_groups", "conflicts", "short_version", "statements", "links", "anomalies", "weights", "detective", "series", "domains", "directions", "snapshot", "profiles", "review_sample", "notify"]
-  secret_env = local.pipeline_secret_env
-  env        = local.pipeline_env
+  stages                = yamldecode(file("${path.root}/../config/pipeline.yaml")).stages
+  secret_env            = local.pipeline_secret_env
+  env                   = local.pipeline_env
 }
 
 # Autoclean (#146): the same image, run alone on its own schedule after the nightly and its
