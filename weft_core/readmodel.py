@@ -183,9 +183,16 @@ def with_evidence(db: Db, views: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def story_card(db: Db, s: dict[str, Any], at: str | None = None) -> dict[str, Any]:
-    reps = graph.select(db, "reports", "n.story_id=?", (s["id"],), at)
+    clause, cargs = graph.asof(at)
+    (agg,) = db.execute(
+        f"MATCH (n:Report) WHERE {clause} AND n.story_id = ? RETURN count(n) AS reports, "
+        "count(DISTINCT n.event_id) AS events, count(DISTINCT n.source_id) AS sources, "
+        "collect(DISTINCT n.perspective) AS perspectives, "
+        "max(coalesce(n.published_at, n.fetched_at, '')) AS last",
+        (*cargs, s["id"]),
+    )
     anomalies = anomalies_for(db, "n.story_id=?", (s["id"],), at)
-    last = max((r["published_at"] or r["fetched_at"] or "" for r in reps), default=None)
+    last = agg["last"]
     now = datetime.fromisoformat(at) if at else datetime.now(UTC)
     quiet = not last or now - datetime.fromisoformat(last) > QUIET_AFTER
     beat = db.execute("MATCH (b:Beat {id: ?}) RETURN b.name AS n", (s["beat_id"],))
@@ -195,10 +202,10 @@ def story_card(db: Db, s: dict[str, Any], at: str | None = None) -> dict[str, An
         "beat": s["beat_id"],
         "beat_name": (beat[0]["n"] if beat else None) or s["beat_id"],
         "status": "quiet" if quiet else "developing",
-        "reports": len(reps),
-        "events": len({r["event_id"] for r in reps if r["event_id"]}),
-        "sources": len({r["source_id"] for r in reps}),
-        "perspectives": sorted({r["perspective"] for r in reps}),
+        "reports": agg["reports"],
+        "events": agg["events"],
+        "sources": agg["sources"],
+        "perspectives": sorted(p for p in agg["perspectives"] if p is not None),
         "anomalies": sum(a["status"] == "active" for a in anomalies),
         "provisional_anomalies": sum(a["status"] == "provisional" for a in anomalies),
         "last_report_at": last,
@@ -301,9 +308,21 @@ def story_graph(
     plist = parties(db, story_id)
     end = until or at or datetime.now(UTC).isoformat()
     start = (datetime.fromisoformat(end) - timedelta(days=days)).isoformat() if days else ""
-    every = graph.select(db, "reports", "n.story_id=?", (story_id,), at)
-    when = {r["id"]: r["published_at"] or r["fetched_at"] or "" for r in every}
-    reps = [r for r in every if start <= when[r["id"]] <= end]
+    stamp = "coalesce(n.published_at, n.fetched_at, '')"
+    reps = graph.select(
+        db,
+        "reports",
+        f"n.story_id=? AND {stamp} >= ? AND {stamp} <= ?",
+        (story_id, start, end),
+        at,
+        props=graph.light("reports"),
+    )
+    when = {r["id"]: r["published_at"] or r["fetched_at"] or "" for r in reps}
+    older = bool(start) and bool(
+        graph.select(
+            db, "reports", f"n.story_id=? AND {stamp} < ?", (story_id, start), at, "LIMIT 1", ["id"]
+        )
+    )
     rep_ids = {r["id"] for r in reps}
     in_window = {r["event_id"] for r in reps if r["event_id"]}
     groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -361,10 +380,11 @@ def story_graph(
             "EXISTS { MATCH (e:Event {id: n.event_id, story_id: ?}) }",
             (story_id,),
             at,
+            props=["id", "label", "perspectives"],
         )
     }
     edges = []
-    for c in graph.select(db, "conflicts", "true", (), at):
+    for c in graph.select(db, "conflicts", "n.event_id IN ?", (sorted(in_window),), at):
         if c["event_id"] in in_window and c["group_a"] in gid_persp and c["group_b"] in gid_persp:
             edges.append(
                 {
@@ -385,22 +405,43 @@ def story_graph(
         "nodes": nodes,
         "edges": edges,
         "anomalies": anomalies,
-        "events": [
-            event_row(db, e, at)
-            for e in graph.select(
-                db, "events", "n.story_id=?", (story_id,), at, "ORDER BY n.first_seen DESC"
-            )
-            if e["id"] in in_window
-        ],
+        "events": _event_rows(db, story_id, in_window, at),
         "window": {
             "from": start or None,
             "to": end,
             "days": days,
-            "older": any(t < start for t in when.values()) if start else False,
+            "older": older,
         },
         "short_version": _split_sv(db, _event_short_versions(db, story_id, at, in_window)),
         "weights_note": "Source weight changes ordering only. No report is hidden.",
     }
+
+
+def _event_rows(db: Db, story_id: str, in_window: set[str], at: str | None) -> list[dict[str, Any]]:
+    """Rows for the story's events in the window; their reports are read in one query."""
+    if not in_window:
+        return []
+    by_event: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in graph.select(
+        db,
+        "reports",
+        "n.event_id IN ?",
+        (sorted(in_window),),
+        at,
+        "ORDER BY n.published_at",
+        graph.light("reports"),
+    ):
+        by_event[r["event_id"]].append(r)
+    events = graph.select(
+        db,
+        "events",
+        "n.id IN ?",
+        (sorted(in_window),),
+        at,
+        "ORDER BY n.first_seen DESC",
+        graph.light("events"),
+    )
+    return [event_row(db, e, at, by_event[e["id"]]) for e in events]
 
 
 def _event_short_versions(
@@ -416,6 +457,7 @@ def _event_short_versions(
             "EXISTS { MATCH (e:Event {id: n.event_id, story_id: ?}) }",
             (story_id,),
             at,
+            props=["id", "label", "perspectives"],
         )
     }
     out: dict[str, Any] = {
@@ -424,7 +466,7 @@ def _event_short_versions(
         "one_perspective_only": [],
         "no_source_published": [],
     }
-    for e in graph.select(db, "events", "n.story_id=?", (story_id,), at):
+    for e in graph.select(db, "events", "n.story_id=?", (story_id,), at, props=["id"]):
         sv = (
             graph.get(db, "short_versions", e["id"], at)
             if events is None or e["id"] in events
@@ -455,8 +497,11 @@ def _event_short_versions(
     return out
 
 
-def event_row(db: Db, e: dict[str, Any], at: str | None = None) -> dict[str, Any]:
-    reps = graph.reports_of_event(db, e["id"], at)
+def event_row(
+    db: Db, e: dict[str, Any], at: str | None = None, reps: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    if reps is None:
+        reps = graph.reports_of_event(db, e["id"], at, graph.light("reports"))
     # the medoid headline among news reports (#112), else the earliest report's
     first = next(
         (r for r in reps if r["id"] == e.get("label_report_id")), reps[0] if reps else None
@@ -491,7 +536,7 @@ def event_page(db: Db, event_id: str, at: str | None = None) -> dict[str, Any] |
     if e is None or public_story(db, e["story_id"]) is None:
         return None
     src, wts, plist = sources_by_id(db), weights_latest(db), parties(db, e["story_id"])
-    reps = graph.reports_of_event(db, event_id, at)
+    reps = graph.reports_of_event(db, event_id, at, graph.light("reports"))
     by_p: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for r in reps:
         s = src.get(r["source_id"])
@@ -690,6 +735,7 @@ def source_profile(db: Db, source_id: str) -> dict[str, Any] | None:
         "reports",
         "n.source_id=? AND EXISTS { MATCH (s:Story {id: n.story_id, public: 1}) }",
         (source_id,),
+        props=graph.light("reports"),
     )
     ids = {r["id"] for r in reps}
     anomalies = [
@@ -847,7 +893,8 @@ def world(db: Db) -> dict[str, Any]:
     for s in store.nodes(db, "Story", "MATCH (n:Story {public: 1}) RETURN n ORDER BY n.id"):
         card = story_card(db, s)
         counts = Counter(
-            r["perspective"] for r in graph.select(db, "reports", "n.story_id=?", (s["id"],))
+            r["perspective"]
+            for r in graph.select(db, "reports", "n.story_id=?", (s["id"],), props=["perspective"])
         )
         anomalies = anomalies_for(db, "n.story_id=?", (s["id"],))
         for country, n in counts.items():
@@ -1203,7 +1250,13 @@ def changes(db: Db, story_id: str, since: str) -> list[dict[str, Any]]:
     shortcut: read straight from the graph tables; replace with Pub/Sub -> Redis when many
     readers hold streams open."""
     out: list[dict[str, Any]] = []
-    reps = graph.select(db, "reports", "n.story_id=? AND n.valid_from > ?", (story_id, since))
+    reps = graph.select(
+        db,
+        "reports",
+        "n.story_id=? AND n.valid_from > ?",
+        (story_id, since),
+        props=graph.light("reports"),
+    )
     src = sources_by_id(db) if reps else {}
     for r in reps:
         out.append(
