@@ -6,12 +6,13 @@ every column rule 4 needs (model, revision, seed, template, input hash, output).
 """
 
 import json
+import re
 from collections import Counter
 from datetime import timedelta
 from typing import Any
 
-from weft_core import store
-from weft_core.autoclean import Env, Match, Rule, register
+from weft_core import schema, store
+from weft_core.autoclean import Env, Match, Rule, batched, register
 
 # --- stale_batch_runs (#150) ------------------------------------------------------------------
 
@@ -190,3 +191,121 @@ def _bq_rule(name: str, table: str, col: str, when: str, hash_col: str) -> Rule:
 _bq_rule("model_call_inputs", "model_calls", "input", "called_at", "input_hash")
 # The bucket lifecycle deleted the object; keep the row (dedupe needs URL and text hash).
 _bq_rule("raw_uri_expired", "raw_items", "raw_gcs_uri", "fetched_at", "item_id")
+
+# --- schema drift (#148) ----------------------------------------------------------------------
+
+_IDENT = re.compile(r"[A-Za-z_]\w*")
+
+
+def _ident(name: str) -> str:
+    if not _IDENT.fullmatch(
+        name
+    ):  # these come from a committed file, but they are built into Cypher
+        raise ValueError(f"not an identifier: {name!r}")
+    return name
+
+
+def _retired_where(e: dict[str, Any]) -> str:
+    return f"n.{_ident(e['property'])} IS NOT NULL" if e.get("property") else "true"
+
+
+def _retired_match(env: Env) -> Match:
+    total, samples = 0, []
+    for e in schema.retired():
+        label = _ident(e["label"])
+        n = env.db.execute(f"MATCH (n:{label}) WHERE {_retired_where(e)} RETURN count(n) AS n")[0][
+            "n"
+        ]
+        if n:
+            total += n
+            samples.append(f"{label}.{e['property']}" if e.get("property") else label)
+    return Match(total, None, samples)
+
+
+def _retired_apply(env: Env) -> int:
+    changed = 0
+    for e in schema.retired():
+        label, where = _ident(e["label"]), _retired_where(e)
+        match = f"MATCH (n:{label}) WHERE {where} WITH n LIMIT {{batch}} "
+        if "property" not in e:
+            q = match + "DETACH DELETE n RETURN count(*) AS n"
+        elif e["action"] == "rename_to":
+            old, new = _ident(e["property"]), _ident(e["to"])
+            q = (
+                match
+                + f"SET n.{new} = coalesce(n.{new}, n.{old}) REMOVE n.{old} RETURN count(*) AS n"
+            )
+        else:
+            q = match + f"REMOVE n.{_ident(e['property'])} RETURN count(*) AS n"
+        changed += batched(env.db, q)
+    return changed
+
+
+# Deletes the nodes of a retired label, so it needs a good snapshot (the label is retired on
+# purpose, which is why the cap in config/autoclean.yaml is off for it).
+register(Rule("retired_schema", 1, _retired_match, _retired_apply, destructive=True))
+
+
+def _undeclared(env: Env) -> list[str]:
+    """Labels and properties in the database that NODES neither declares nor retires."""
+    retired = schema.retired()
+    out = []
+    for r in env.db.execute(
+        "CALL db.schema.nodeTypeProperties() YIELD nodeLabels, propertyName "
+        "RETURN nodeLabels AS labels, propertyName AS prop"
+    ):
+        for label in r["labels"]:
+            if any(e["label"] == label and "property" not in e for e in retired):
+                continue  # the retired_schema rule owns it
+            if label not in store.NODES:
+                out.append(label)
+            elif (
+                r["prop"]
+                and r["prop"] not in store.NODES[label]
+                and not any(e["label"] == label and e.get("property") == r["prop"] for e in retired)
+            ):
+                out.append(f"{label}.{r['prop']}")
+    return sorted(set(out))
+
+
+def _undeclared_match(env: Env) -> Match:
+    found = _undeclared(env)
+    return Match(len(found), None, found)
+
+
+# Report only, never deletes: these are leftovers of patches from before the drift check, and a
+# person decides whether to declare, retire or migrate them.
+register(Rule("undeclared_schema", 1, _undeclared_match, lambda env: 0))
+
+
+def _extra_indexes(env: Env) -> list[str]:
+    want = store.expected_indexes()
+    return sorted(
+        r["name"]
+        for r in env.db.execute(
+            "SHOW INDEXES YIELD name, type, labelsOrTypes, properties, owningConstraint "
+            "WHERE type = 'RANGE' AND owningConstraint IS NULL "
+            "RETURN name, labelsOrTypes, properties"
+        )
+        if not (
+            len(r["labelsOrTypes"]) == 1
+            and len(r["properties"]) == 1
+            and (r["labelsOrTypes"][0], r["properties"][0]) in want
+        )
+    )
+
+
+def _extra_indexes_match(env: Env) -> Match:
+    found = _extra_indexes(env)
+    return Match(len(found), None, found)
+
+
+def _extra_indexes_apply(env: Env) -> int:
+    found = _extra_indexes(env)
+    for name in found:
+        env.db.execute(f"DROP INDEX `{_ident(name)}` IF EXISTS")
+    return len(found)
+
+
+# Indexes `store.init` no longer creates. Dropping one loses no data; it only needs a rebuild.
+register(Rule("stale_indexes", 1, _extra_indexes_match, _extra_indexes_apply))
