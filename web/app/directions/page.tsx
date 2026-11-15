@@ -16,7 +16,7 @@ export default async function DirectionsPage({ searchParams }: { searchParams: P
       <Kicker>Directions · {d.notice}</Kicker>
       <h1>Where things may be heading</h1>
       <p role="note"><strong>{d.disclaimer}</strong></p>
-      <div className="row" style={{ margin: "12px 0" }}>
+      <div className="row my12">
         <Link className={`pill${!facet ? " on" : ""}`} href="/directions">All</Link>
         {d.facets.map((f) => <Link key={f} className={`pill${facet === f ? " on" : ""}`} href={`/directions?facet=${f}`}>{f}</Link>)}
       </div>
@@ -26,7 +26,7 @@ export default async function DirectionsPage({ searchParams }: { searchParams: P
       <Kicker>Calibration</Kicker>
       <Record t={c} />
       {c.calibration.length > 0 && (
-        <table style={{ fontSize: 13 }}>
+        <table className="fs13">
           <thead><tr><th>Said</th><th>Questions</th><th>Average said</th><th>Happened</th></tr></thead>
           <tbody>{c.calibration.map((b) => (
             <tr key={b.decile[0]}><td>{Math.round(b.decile[0] * 100)}–{Math.round(b.decile[1] * 100)}%</td><td>{b.n}</td><td>{Math.round(b.said * 100)}%</td><td>{Math.round(b.happened * 100)}%</td></tr>

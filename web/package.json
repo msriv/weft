@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "node e2e/run.mjs"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
@@ -22,6 +23,8 @@
     "world-atlas": "^2.0.2"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/d3-geo": "^3.1.0",
     "@types/d3-scale": "^4.0.9",
     "@types/d3-shape": "^3.1.7",
@@ -30,6 +33,8 @@
     "@types/react-dom": "^19.0.0",
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-specification": "^1.0.5",
+    "jsdom": "^31.0.1",
+    "playwright": "^1.65.1",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"
   }
