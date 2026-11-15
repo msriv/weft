@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from weft_core import config, graph, models, store
+from weft_core.autoclean import Publish, Warehouse
 from weft_core.ledger import Ledger
 from weft_core.models import ModelClient
 from weft_core.nlp import Nlp
@@ -46,6 +47,8 @@ class Ctx:
     rules: dict[str, Any] = field(default_factory=config.rules)  # config/rules.yaml
     budgets: dict[str, Budget] = field(default_factory=dict)
     ledger: Ledger | None = None  # spend ledger (#157); None in tests
+    warehouse: Warehouse | None = None  # BigQuery, for autoclean
+    publish: Publish | None = None  # Pub/Sub, for autoclean re-queues
 
     def budget(self, story_id: str, stage: str = "claims") -> Budget:
         """Each stage has its own share of the beat's nightly tokens, so an early stage
