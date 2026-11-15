@@ -37,7 +37,7 @@ flowchart TD
   ST[Stream path, minutes: extract, language ID, dedupe, entities, embed, attach to nearest event]
   M[Model servers: Qwen3-14B, Qwen3-8B, gpt-oss-20b, MADLAD-400, BGE-M3, NLI, spaCy]
   N[Nightly path, 4 h window: re-group, claims, conflicts, translation, ANOMALY RULES - NO AI, source weights]
-  G[(Neo4j: story graph + vector index, valid_from/valid_to on everything)]
+  G[(Neo4j: story graph, valid_from/valid_to on everything)]
   W[(BigQuery + GCS: raw files, model-call log, snapshots, anomaly log)]
   A[API + Ask agent: read API, SSE live updates, Ask with read-only tools]
   D[Digests: daily snapshot diff -> email, web push, Today page]
@@ -64,7 +64,7 @@ Ingestion polls feeds and sitemaps every 5–15 minutes and crawls official port
 
 ### Source registry
 
-Every source lives in a reviewed `config/sources/*.yaml` file in git, synced to `Source` nodes in Neo4j. A git history of who added or relabelled a source is part of the trust story.
+Sources live in Neo4j as `Source` nodes, found by automated discovery (D15); the admin can add, relabel or reject one, and each change is recorded in the admin log. `config/sources/schema.json` describes the shape. (The original plan of reviewed YAML files in git was dropped with D15.)
 
 | Field | Example | Notes |
 | --- | --- | --- |
@@ -132,7 +132,7 @@ Two paths share one graph. The stream path attaches each new item within minutes
 | 7 | Attach to event | Vector + entities → event ID or new event | Top-20 nearest open events from the last 72 h; score = cosine + entity overlap + time proximity; above threshold = attach, else new event |
 | 8 | Write | → `Report` node, provisional edges | Neo4j upsert; publish `graph.changed` |
 
-### Nightly path (Dataflow + batch inference)
+### Nightly path (plain Python stages in a Cloud Run job; Dataflow planned, not built, D23)
 
 Runs in a 4-hour window. Each stage reads the previous stage's output table, so any stage can be re-run alone.
 
@@ -214,7 +214,7 @@ A labelled set per language covers merges, claims, translations and NLI pairs. N
 
 ## Data model
 
-Neo4j holds the story graph and its vector indexes. BigQuery holds raw metadata, logs and analytics. GCS holds raw files and snapshots. User accounts sit in Firestore, apart from the story graph.
+Neo4j holds the story graph and the app's own data (D19). Vectors are properties compared in Python; a vector index is planned, not built. BigQuery holds raw metadata, logs and analytics. GCS holds raw files and snapshots. User accounts sit in Firestore, apart from the story graph.
 
 ### Neo4j nodes
 
@@ -278,7 +278,7 @@ All backend code is Python 3.12, so the pipeline, the models and the API share o
 | `crawler` | Cloud Run job, daily | Portals, transcripts, PDFs |
 | `fetcher` | Cloud Run service on `items.new` | Fetch + extract; writes GCS and `raw_items` |
 | `stream-worker` | Cloud Run service on `items.extracted` | Stream stages 2–8 |
-| `nightly` | Dataflow Flex template + batch inference, orchestrated by Cloud Workflows | Nightly stages 1–11 |
+| `nightly` | Cloud Run job running the stages in order (Dataflow planned, not built, D23), orchestrated by Cloud Workflows | Nightly stages 1–11 |
 | `api` | Cloud Run, FastAPI | Read API, live stream, accounts |
 | `ask` | Cloud Run, FastAPI | Ask agent loop |
 | `notifier` | Cloud Run on `graph.changed` | Digests, email, web push |
@@ -302,7 +302,7 @@ All backend code is Python 3.12, so the pipeline, the models and the API share o
 
 ### Live updates
 
-`GET /v1/stories/{id}/stream` is a server-sent events stream with `node.added`, `edge.added`, `anomaly.updated` and `event.merged` messages. `stream-worker` publishes to `graph.changed`; the API fans out through Memorystore (Redis) pub/sub to open connections.
+`GET /v1/stories/{id}/stream` is a server-sent events stream with `node.added`, `edge.added`, `anomaly.updated` and `event.merged` messages. `stream-worker` publishes to `graph.changed`; the API fans out to open connections by polling the graph (Memorystore Redis pub/sub is planned, not built, D23).
 
 ### Ask agent
 
@@ -370,12 +370,12 @@ Everything runs on Google Cloud, serverless where possible. GKE is used only for
 | Scheduling | Cloud Scheduler; Cloud Workflows for the nightly run |
 | Queues | Pub/Sub; Cloud Tasks for delayed re-fetches |
 | Stateless compute | Cloud Run services and jobs |
-| Batch processing | Dataflow (Apache Beam, Python), Flex templates |
+| Batch processing | Cloud Run job, plain Python stages (Dataflow planned, not built, D23) |
 | Model serving | MVP: hosted OpenAI-compatible API. Later: GKE Standard, on-demand L4 pool for online jobs, spot L4 pool for batch |
 | Graph database | Neo4j AuraDB on GCP (managed), private endpoint |
 | Analytics and logs | BigQuery |
 | Files | Cloud Storage |
-| Cache and live fan-out | Memorystore for Redis |
+| Cache and live fan-out | In-process caches; Memorystore for Redis planned, not built (D23) |
 | Accounts and preferences | Firebase Authentication, Firestore |
 | Edge | External HTTPS load balancer, Cloud CDN, Cloud Armor (rate limits, bot rules) |
 | Secrets | Secret Manager |

@@ -18,18 +18,19 @@ These override convenience. If a task would break one, stop and say so.
 
 ## Stack
 
-- **Backend, pipeline, ML:** Python 3.12. FastAPI for services. Apache Beam on Dataflow for the nightly batch.
+- **Backend, pipeline, ML:** Python 3.12. FastAPI for services. The nightly batch is plain Python stages in one Cloud Run job, orchestrated by Cloud Workflows (D18).
 - **Frontend:** Next.js (App Router), React, TypeScript. Story graph drawn with SVG + `d3-scale`/`d3-shape` (PixiJS canvas above ~300 nodes). Layout is computed (x = day, perspective bands above/below a document spine), never force-directed.
-- **Data:** Neo4j (story graph + vector indexes), BigQuery (raw metadata, logs, analytics), GCS (raw files, snapshots), Firestore (user accounts and preferences only).
-- **Infra:** GCP. Cloud Run, Pub/Sub, Cloud Tasks, Cloud Scheduler, Cloud Workflows, Dataflow, Memorystore Redis, Terraform, GitHub Actions.
+- **Data:** Neo4j (story graph and the app's own data, D19; vectors are stored as properties and compared in Python, no vector index yet), BigQuery (raw metadata, logs, analytics), GCS (raw files, snapshots), Firestore (user accounts and preferences only).
+- **Infra:** GCP. Cloud Run, Pub/Sub, Cloud Tasks, Cloud Scheduler, Cloud Workflows, Terraform, GitHub Actions.
+- **Planned, not built:** Apache Beam on Dataflow and Memorystore Redis. Deferred by D23, which says what brings each back.
 - **Models:** open-weight from Hugging Face. MVP calls them through a hosted OpenAI-compatible API (see `docs/decisions.md` D7). Small models (BGE-M3 embeddings, mDeBERTa NLI, spaCy/GLiNER, GlotLID) run on our own CPUs.
 
 ## Suggested repo layout
 
 ```
-config/         sources/*.yaml (source registry), rules.yaml (anomaly thresholds)
+config/         rules.yaml (anomaly thresholds), pipeline.yaml (limits and tuning), sources/schema.json (sources themselves live in Neo4j, found by discovery, D15)
 services/       poller, crawler, fetcher, stream_worker, api, ask, notifier
-pipeline/       nightly Beam pipeline, one module per stage
+pipeline/       nightly stages (plain Python), one module per stage (D18)
 weft_core/      shared Python package: models client, graph client, schemas, rules engine
 web/            Next.js app
 infra/          Terraform, one module per concern

@@ -1,5 +1,5 @@
 """Nightly runner. `python -m pipeline.run` runs every stage in order; `--stage NAME` re-runs one;
-`--from NAME` resumes. Each stage's start, end, row count and status go to `batch_runs`."""
+`--from NAME` resumes. Each stage's start, end, row count and status go to `BatchRun` nodes in the graph."""
 
 import argparse
 import sys
