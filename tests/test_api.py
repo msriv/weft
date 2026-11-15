@@ -210,14 +210,15 @@ def test_digest_only_for_followed_stories_never_provisional_and_unsubscribes() -
             ).status_code
             == 200
         )
+    ctx.db.execute("MATCH (n:Subscription) SET n.status = 'confirmed'")
     ctx.db.execute(
         "MERGE (n:DailyDiff {day: '2026-11-06'}) SET n.payload=?", ('{"new_events":["e"]}',)
     )
-    sent: list[tuple[str, str, str]] = []
+    sent: list[tuple[str, ...]] = []
     n = digest.send_due(
         ctx.db, lambda *a: sent.append(a), "https://w.test", datetime(2026, 11, 6, tzinfo=UTC)
     )
-    assert n == 1 and [to for to, _, _ in sent] == ["a@x.org"]
+    assert n == 1 and [m[0] for m in sent] == ["a@x.org"]
     assert "headline from" in sent[0][2] and "outlets" in sent[0][2]  # new events, not totals
     assert (
         digest.send_due(
@@ -228,8 +229,10 @@ def test_digest_only_for_followed_stories_never_provisional_and_unsubscribes() -
     token = ctx.db.execute("MATCH (n:Subscription {email: 'a@x.org'}) RETURN n.token AS token")[0][
         "token"
     ]
-    assert c.get(f"/v1/unsubscribe?token={token}").json() == {"unsubscribed": True}
-    assert c.get(f"/v1/unsubscribe?token={token}").status_code == 404
+    assert c.get(f"/v1/unsubscribe?token={token}").status_code == 200  # a page, no change
+    assert c.get(f"/v1/unsubscribe?token={token}").status_code == 200
+    assert c.post(f"/v1/unsubscribe?token={token}").status_code == 200
+    assert c.post(f"/v1/unsubscribe?token={token}").status_code == 404
 
 
 def test_admin_sees_pipeline_runs() -> None:
