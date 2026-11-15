@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AnomalyFeedback from "@/components/AnomalyFeedback";
-import { RULE_NAMES, STATE_LABEL, ago, perspectiveName } from "@/lib/format";
+import Time from "@/components/Time";
+import { STATE_LABEL, count, perspectiveName, ruleName } from "@/lib/format";
 import type { Anomaly, Issuer, SourceLabel, StoryCard } from "@/lib/types";
 
 export function Kicker({ children, anomaly }: { children: React.ReactNode; anomaly?: boolean }) {
@@ -9,7 +10,7 @@ export function Kicker({ children, anomaly }: { children: React.ReactNode; anoma
 
 export function SourceTag({ s }: { s: SourceLabel }) {
   return (
-    <span className="row" style={{ gap: 8 }}>
+    <span className="row gap8">
       <Link href={`/sources/${s.id}`}>{s.name}</Link>
       <span className="pill">{STATE_LABEL[s.state_run]}</span>
       {s.paywalled && <span className="pill">Paywalled: headline and lede only</span>}
@@ -30,13 +31,13 @@ export function AnomalyCard({ a }: { a: Anomaly }) {
   return (
     <div className="card anomaly">
       <Kicker anomaly>
-        Anomaly · {RULE_NAMES[a.rule] ?? a.rule}
+        Anomaly · {ruleName(a.rule)}
         {a.status === "provisional" ? " · provisional" : ""}
       </Kicker>
-      <p style={{ color: "var(--anomaly-light)", margin: "6px 0" }}>{a.summary}</p>
+      <p className="c-anomaly-light my6">{a.summary}</p>
       <AnomalyDetail a={a} />
-      <div className="muted" style={{ fontSize: 12 }}>
-        Rule {a.rule} version {a.rule_version} · {a.evidence_ids.length} pieces of evidence ·{" "}
+      <div className="muted fs12">
+        Rule: {ruleName(a.rule)}, version {a.rule_version} · {count(a.evidence_ids.length, "piece")} of evidence ·{" "}
         <Link href={`/nodes/${a.id}`}>See the rule and evidence</Link>
       </div>
       <AnomalyFeedback id={a.id} />
@@ -51,31 +52,31 @@ export function AnomalyDetail({ a, max = 6 }: { a: Pick<Anomaly, "rule" | "detai
   const d = a.detail ?? {};
   if (a.rule === "quote_differs" && str(d.quote)) {
     return (
-      <div className="row" style={{ gap: 12, alignItems: "stretch", margin: "6px 0" }}>
-        <blockquote style={{ flex: 1, margin: 0 }}>Quoted: {str(d.quote)}</blockquote>
-        <blockquote style={{ flex: 1, margin: 0 }}>Issued by {str(d.issuer)}: {str(d.statement)}</blockquote>
+      <div className="row gap12 is my6">
+        <blockquote className="flex1 m0">Quoted: {str(d.quote)}</blockquote>
+        <blockquote className="flex1 m0">Issued by {str(d.issuer)}: {str(d.statement)}</blockquote>
       </div>
     );
   }
   if (a.rule === "conflicting_accounts" && Array.isArray(d.sides)) {
     const sides = d.sides as { label: string; perspectives: string[] }[];
     return (
-      <div className="row" style={{ gap: 12, alignItems: "stretch", margin: "6px 0" }}>
+      <div className="row gap12 is my6">
         {sides.map((x, i) => (
-          <blockquote key={i} style={{ flex: 1, margin: 0 }}>{x.label}<div className="muted" style={{ fontSize: 12 }}>Carried by {x.perspectives.map(perspectiveName).join(", ")}</div></blockquote>
+          <blockquote key={i} className="flex1 m0">{x.label}<div className="muted fs12">Carried by {x.perspectives.map(perspectiveName).join(", ")}</div></blockquote>
         ))}
       </div>
     );
   }
   if (["omission", "unattributed", "anonymous_sourcing", "single_origin"].includes(a.rule) && str(d.label)) {
-    return <blockquote style={{ margin: "6px 0" }}>Claim group: {str(d.label)}</blockquote>;
+    return <blockquote className="my6">Claim group: {str(d.label)}</blockquote>;
   }
   if ((a.rule === "numbers_differ" || a.rule === "figure_revised") && Array.isArray(d.figures)) {
     const figs = d.figures as { id: string; text: string; value: number }[];
     return (
-      <div className="row" style={{ gap: 12, alignItems: "stretch", margin: "6px 0" }}>
+      <div className="row gap12 is my6">
         {figs.map((f) => (
-          <blockquote key={f.id} style={{ flex: 1, margin: 0 }}><b>{f.value}</b> · {f.text}</blockquote>
+          <blockquote key={f.id} className="flex1 m0"><b>{f.value}</b> · {f.text}</blockquote>
         ))}
       </div>
     );
@@ -83,7 +84,7 @@ export function AnomalyDetail({ a, max = 6 }: { a: Pick<Anomaly, "rule" | "detai
   if (a.rule === "silent_edit" && Array.isArray(d.diff)) {
     const lines = (d.diff as string[]).slice(0, max);
     return (
-      <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, margin: "6px 0" }}>
+      <pre className="prewrap fs12 my6">
         {lines.map((ln, i) => (
           <div key={i} style={{ color: ln.startsWith("-") ? "var(--anomaly-light)" : undefined }}>
             {ln.startsWith("-") ? "Removed: " : "Added: "}{ln.slice(1)}
@@ -94,23 +95,23 @@ export function AnomalyDetail({ a, max = 6 }: { a: Pick<Anomaly, "rule" | "detai
     );
   }
   if (a.rule === "loaded_wording" && str(d.term)) {
-    return <p className="muted" style={{ margin: "6px 0" }}>Word: “{str(d.term)}”</p>;
+    return <p className="muted my6">Word: “{str(d.term)}”</p>;
   }
   return null;
 }
 
 export function StoryRow({ s }: { s: StoryCard }) {
   return (
-    <Link href={`/s/${s.id}`} className="card" style={{ display: "block" }}>
+    <Link href={`/s/${s.id}`} className="card block">
       <Kicker>
-        {s.beat} · {s.status === "quiet" ? "Quiet" : "Developing"} · {s.perspectives.map(perspectiveName).join(", ")}
+        {s.beat_name ?? s.beat} · {s.status === "quiet" ? "Quiet" : "Developing"} · {s.perspectives.map(perspectiveName).join(", ")}
       </Kicker>
-      <h3 style={{ margin: "6px 0" }}>{s.title}</h3>
-      <div className="row muted" style={{ fontSize: 13 }}>
-        <span>{s.reports} reports</span><span>{s.sources} sources</span><span>{s.perspectives.length} perspectives</span>
-        {s.anomalies > 0 && <span className="pill anomaly">{s.anomalies} anomalies</span>}
+      <h3 className="my6">{s.title}</h3>
+      <div className="row muted fs13">
+        <span>{count(s.reports, "report")}</span><span>{count(s.sources, "source")}</span><span>{count(s.perspectives.length, "perspective")}</span>
+        {s.anomalies > 0 && <span className="pill anomaly">{count(s.anomalies, "anomaly", "anomalies")}</span>}
         {s.provisional_anomalies > 0 && <span className="pill">{s.provisional_anomalies} provisional</span>}
-        <span>Last report {ago(s.last_report_at)}</span>
+        <span>Last report <Time iso={s.last_report_at} relative /></span>
       </div>
     </Link>
   );

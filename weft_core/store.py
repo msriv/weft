@@ -226,7 +226,13 @@ NODES: dict[str, dict[str, Any]] = {
         "resolution": None,
     },
     "Correction": {"day": None, "kind": None, "what": None, "created_at": None},
-    "Translation": {"key": None, "lang": None, "text": None, "created_at": None},
+    "Translation": {
+        "key": None,
+        "lang": None,
+        "text": None,
+        "created_at": None,
+        "last_used": None,  # a cache hit stamps it; autoclean drops entries unused for 90 days
+    },
     "ReviewItem": {
         "id": None,
         "kind": None,
@@ -244,6 +250,8 @@ NODES: dict[str, dict[str, Any]] = {
         "token": None,
         "created_at": None,
         "last_sent": None,
+        "status": "pending",  # pending -> confirmed; bouncing after 3 hard send failures (#167)
+        "fails": 0,
         "last_sent_at": None,
     },
     "DailyDiff": {"day": None, "payload": None},
@@ -265,8 +273,8 @@ NODES: dict[str, dict[str, Any]] = {
     "Counter": {"name": None, "n": 0},
     "Cites": {"report_id": None, "url_key": None, "document_id": None},
     "Quotes": {"figure_id": None, "statement_id": None, "containment": None, "edit_ratio": None},
-    "MergeRejected": {"pair": None},
-    "NliCache": {"key": None, "c": None, "e": None},
+    "MergeRejected": {"pair": None, "created_at": None},
+    "NliCache": {"key": None, "c": None, "e": None, "created_at": None},
     "DomainCandidate": {
         "domain": None,
         "beat_id": None,

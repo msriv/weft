@@ -245,6 +245,7 @@
   "key"
  ],
  "MergeRejected": [
+  "created_at",
   "pair"
  ],
  "MinhashBand": [
@@ -267,6 +268,7 @@
  ],
  "NliCache": [
   "c",
+  "created_at",
   "e",
   "key"
  ],
@@ -450,16 +452,19 @@
  "Subscription": [
   "created_at",
   "email",
+  "fails",
   "follows",
   "frequency",
   "last_sent",
   "last_sent_at",
+  "status",
   "token"
  ],
  "Translation": [
   "created_at",
   "key",
   "lang",
+  "last_used",
   "text"
  ]
 }

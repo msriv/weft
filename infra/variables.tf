@@ -32,6 +32,18 @@ variable "fetcher_image" {
   type        = string
 }
 
+variable "billing_account_id" {
+  description = "Billing account id for the project budget alerts (50/90/100%). Empty skips the budget."
+  type        = string
+  default     = ""
+}
+
+variable "graph_node_limit" {
+  description = "Node limit of the Neo4j AuraDB tier in use; the graph-size alert fires at 70% of it."
+  type        = number
+  default     = 200000
+}
+
 variable "alert_email" {
   description = "Recipient for alert policies."
   type        = string

@@ -43,3 +43,24 @@ rules:
   orphan_beat_children: {}
   orphan_domain_children: {}
   broken_references: {max_rows: 1000000000, max_fraction: 1.0}  # report only
+  # Caches, queues and off-beat reports (#152). `days` is how long a node is kept.
+  nli_cache: {days: 30, max_fraction: 1.0, max_rows: 1000000}
+  merge_rejected: {days: 30, max_fraction: 1.0, max_rows: 1000000}
+  portal_candidates: {days: 30, max_fraction: 1.0}
+  requested_candidates: {days: 30, max_fraction: 1.0}
+  beat_maybe: {days: 30, max_fraction: 1.0, max_rows: 1000000}  # labelled ones are eval data: kept
+  review_items: {days: 90, max_fraction: 1.0}                    # rated ones are kept
+  batch_runs: {days: 180, max_fraction: 1.0}
+  daily_diff: {days: 90, max_fraction: 1.0}
+  translations: {days: 90, max_fraction: 1.0, max_rows: 1000000}
+  # Most of a general feed's volume is off-beat, so the fraction cap is wide; the row cap is not.
+  offbeat_reports: {days: 14, max_fraction: 0.9, max_rows: 1000000}
+  reader_report_email: {days: 30}
+  # GCS (#154). The poller rewrites a feed's state on every poll; the crawler only when a page
+  # changes, so its window is longer. Snapshots are never deleted (Replay's long-term record).
+  orphan_state: {prefix_days: {"poller-state/": 30, "crawler-state/": 90}, max_rows: 100000}
+  partial_snapshots: {max_rows: 1000000000, max_fraction: 1.0}  # report only
+  raw_without_row: {limit: 20000, max_rows: 1000000000, max_fraction: 1.0}  # report only
+  # Version compaction (#151). Lossless for Replay; history is never deleted by age (D23).
+  strip_closed_vectors: {days: 7, max_fraction: 1.0, max_rows: 100000000}
+  collapse_intraday_versions: {days: 30, max_fraction: 0.9, max_rows: 100000000}

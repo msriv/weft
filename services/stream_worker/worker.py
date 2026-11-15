@@ -199,7 +199,7 @@ def place(
             event_id = ev["id"]
             if document:  # a document records an event, it is not a report of it
                 return story_id, event_id, confidence, "attached"
-            graph.put(
+            graph.put_recent(
                 d.db,
                 "events",
                 {
@@ -207,6 +207,7 @@ def place(
                     **clustering.absorb(ev, vec, ent_names, published),
                     "grouping_confidence": confidence,
                 },
+                cfg.get("event_inplace_minutes", 0),
             )
             status = "attached"
         elif document:

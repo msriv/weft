@@ -292,6 +292,11 @@ def test_stage_runs_in_dry_run_and_changes_nothing() -> None:
         ((NOW - timedelta(days=1)).isoformat(),),
     )
     c.warehouse = FakeWarehouse([])
+    c.snapshots = c.raw_blobs = type(
+        "Empty",
+        (),
+        {"list": lambda self, prefix="", limit=None: [], "delete": lambda self, n: None},
+    )()
     assert stage.run(c) == 0
     assert c.db.execute("MATCH (n:BatchRun) RETURN n.status AS s") == [{"s": "running"}]
     runs = c.db.execute("MATCH (n:AutocleanRun) RETURN n.rule AS r, n.status AS s")

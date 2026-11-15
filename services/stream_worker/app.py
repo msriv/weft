@@ -12,6 +12,7 @@ from services.stream_worker.worker import Deps, process, process_document
 from weft_core import config, graph, store
 from weft_core.cache import TtlCache
 from weft_core.nlp import default_nlp
+from weft_core.probes import add_probes
 
 
 def _retry_if_unknown(status: str) -> None:
@@ -23,6 +24,7 @@ def _retry_if_unknown(status: str) -> None:
 
 def create_app(deps: Deps) -> FastAPI:
     app = FastAPI()
+    add_probes(app, deps.db)
 
     @app.post("/")
     async def push(request: Request) -> Response:

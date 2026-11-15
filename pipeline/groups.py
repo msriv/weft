@@ -138,7 +138,10 @@ def nli_scores(ctx: Ctx, premise: str, hypothesis: str) -> tuple[float, float]:
         return float(hit[0]["c"]), float(hit[0]["e"])
     c = ctx.nlp.nli.contradiction(premise, hypothesis)
     e = ctx.nlp.nli.entailment(premise, hypothesis)
-    ctx.db.execute("MERGE (n:NliCache {key: ?}) SET n.c=?, n.e=?", (key, c, e))
+    ctx.db.execute(
+        "MERGE (n:NliCache {key: ?}) ON CREATE SET n.created_at=? SET n.c=?, n.e=?",
+        (key, ctx.now, c, e),
+    )
     return c, e
 
 

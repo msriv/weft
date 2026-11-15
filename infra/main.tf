@@ -50,9 +50,11 @@ module "fetcher" {
 }
 
 module "monitoring" {
-  source      = "./modules/monitoring"
-  project_id  = var.project_id
-  alert_email = var.alert_email
+  source             = "./modules/monitoring"
+  project_id         = var.project_id
+  alert_email        = var.alert_email
+  billing_account_id = var.billing_account_id
+  graph_node_limit   = var.graph_node_limit
 }
 
 module "crawler" {
@@ -256,6 +258,26 @@ resource "google_project_iam_member" "api_firestore" {
   member  = "serviceAccount:${module.platform.service_account_emails["api"]}"
 }
 
+# Shared secret the web proxy signs the browser's address with, so the API's rate limits (#158)
+# can tell readers apart and a direct caller cannot forge an address. Generated here, no manual step.
+resource "random_password" "proxy_secret" {
+  length  = 40
+  special = false
+}
+
+resource "google_secret_manager_secret" "proxy_secret" {
+  project   = var.project_id
+  secret_id = "weft-proxy-secret"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "proxy_secret" {
+  secret      = google_secret_manager_secret.proxy_secret.id
+  secret_data = random_password.proxy_secret.result
+}
+
 module "api" {
   source                = "./modules/run_service"
   project_id            = var.project_id
@@ -266,6 +288,7 @@ module "api" {
   secret_env = merge(module.discovery.neo4j_secret_ids, {
     ADMIN_TOKEN   = module.discovery.admin_token_secret_id
     MODEL_API_KEY = google_secret_manager_secret.model_api_key.secret_id
+    PROXY_SECRET  = google_secret_manager_secret.proxy_secret.secret_id
   })
   env = {
     PROJECT_ID     = var.project_id
@@ -278,6 +301,7 @@ module "api" {
   memory        = "4Gi"
   public        = true
   max_instances = 5
+  depends_on    = [google_secret_manager_secret_version.proxy_secret]
 }
 
 module "web" {
@@ -287,9 +311,11 @@ module "web" {
   name                  = "weft-web"
   image                 = var.web_image
   service_account_email = module.platform.service_account_emails["web"]
+  secret_env            = { PROXY_SECRET = google_secret_manager_secret.proxy_secret.secret_id }
   env                   = { API_URL = module.api.uri, FIREBASE_API_KEY = var.firebase_api_key }
   public                = true
   max_instances         = 5
+  depends_on            = [google_secret_manager_secret_version.proxy_secret]
 }
 
 output "web_url" { value = module.web.uri }
