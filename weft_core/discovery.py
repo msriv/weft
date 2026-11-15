@@ -10,7 +10,7 @@ import io
 import json
 import re
 import zipfile
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
@@ -21,7 +21,7 @@ from urllib.parse import urljoin, urlsplit
 import feedparser
 import httpx
 
-from weft_core import beats, outlets, relevance, store
+from weft_core import beats, config, outlets, relevance, sourceyield, store
 from weft_core.nlp import STOP_EN, StopwordLangId
 from weft_core.polite import PoliteClient
 from weft_core.textutil import words
@@ -182,12 +182,19 @@ def site_name(html: str) -> str | None:
 
 
 def discover(
-    db: store.Db, http: PoliteClient, gkg_text: str, now: datetime | None = None, limit: int = 20
+    db: store.Db,
+    http: PoliteClient,
+    gkg_text: str,
+    now: datetime | None = None,
+    limit: int = 20,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, list[str]]:
     """One pass over recent GKG rows. Hits per domain add up across runs, so a niche beat's
     outlets qualify over hours or days. Domains the admin asked for are probed first.
     Returns {domain: feeds} for newly registered sources."""
     now = now or datetime.now(UTC)
+    cfg = config.pipeline()["sources"] if cfg is None else cfg
+    sourceyield.refresh(db, cfg, now)
     rows = list(parse_gkg(gkg_text))
     found: dict[str, list[str]] = {}
     store.prune_candidates(db, (now - CANDIDATE_TTL).isoformat())
@@ -198,8 +205,10 @@ def discover(
             store.add_candidate_hits(
                 db, domain, beat["id"], len(urls), now.isoformat(), sum(urls.values())
             )
-        for domain in store.candidates(db, beat["id"], MIN_URLS, limit):
-            if (feeds := _probe(db, http, domain, beat, now)) is not None:
+        scored = store.scored_candidates(db, beat["id"], MIN_URLS, limit)
+        counts = Counter(s.get("country") or "" for s in store.all_sources(db, "n.status='active'"))
+        for domain, rel in sourceyield.order(scored, counts, outlets.country_for):
+            if (feeds := _probe(db, http, domain, beat, now, rel=rel, cfg=cfg)) is not None:
                 found[domain] = feeds
     for c in store.requested_sources(db):  # admin "add source": any beat
         wanted = next((b for b in store.beats(db) if b["id"] == c["beat_id"]), None)
@@ -216,9 +225,14 @@ def _probe(
     beat: dict[str, Any] | None,
     now: datetime,
     via: str | None = None,
+    rel: float = 0.0,
+    cfg: dict[str, Any] | None = None,
 ) -> list[str] | None:
     """Probe and register (or re-register) one domain. Returns its feeds when accepted."""
     name, home, feeds, lang, reason = verified_feeds(http, domain, now, beat)
+    full = not reason and via is None and cfg and beat  # admin-requested sources bypass the ceiling
+    if full and not sourceyield.make_room(db, beat["id"], rel, cfg):
+        return None  # stays a candidate and waits for room
     store.register_source(
         db,
         domain=domain,
@@ -229,6 +243,7 @@ def _probe(
         rejected=bool(reason),  # remembered either way; a rejection is retried after RETRY_AFTER
         rejected_reason=reason or None,
         languages=[lang],
+        relevance=rel,
     )
     store.clear_candidate(db, domain)
     return None if reason else feeds

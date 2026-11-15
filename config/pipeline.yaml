@@ -18,6 +18,16 @@ prefilter:
   enabled: true
   sample_rate: 0.02
 
+# Source yield, cadence, dormancy and ceilings (#171).
+sources:
+  window_days: 14
+  dormant_days: 30                # no on-beat report in this long: dormant (not polled)
+  low_yield: 0.05                 # below this on-beat share a source is polled every low_every-th run
+  low_every: 6
+  run_seconds: 600                # the poller schedule
+  max_per_beat: 40                # active sources found by discovery, per beat
+  max_total: 150
+
 # Extraction quality gate (#170): pages that are not articles are not stored as reports.
 quality:
   min_chars: 300

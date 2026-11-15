@@ -3,13 +3,14 @@
 import json
 import os
 import sys
+import time
 from datetime import UTC, datetime
 
 import httpx
 from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.poller.poller import FeedState, Poller
-from weft_core import config, portals, store
+from weft_core import config, portals, sourceyield, store
 from weft_core.gcp import bigquery_client
 from weft_core.health import unhealthy
 from weft_core.polite import PoliteClient
@@ -65,6 +66,7 @@ def main() -> int:
         publisher.publish(topic, json.dumps(msg).encode()).result()
         published += 1
 
+    t0 = time.monotonic()
     db = store.from_env()
     with httpx.Client(timeout=30, follow_redirects=True) as http:
         pf = config.pipeline()["prefilter"]
@@ -76,13 +78,16 @@ def main() -> int:
             pf["sample_rate"],
             on_foreign=lambda domain, url: portals.record_candidates(db, {domain}, url),
         )
-        results = poller.run(store.active_sources(db))
+        scfg = config.pipeline()["sources"]
+        due = [s for s in store.active_sources(db) if sourceyield.due(s, scfg)]
+        results = poller.run(due)
     for sid, st in sorted(poller.stats.items()):
         print(json.dumps({"event": "poll_source", "source_id": sid, **st}), flush=True)
     for sid, err in results.items():
         if err:
             print(f"poll failed: {sid}: {err}", file=sys.stderr)
     failed = sum(1 for e in results.values() if e)
+    print(json.dumps({"event": "poll_run", "seconds": round(time.monotonic() - t0, 1)}), flush=True)
     print(f"polled {len(results)} sources, {failed} failed, {published} new items", flush=True)
     # the rules engine reads this flag to suppress silence anomalies for unhealthy feeds
     store.set_health(db, record_and_report(project, results))
