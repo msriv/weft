@@ -27,7 +27,7 @@ export default async function Event({ params }: { params: Promise<{ id: string; 
       <h1>{e.event.label ?? "Event"}</h1>
       {e.event.label_source && <p className="muted">Headline from {e.event.label_source}</p>}
       {sv && (
-        <div className="grid g2" style={{ marginTop: 16 }}>
+        <div className="grid g2 mt16">
           <div className="card"><Kicker>Reported by all perspectives</Kicker>{sv.reported_by_all.map((g) => <p key={g}>{label[g]}</p>)}{!sv.reported_by_all.length && <p className="muted">None yet.</p>}</div>
           <div className="card"><Kicker anomaly>Reports conflict on</Kicker>{sv.reports_conflict_on.map((p, i) => <p key={i}>{p.map((g) => label[g]).join(" — versus — ")}</p>)}{!sv.reports_conflict_on.length && <p className="muted">None recorded.</p>}</div>
           <div className="card"><Kicker>No source has published</Kicker>{sv.no_source_published.length ? <p>From {sv.no_source_published.map(perspectiveName).join(", ")}</p> : null}{sv.untracked?.length ? <p className="muted">Weft tracks no source from {sv.untracked.map(perspectiveName).join(", ")}.</p> : null}{!sv.no_source_published.length && !sv.untracked?.length && <p className="muted">Every party has published.</p>}</div>
@@ -47,10 +47,10 @@ export default async function Event({ params }: { params: Promise<{ id: string; 
             <p>{e.voices[p]?.headline}</p>
             {e.voices[p]?.words.length ? <><Kicker>Words they use</Kicker><p>{e.voices[p].words.join(", ")}</p></> : null}
             {reps.map((r) => (
-              <div key={r.id} style={{ borderTop: "1px solid var(--hair)", padding: "8px 0" }}>
+              <div key={r.id} className="bt py8">
                 <a href={r.url} rel="noopener noreferrer">{r.title}</a> <span className="pill">{r.type}</span>
                 <div><SourceTag s={r.source} /></div>
-                <p className="muted" style={{ fontSize: 13 }}>{r.summary}{r.lang && r.lang !== "en" && " (translated summary — show original)"}</p>
+                <p className="muted fs13">{r.summary}{r.lang && r.lang !== "en" && " (translated summary — show original)"}</p>
               </div>
             ))}
           </section>

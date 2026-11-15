@@ -24,9 +24,9 @@ export default async function TodayPage() {
         <section key={beat}>
           <h3>{evs[0].title}</h3>
           {evs.map((e) => (
-            <Link key={e.id} href={`/s/${e.story_id}/e/${e.id}`} className="card" style={{ display: "block" }}>
+            <Link key={e.id} href={`/s/${e.story_id}/e/${e.id}`} className="card block">
               <div>{e.thread_label && e.follows ? <span className="muted">Thread {e.thread_label} advanced: </span> : null}{e.label ?? "Untitled event"}</div>
-              <div className="muted" style={{ fontSize: 13 }}>
+              <div className="muted fs13">
                 {e.label_source && `Headline from ${e.label_source} · `}{e.outlets} outlets · {e.perspectives.map(perspectiveName).join(", ")}
                 {e.new_documents > 0 && ` · ${e.new_documents} new documents`} · first seen {ago(e.first_seen)}
               </div>
@@ -36,16 +36,16 @@ export default async function TodayPage() {
       )) : <Empty>No new events since then.</Empty>}
       {t?.whats_new && t.whats_new.length > 0 && <><hr /><Kicker>New in the coverage</Kicker></>}
       {t?.whats_new?.map((n, i) => (
-        <Link key={i} href={`/s/${n.story_id}/e/${n.event_id}`} className="row" style={{ display: "flex" }}>
+        <Link key={i} href={`/s/${n.story_id}/e/${n.event_id}`} className="row flexd">
           <span className="muted">{n.kind === "new_conflict" ? "Reports conflict on" : n.kind === "gained_perspective" ? `Now also reported from ${n.perspectives.map(perspectiveName).join(", ")}` : "New claim"}</span>
           <span>{n.text}</span>
         </Link>
       ))}
       {t && t.new_anomalies.length > 0 && <><hr /><Kicker>New anomalies</Kicker></>}
       {t && t.new_anomalies.map((a) => <AnomalyCard key={a.id} a={a} />)}
-      {t?.directions && <p className="muted" style={{ fontSize: 13 }}><Link href="/directions">{t.directions}</Link> (model speculation, not reporting).</p>}
+      {t?.directions && <p className="muted fs13"><Link href="/directions">{t.directions}</Link> (model speculation, not reporting).</p>}
       {t && t.changes.length > 0 && (
-        <p className="muted" style={{ fontSize: 13 }}>Last nightly run: {t.changes.map((c) => `${c.count} ${c.label.toLowerCase()}`).join(" · ")}.</p>
+        <p className="muted fs13">Last nightly run: {t.changes.map((c) => `${c.count} ${c.label.toLowerCase()}`).join(" · ")}.</p>
       )}
       <hr />
       <Kicker>Stories with something new</Kicker>

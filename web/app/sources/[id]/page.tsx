@@ -37,7 +37,7 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
       <div className="row"><div className="stat">{s.weight_insufficient ? "—" : s.weight?.toFixed(2)}</div><div className="kicker">Current weight{s.weight_insufficient ? " · not enough reports yet" : ""}</div></div>
       <p className="muted">{p.weight_note}</p>
       {p.history.length > 1 && (
-        <svg viewBox="0 0 300 60" role="img" aria-label="Weight over time" style={{ width: "100%", maxWidth: 480 }}>
+        <svg viewBox="0 0 300 60" role="img" aria-label="Weight over time" className="w100 mw480">
           <polyline fill="none" stroke="var(--text)" points={p.history.map((h, i) => `${(i / (p.history.length - 1)) * 300},${58 - h.weight * 56}`).join(" ")} />
         </svg>
       )}
@@ -46,7 +46,7 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
       {p.factor_names.map((f) => {
         const v = p.factors?.[f];
         return (
-          <div key={f} style={{ margin: "8px 0" }}>
+          <div key={f} className="my8">
             <div className="row"><span>{FACTORS[f][0]}</span><span className="pill">{FACTORS[f][1]}</span><span className="muted">{v == null ? "no data yet" : `${Math.round(v * 100)}%`}</span></div>
             {v != null && <div className="bar"><i style={{ width: `${v * 100}%` }} /></div>}
           </div>

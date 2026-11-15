@@ -82,7 +82,7 @@ export default function Globe({ world, directions = [] }: { world: World; direct
   const turn = (to: Marker) => setRot([-to.at[0], -to.at[1]]);
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: "minmax(280px, 560px) 1fr", alignItems: "start" }}>
+    <div className="grid globe-layout">
       <div>
         <div className="row" role="group" aria-label="Filter">
           {(["all", "anomalies", "gaps"] as Filter[]).map((f) => (
@@ -92,7 +92,7 @@ export default function Globe({ world, directions = [] }: { world: World; direct
           ))}
         </div>
         <svg
-          viewBox={`0 0 ${W} ${W}`} role="img" aria-label="Globe of stories by the countries they are about, and coverage gaps" style={{ width: "100%", touchAction: "none", cursor: "grab" }}
+          viewBox={`0 0 ${W} ${W}`} role="img" aria-label="Globe of stories by the countries they are about, and coverage gaps" className="globe-svg"
           onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY, rot }; setDragging(true); (e.target as Element).setPointerCapture?.(e.pointerId); }}
           onPointerMove={(e) => {
             const d = drag.current;
@@ -111,7 +111,7 @@ export default function Globe({ world, directions = [] }: { world: World; direct
               <g
                 key={m.key} tabIndex={0} role="button" aria-label={`${m.kind === "gap" ? "Coverage gap" : "Story"}: ${m.title}, ${perspectiveName(m.country)}`}
                 onMouseEnter={() => setHover(m)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(m)}
-                onClick={() => setPinned(m)} onKeyDown={(e) => e.key === "Enter" && setPinned(m)} style={{ cursor: "pointer" }}
+                onClick={() => setPinned(m)} onKeyDown={(e) => e.key === "Enter" && setPinned(m)} className="pointer"
               >
                 {m.anomalies > 0 && <circle cx={p[0]} cy={p[1]} r={r + 6} fill="rgba(255,122,69,0.15)" stroke="var(--anomaly)" strokeWidth={2} />}
                 {m.kind === "gap"
@@ -139,15 +139,15 @@ export default function Globe({ world, directions = [] }: { world: World; direct
                 : `About ${perspectiveName(card.country)} · ${card.reports} reports from ${card.perspectives} perspectives`}
             </p>
             {card.from && (
-              <p className="muted" style={{ fontSize: 13 }}>
+              <p className="muted fs13">
                 Reports from: {Object.entries(card.from).map(([c, n]) => `${perspectiveName(c)} ${n}`).join(" · ")}
               </p>
             )}
             <Link href={`/s/${card.storyId}`}>Open the story</Link>
             {directions.includes(card.country) && (
-              <Link href={`/directions?subject=${card.country}`} style={{ marginLeft: 12 }}>Directions for {perspectiveName(card.country)}</Link>
+              <Link href={`/directions?subject=${card.country}`} className="ml12">Directions for {perspectiveName(card.country)}</Link>
             )}
-            {pinned && <button style={{ marginLeft: 12 }} onClick={() => setPinned(null)}>Close</button>}
+            {pinned && <button className="ml12" onClick={() => setPinned(null)}>Close</button>}
           </div>
         )}
       </div>
@@ -158,9 +158,9 @@ export default function Globe({ world, directions = [] }: { world: World; direct
             <b>{perspectiveName(g.country)}</b> · {g.reports} reports on <Link href={`/s/${g.story_id}`}>{g.title}</Link>
           </div>
         )) : <p className="muted">No gaps recorded.</p>}
-        <div className="kicker" style={{ marginTop: 18 }}>Stories on the globe, by where they happen</div>
+        <div className="kicker mt18">Stories on the globe, by where they happen</div>
         {markers.filter((m) => m.kind === "story").map((m) => (
-          <button key={m.key} style={{ display: "block", width: "100%", textAlign: "left", margin: "6px 0" }} onClick={() => { turn(m); setPinned(m); }}>
+          <button key={m.key} className="block w100 tal my6" onClick={() => { turn(m); setPinned(m); }}>
             {perspectiveName(m.country)} · {m.title} · {m.reports}
           </button>
         ))}

@@ -23,20 +23,20 @@ export default function ClaimMatrix({ e }: { e: EventPage }) {
   for (const q of quotes) bySpeaker.set(q.speaker ?? "Speaker not named", [...(bySpeaker.get(q.speaker ?? "Speaker not named") ?? []), q]);
   return (
     <>
-      <div style={{ overflowX: "auto" }}>
-        <table className="matrix" style={{ borderCollapse: "collapse", fontSize: 13 }}>
+      <div className="oxauto">
+        <table className="matrix cc fs13">
           <thead>
             <tr><th />{spans.map((s) => <th key={s.p} colSpan={s.n} scope="colgroup">Outlets from {perspectiveName(s.p)}</th>)}</tr>
             <tr><th scope="col">Claim group</th>{cols.map((c) => <th key={`${c.p}:${c.name}`} scope="col" className="muted">{c.name}</th>)}</tr>
           </thead>
           <tbody>
             {groups.map((g) => (
-              <tr key={g.id} style={{ borderTop: "1px solid var(--hair)" }}>
-                <th scope="row" style={{ textAlign: "left", fontWeight: 400, maxWidth: 320 }}>{g.label}</th>
+              <tr key={g.id} className="bt">
+                <th scope="row" className="tal fw4 mw320">{g.label}</th>
                 {cols.map((c) => {
                   const hit = g.claims.find((x) => c.ids.has(x.report_id));
                   return (
-                    <td key={`${c.p}:${c.name}`} style={{ textAlign: "center", padding: 4 }}>
+                    <td key={`${c.p}:${c.name}`} className="tac p4">
                       {hit ? <a href={`/nodes/${hit.report_id}`} title={hit.text} aria-label={`${c.name}: ${hit.text}`}>●</a> : <span className="muted" aria-label={`No sentence from ${c.name}`}>·</span>}
                     </td>
                   );
@@ -49,7 +49,7 @@ export default function ClaimMatrix({ e }: { e: EventPage }) {
       {numbers.length > 0 && (
         <>
           <h3>Figures</h3>
-          <table style={{ fontSize: 13 }}>
+          <table className="fs13">
             <thead><tr><th scope="col">Figure</th><th scope="col">Quantity</th><th scope="col">Outlet</th><th scope="col">Text</th></tr></thead>
             <tbody>{numbers.map((f) => (
               <tr key={f.id}><td>{f.value}{f.unit ? ` ${f.unit}` : ""}</td><td>{f.quantity ?? ""}</td><td>{outletOf.get(f.report_id) ?? ""}</td><td><a href={`/nodes/${f.report_id}`}>{f.text}</a></td></tr>
@@ -63,7 +63,7 @@ export default function ClaimMatrix({ e }: { e: EventPage }) {
           {[...bySpeaker.entries()].map(([who, qs]) => (
             <div key={who}>
               <b>{who}</b>
-              {qs.map((q) => <blockquote key={q.id} style={{ margin: "4px 0" }}>{q.text} <a className="muted" href={`/nodes/${q.report_id}`}>{outletOf.get(q.report_id) ?? "report"}</a></blockquote>)}
+              {qs.map((q) => <blockquote key={q.id} className="my4">{q.text} <a className="muted" href={`/nodes/${q.report_id}`}>{outletOf.get(q.report_id) ?? "report"}</a></blockquote>)}
             </div>
           ))}
         </>
