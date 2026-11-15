@@ -8,7 +8,7 @@ export type SourceLabel = {
 export type Issuer = SourceLabel & { is_party: boolean };
 export type Party = { party: string; cited: boolean; citation: string | null };
 export type StoryCard = {
-  id: string; title: string; beat: string; status: "developing" | "quiet"; reports: number;
+  id: string; title: string; beat: string; beat_name?: string; status: "developing" | "quiet"; reports: number;
   events: number; sources: number; perspectives: string[]; anomalies: number;
   provisional_anomalies: number; last_report_at: string | null; parties: Party[];
 };

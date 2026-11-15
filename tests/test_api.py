@@ -64,6 +64,7 @@ def test_nothing_is_readable_until_the_admin_toggle() -> None:
         == 200
     )
     assert [s["id"] for s in c.get("/v1/stories").json()] == ["iran-israel-war"]
+    assert c.get("/v1/stories").json()[0]["beat_name"]  # a name for readers, never just the id
 
 
 def test_story_event_node_document_actor_world_method() -> None:

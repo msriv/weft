@@ -8,7 +8,8 @@ import Conflict from "@/components/Conflict";
 import ReportProblem from "@/components/ReportProblem";
 import { api } from "@/lib/api";
 import { meta } from "@/lib/meta";
-import { day, perspectiveName } from "@/lib/format";
+import Time from "@/components/Time";
+import { perspectiveName } from "@/lib/format";
 import { plural, type Side } from "@/lib/story";
 import type { EventPage } from "@/lib/types";
 
@@ -33,7 +34,7 @@ export default async function Event({ params }: { params: Promise<{ id: string; 
   return (
     <>
       <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: title, href: `/s/${id}` }, { label: e.event.label ?? "Event" }]} />
-      <Kicker>Event · {day(e.event.first_seen)} · {plural(e.event.perspectives.length, "perspective")} · {plural(e.event.reports, "report")}{e.event.outlets != null && e.event.origins != null ? ` · ${plural(e.event.outlets, "outlet")}, ${plural(e.event.origins, "independent text")}` : ""}</Kicker>
+      <Kicker>Event · <Time iso={e.event.first_seen} /> · {plural(e.event.perspectives.length, "perspective")} · {plural(e.event.reports, "report")}{e.event.outlets != null && e.event.origins != null ? ` · ${plural(e.event.outlets, "outlet")}, ${plural(e.event.origins, "independent text")}` : ""}</Kicker>
       <h1>{e.event.label ?? "Event"}</h1>
       {e.event.label_source && <p className="muted">Headline from {e.event.label_source}</p>}
 
@@ -70,7 +71,7 @@ export default async function Event({ params }: { params: Promise<{ id: string; 
             {reps.map((r) => (
               <details key={r.id} className="bt report">
                 <summary>
-                  <span>{r.source.name}</span> <span className="muted">· {r.title}{r.published_at ? ` · ${day(r.published_at)}` : ""}</span>
+                  <span>{r.source.name}</span> <span className="muted">· {r.title}{r.published_at ? <> · <Time iso={r.published_at} /></> : ""}</span>
                 </summary>
                 <p className="fs13"><a href={r.url} rel="noopener noreferrer">{r.title}</a> <span className="pill">{r.type}</span></p>
                 {r.source.state_run !== "unverified" && <div><SourceTag s={r.source} /></div>}

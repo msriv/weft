@@ -2,7 +2,7 @@ import Link from "next/link";
 import Globe from "@/components/Globe";
 import { Empty, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
-import { perspectiveName } from "@/lib/format";
+import { count, perspectiveName } from "@/lib/format";
 import type { Directions, World } from "@/lib/types";
 
 export default async function WorldPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
@@ -26,7 +26,7 @@ export default async function WorldPage({ searchParams }: { searchParams: Promis
             <div className="card" key={id}>
               <h3><Link href={`/s/${id}`}>{items[0].title}</Link></h3>
               <div className="row mt8">
-                {items.map((i) => <span key={i.country} className="pill on">{perspectiveName(i.country)} · {i.reports}</span>)}
+                {items.map((i) => <span key={i.country} className="pill on">{perspectiveName(i.country)} · {count(i.reports, "report")}</span>)}
               </div>
               {items.some((i) => withDirections.includes(i.country)) && (
                 <p className="muted fs13">
@@ -39,7 +39,7 @@ export default async function WorldPage({ searchParams }: { searchParams: Promis
           <hr />
           <Kicker>Coverage gaps</Kicker>
           <p className="muted">Places where we hold few reports on a story they are party to. This describes our coverage, not the story.</p>
-          {w.gaps.map((g) => <div className="card" key={`${g.story_id}-${g.country}`}>{perspectiveName(g.country)} · {g.reports} reports · <Link href={`/s/${g.story_id}`}>{g.title}</Link></div>)}
+          {w.gaps.map((g) => <div className="card" key={`${g.story_id}-${g.country}`}>{perspectiveName(g.country)} · {count(g.reports, "report")} · <Link href={`/s/${g.story_id}`}>{g.title}</Link></div>)}
         </>
       )}
     </>

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { DEFAULTS, loadPrefs, savePrefs, type Prefs } from "@/lib/prefs";
 import { Kicker } from "@/components/bits";
+import { perspectiveLabel } from "@/lib/format";
 import { pullPrefs, signIn, signOut, signedInAs } from "@/lib/account";
 
 type Card = { id: string; title: string; beat: string; perspectives: string[] };
@@ -63,7 +64,7 @@ export default function Welcome() {
       <Kicker>Perspectives you want to see first</Kicker>
       <div className="row">
         {regions.map((r) => (
-          <button type="button" key={r} aria-pressed={prefs.regions.includes(r)} className={`pill${prefs.regions.includes(r) ? " on" : ""}`} onClick={() => toggle("regions", r)}>{r}</button>
+          <button type="button" key={r} aria-pressed={prefs.regions.includes(r)} className={`pill${prefs.regions.includes(r) ? " on" : ""}`} onClick={() => toggle("regions", r)}>{perspectiveLabel(r)}</button>
         ))}
       </div>
       <Kicker>Email digest</Kicker>

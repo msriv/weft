@@ -143,10 +143,12 @@ def story_card(db: Db, s: dict[str, Any], at: str | None = None) -> dict[str, An
     last = max((r["published_at"] or r["fetched_at"] or "" for r in reps), default=None)
     now = datetime.fromisoformat(at) if at else datetime.now(UTC)
     quiet = not last or now - datetime.fromisoformat(last) > QUIET_AFTER
+    beat = db.execute("MATCH (b:Beat {id: ?}) RETURN b.name AS n", (s["beat_id"],))
     return {
         "id": s["id"],
         "title": s["title"],
         "beat": s["beat_id"],
+        "beat_name": (beat[0]["n"] if beat else None) or s["beat_id"],
         "status": "quiet" if quiet else "developing",
         "reports": len(reps),
         "events": len({r["event_id"] for r in reps if r["event_id"]}),

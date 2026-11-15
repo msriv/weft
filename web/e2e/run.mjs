@@ -29,6 +29,11 @@ for (const [w, h] of [[390, 844], [1280, 900]]) {
     if (sw !== cw) bad.push(`${w}px ${path}: scrollWidth ${sw} != clientWidth ${cw}`);
     const own = errs.filter((e) => !/favicon|Failed to load resource/.test(e));
     if (own.length) bad.push(`${w}px ${path}: console errors ${own.join(" | ").slice(0, 200)}`);
+    const text = await p.evaluate(() => document.body.innerText);
+    for (const [re, what] of [[/\d{4}-\d{2}-\d{2}/, "ISO date"], [/\b(AL|VE|KE)\b/, "country code"], [/kessar-strait/i, "beat id"]]) {
+      const m = text.match(re);
+      if (m) bad.push(`${w}px ${path}: visible ${what} "${m[0]}"`);
+    }
     if (path === "/s/kessar-strait") {
       const boxes = await p.$$eval(".card", (els) => els.filter((e) => e.offsetParent).map((e) => { const r = e.getBoundingClientRect(); return [r.left, r.top + scrollY, r.right, r.bottom + scrollY]; }));
       for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
