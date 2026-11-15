@@ -97,6 +97,7 @@ class ReaderPrefs(BaseModel):
     follows: list[str] = []
     frequency: str = "daily"
     email: str | None = None
+    last_visit: str | None = None  # Today shows what is new since this
 
 
 class Question(BaseModel):
