@@ -414,6 +414,13 @@
   "source_id",
   "stubs"
  ],
+ "SourceDay": [
+  "day",
+  "items",
+  "key",
+  "source_id",
+  "stubs"
+ ],
  "SourceWeight": [
   "day",
   "factors",
