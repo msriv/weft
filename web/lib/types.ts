@@ -16,6 +16,7 @@ export type Anomaly = {
   id: string; rule: string; rule_version: number; status: "active" | "provisional" | "withdrawn";
   subject_kind: string; subject_id: string; story_id: string | null; event_id: string | null;
   summary: string; inputs: Record<string, unknown>; evidence_ids: string[];
+  evidence?: { id: string; outlet: string; perspective: string; published_at: string | null }[]; provisional_reason?: string | null;
   detail: Record<string, unknown>; since: string;
 };
 export type GraphNode = {

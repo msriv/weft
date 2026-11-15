@@ -24,8 +24,10 @@ const nodes = [
   { id: "n4", kind: "report_group", event_id: "e2", at: iso(12), anomalies: [], perspective: "AL", count: 5, sources: ["The Aldoria Post"], report_ids: ["r4"] },
   { id: "n5", kind: "document", event_id: "e1", at: iso(11), anomalies: [], title: "Statement on the detentions", doc_kind: "statement", issuer: { ...src("min-maritime", "Ministry of Maritime Affairs", "AL", "AL"), is_party: true } },
 ];
-const anomaly = { id: "a1", rule: "number_mismatch", rule_version: 1, status: "provisional", subject_kind: "event", subject_id: "e1", story_id: "kessar-strait", event_id: "e1",
-  summary: "Reports differ on the number of vessels detained: 12 in The Aldoria Post, 9 in Veymar Wire.", inputs: { a: 12, b: 9 }, evidence_ids: ["r1", "r2"], detail: {}, since: iso(13) };
+const anomaly = { id: "a1", rule: "numbers_differ", rule_version: 1, status: "provisional", subject_kind: "event", subject_id: "e1", story_id: "kessar-strait", event_id: "e1",
+  summary: "Reports differ on the number of vessels detained: 12 in The Aldoria Post, 9 in Veymar Wire.", inputs: { a: 12, b: 9 }, evidence_ids: ["r1", "r2"], detail: { figures: [{ id: "f1", text: "12 vessels", value: 12 }, { id: "f2", text: "9 vessels", value: 9 }] }, since: iso(13),
+  evidence: [{ id: "r1", outlet: "The Aldoria Post", perspective: "AL", published_at: iso(11) }, { id: "r2", outlet: "Veymar Wire", perspective: "VE", published_at: iso(10) }],
+  provisional_reason: "Only 2 perspectives have reported so far; needs 3." };
 const graph = {
   story: STORY, as_of: null, summary: [], perspectives: ["AL", "VE", "KE"], nodes, anomalies: [anomaly],
   edges: [{ kind: "conflict", event_id: "e1", groups: ["g1", "g2"], between: [["AL"], ["VE"]], nli_score: 0.91 }],

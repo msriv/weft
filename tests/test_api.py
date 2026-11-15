@@ -424,3 +424,23 @@ def test_search_finds_public_items_only() -> None:
     ev = c.get("/v1/stories/iran-israel-war", params={"days": 0}).json()["events"][0]
     found = c.get("/v1/search", params={"q": (ev["label"] or "")[:8]}).json()["events"]
     assert ev["id"] in [e["id"] for e in found]
+
+
+def test_anomalies_carry_outlets_and_a_provisional_reason() -> None:
+    from weft_core import readmodel
+
+    _, ctx = build()
+    r = graph.get(ctx.db, "reports", "1")
+    assert r is not None
+    view = {
+        "id": "a",
+        "status": "provisional",
+        "event_id": r["event_id"],
+        "evidence_ids": ["1", "nope"],
+    }
+    [out] = readmodel.with_evidence(ctx.db, [view])
+    assert [e["id"] for e in out["evidence"]] == ["1"]  # unknown ids are dropped
+    assert out["evidence"][0]["outlet"] and out["evidence"][0]["perspective"]
+    assert "needs" in out["provisional_reason"]  # three reports are below the thresholds
+    [act] = readmodel.with_evidence(ctx.db, [{**view, "status": "active"}])
+    assert act["provisional_reason"] is None

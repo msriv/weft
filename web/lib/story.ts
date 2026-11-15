@@ -4,7 +4,7 @@ import type { GraphEdge, GraphNode, ShortVersion, StoryGraph } from "./types";
 
 export const TABS = [["overview", "Overview"], ["timeline", "Timeline"], ["network", "Network"], ["anomalies", "Anomalies"], ["questions", "Questions"]] as const;
 export type Tab = (typeof TABS)[number][0];
-export type StoryQuery = { tab?: string; view?: string; at?: string; live?: string; until?: string; days?: string };
+export type StoryQuery = { tab?: string; view?: string; at?: string; live?: string; until?: string; days?: string; kind?: string };
 
 /** Old `?view=list` links open the Timeline. */
 export function tabOf(q: StoryQuery): Tab {
@@ -14,7 +14,7 @@ export function tabOf(q: StoryQuery): Tab {
 
 /** A link to `tab` (or with other changes) that keeps replay date, window and live mode. */
 export function storyHref(id: string, q: StoryQuery, change: Partial<StoryQuery> = {}): string {
-  const keep = { at: q.at, until: q.until, days: q.days, live: q.live, tab: tabOf(q) === "overview" ? undefined : tabOf(q) };
+  const keep = { at: q.at, until: q.until, days: q.days, live: q.live, kind: q.kind, tab: tabOf(q) === "overview" ? undefined : tabOf(q) };
   const next = { ...keep, ...change };
   const p = new URLSearchParams(Object.entries(next).filter((e): e is [string, string] => !!e[1] && e[1] !== "overview"));
   return `/s/${id}${p.size ? `?${p}` : ""}`;

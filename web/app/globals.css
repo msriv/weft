@@ -40,6 +40,7 @@ input[type="checkbox"], input[type="radio"] { min-height: 0; width: 18px; height
 .nav a:hover, .nav a[aria-current="page"] { color: var(--text); text-decoration: none; }
 .card { display: block; border: 1px solid var(--border-strong); border-radius: 10px; padding: 16px 18px; margin: 12px 0; }
 .card.anomaly { border-color: var(--anomaly); background: var(--anomaly-tint); }
+.card.anomaly.provisional { background: transparent; border-style: dashed; }
 .grid { display: grid; gap: 14px; } .g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .row { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
 .pill { font-family: var(--mono); font-size: var(--t-sm); letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--border-strong); border-radius: 99px; padding: 2px 9px; color: var(--muted); }
@@ -213,3 +214,4 @@ details.report summary { padding: var(--s2) 0; cursor: pointer; }
 .fields dt { color: var(--muted); font-size: 13px; }
 .fields dd { margin: 0; }
 @media (max-width: 640px) { .fields > div { grid-template-columns: 1fr; gap: 0; } }
+.ml8 { margin-left: 8px; }
