@@ -151,8 +151,8 @@ module "nightly" {
   image                 = var.nightly_image
   service_account_email = module.platform.service_account_emails["nightly"]
   stages                = yamldecode(file("${path.root}/../config/pipeline.yaml")).stages
-  secret_env = local.pipeline_secret_env
-  env        = local.pipeline_env
+  secret_env            = local.pipeline_secret_env
+  env                   = local.pipeline_env
 }
 
 # Autoclean (#146): the same image, run alone on its own schedule after the nightly and its

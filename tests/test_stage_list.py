@@ -9,8 +9,12 @@ from weft_core import config
 ROOT = Path(__file__).resolve().parent.parent
 
 
+# autoclean has its own scheduler job (#146), so it is not in the nightly list
+NOT_NIGHTLY = {"autoclean"}
+
+
 def test_config_stages_match_runner() -> None:
-    assert stage_names() == list(STAGES)
+    assert stage_names() == [s for s in STAGES if s not in NOT_NIGHTLY]
 
 
 def test_needs_only_name_earlier_stages() -> None:

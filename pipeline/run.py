@@ -103,7 +103,7 @@ def run_stages(ctx: Ctx, only: str | None = None, start: str | None = None) -> d
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage", choices=stage_names())
+    ap.add_argument("--stage", choices=list(STAGES))  # includes autoclean, which has its own job
     ap.add_argument("--from", dest="start", choices=stage_names())
     args = ap.parse_args(argv)
     ctx = production_ctx()
