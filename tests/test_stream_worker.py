@@ -333,9 +333,18 @@ def test_one_report_costs_a_bounded_number_of_queries() -> None:
     db, d, _ = setup()
     runs: list[str] = []
     inner = db.execute
-    db.execute = lambda q, a=(): (runs.append(q), inner(q, a))[1]  # type: ignore[method-assign]
+
+    def counted(q: str, a: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        runs.append(q)
+        return inner(q, a)
+
+    db.execute = counted  # type: ignore[method-assign,assignment]
     nlp = d.nlp
-    nlp.entities.extract = lambda t: [(f"Entity{i}", "X") for i in range(30)]  # type: ignore[method-assign]
+
+    def many(text: str) -> list[tuple[str, str]]:
+        return [(f"Entity{i}", "X") for i in range(30)]
+
+    nlp.entities.extract = many  # type: ignore[method-assign]
     process(msg("q1", "a-il", T, L, "2026-11-06T01:00:00+00:00"), d)
     assert len(runs) < 40  # 30 entities would be 30+ queries one by one
 
