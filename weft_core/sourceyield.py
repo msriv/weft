@@ -61,7 +61,7 @@ def due(source: dict[str, Any], cfg: dict[str, Any], now: datetime | None = None
     now = now or datetime.now(UTC)
     run = int(now.timestamp() // cfg["run_seconds"])
     offset = int(hashlib.sha256(source["id"].encode()).hexdigest(), 16)
-    return (run + offset) % cfg["low_every"] == 0
+    return bool((run + offset) % cfg["low_every"] == 0)
 
 
 def make_room(db: store.Db, beat_id: str, relevance: float, cfg: dict[str, Any]) -> bool:

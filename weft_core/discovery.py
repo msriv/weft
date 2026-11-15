@@ -230,8 +230,13 @@ def _probe(
 ) -> list[str] | None:
     """Probe and register (or re-register) one domain. Returns its feeds when accepted."""
     name, home, feeds, lang, reason = verified_feeds(http, domain, now, beat)
-    full = not reason and via is None and cfg and beat  # admin-requested sources bypass the ceiling
-    if full and not sourceyield.make_room(db, beat["id"], rel, cfg):
+    if (  # admin-requested sources bypass the ceiling
+        not reason
+        and via is None
+        and cfg is not None
+        and beat is not None
+        and not sourceyield.make_room(db, beat["id"], rel, cfg)
+    ):
         return None  # stays a candidate and waits for room
     store.register_source(
         db,
