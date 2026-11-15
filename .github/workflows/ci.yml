@@ -84,7 +84,7 @@ jobs:
 
   # Read-only plan against the real state, for pull requests from this repository.
   plan:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.WIF_PROVIDER != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read

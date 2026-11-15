@@ -20,6 +20,7 @@ env:
 
 jobs:
   build:
+    if: vars.WIF_PROVIDER != ''  # skipped until the one-time bootstrap is done (infra/README.md)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
