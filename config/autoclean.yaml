@@ -1,0 +1,22 @@
+# Autoclean rules (#146, #147). Deterministic code only; no model decides what is removed.
+# Every rule ships in dry_run: it logs how many rows match and up to 20 sample ids, and changes
+# nothing. Switch a rule to `apply` here once its dry-run counts look right.
+# A rule with no entry under `rules` gets `defaults`.
+version: 1
+
+# Same number as the raw bucket lifecycle (infra raw_retention_days), so the two cannot drift.
+raw_retention_days: 30
+
+defaults:
+  enabled: true
+  mode: dry_run          # dry_run | apply
+  max_fraction: 0.05     # abort when a rule matches more than this share of its population
+  max_rows: 10000        # ... or more than this many rows
+
+rules:
+  stale_batch_runs: {hours: 3}
+  claims_skipped: {days: 2}
+  unplaced_items: {min_age_hours: 1, max_age_days: 7, max_rows: 500}
+  # Both null one column past raw_retention_days and lose nothing rule 4 needs, so no cap applies.
+  model_call_inputs: {max_rows: 1000000000, max_fraction: 1.0}
+  raw_uri_expired: {max_rows: 1000000000, max_fraction: 1.0}
