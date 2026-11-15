@@ -383,9 +383,11 @@
   "country",
   "country_source",
   "crawl",
+  "disc_rel",
   "discovered_at",
   "discovered_via",
   "domain",
+  "dormant_at",
   "feeds",
   "healthy",
   "homepage",
@@ -404,7 +406,8 @@
   "state_run_source",
   "status",
   "type",
-  "verified_at"
+  "verified_at",
+  "yield_14d"
  ],
  "SourceDay": [
   "day",
