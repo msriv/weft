@@ -23,6 +23,12 @@ docker compose logs -f        # watch it work
 
 Web: http://localhost:3000. Create a reader account on `/welcome` to try sign-in and synced preferences (Firebase Auth emulator; accounts vanish on `down -v`). API: http://localhost:8080.
 
+### First run
+
+- **Time:** the first `--build` downloads the small models (BGE-M3, GlotLID, spaCy, NLI) into the images, several GB and often 10 to 30 minutes; the stream worker then needs a few more minutes to load them before it reports ready. Set `HF_TOKEN` to avoid download rate limits.
+- **Required in `.env`:** `MODEL_API_KEY`, `MODEL_NAME` and `MODEL_REVISION` (the example file has working values). Without a key the pipeline still runs but skips every model call; Ask answers 503.
+- **Progress:** `docker compose ps` shows readiness; the admin page (`/admin`) lists pipeline stage runs and sources; `docker compose logs -f poller fetcher stream-worker` shows items moving. The first nightly run starts about 30 minutes after startup. Until stories are published in the admin the public pages show their empty states.
+
 ### Seeding and schedules
 
 Seeding is part of startup, through the real pipeline and no hand-seeded sources. `seed` runs the first discovery (reads GDELT, registers real feeds and portals per beat). Then the same jobs production runs, on production's cadence, loop in their own containers: `poller` every 10 min, `discovery` hourly, `crawler` daily, `pipeline` (nightly stages) daily, first run 30 min after start. `fetcher` and `stream-worker` process what the poller publishes.

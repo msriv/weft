@@ -4,8 +4,15 @@ import { AnomalyCard, IssuerTag, Kicker, SourceTag } from "@/components/bits";
 import ClaimMatrix from "@/components/ClaimMatrix";
 import ReportProblem from "@/components/ReportProblem";
 import { api } from "@/lib/api";
+import { meta } from "@/lib/meta";
 import { day, perspectiveName } from "@/lib/format";
 import type { EventPage } from "@/lib/types";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string; eventId: string }> }) {
+  const p = await params;
+  const x = await api<EventPage>(`/v1/events/${p.eventId}`);
+  return meta(x?.event.label ?? "Event", "Coverage of one event within a story.");
+}
 
 export default async function Event({ params }: { params: Promise<{ id: string; eventId: string }> }) {
   const { id, eventId } = await params;

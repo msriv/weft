@@ -184,7 +184,8 @@ def run_all(
     cfg: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Every registered rule, in registration order. One rule failing does not stop the rest."""
-    import weft_core.autoclean_rules  # noqa: F401  (registers the rules)
+    import weft_core.autoclean_graph
+    import weft_core.autoclean_rules  # noqa: F401
 
     cfg = cfg or config.load("autoclean.yaml")
     # the bucket lifecycle and this follow one Terraform variable, so they cannot drift
