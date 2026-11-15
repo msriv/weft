@@ -7,6 +7,7 @@ import base64
 import json
 import os
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -14,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from google.cloud import bigquery, pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.fetcher import refetch as refetch_mod
-from services.fetcher.fetcher import Store, fetch_item
+from services.fetcher.fetcher import Store, fetch_item, seen_from_rows
 from services.fetcher.tasks import CloudTasksQueue
 from weft_core import store
 from weft_core import store as store_mod
@@ -30,7 +31,9 @@ class GcpStore:
 
     def seen(self, canonical_url: str | None, text_hash: str) -> bool:
         job = self._bq.query(
-            f"SELECT 1 FROM `{self._ds}.raw_items` WHERE canonical_url = @u OR url = @u OR text_hash = @h LIMIT 1",
+            "SELECT text_hash, fetched_at "
+            f"FROM `{self._ds}.raw_items` WHERE canonical_url = @u OR url = @u "
+            "OR (@h != '' AND text_hash = @h)",
             job_config=bigquery.QueryJobConfig(
                 query_parameters=[
                     bigquery.ScalarQueryParameter("u", "STRING", canonical_url),
@@ -38,7 +41,8 @@ class GcpStore:
                 ]
             ),
         )
-        return bool(job.result().total_rows)
+        rows = [(r.text_hash, r.fetched_at) for r in job.result()]
+        return seen_from_rows(rows, datetime.now(UTC))
 
     def save_version(self, item_id: str, n: int, content: bytes, ext: str) -> None:
         self._bucket.blob(f"{item_id}.v{n}.{ext}").upload_from_string(content)
