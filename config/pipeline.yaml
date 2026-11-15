@@ -14,6 +14,7 @@ stream:
   veto_min_reports: 20           # entity veto once the story has this many reports in 30 days
   near_dup_jaccard: 0.80
   near_dup_window_hours: 72
+  event_inplace_minutes: 10      # an attach within this long of the event's last write updates it in place (#151)
 
 # Spend limits per UTC day across all services (#157). Each caller gets its share, so the
 # public /v1/ask can never use up the pipeline's tokens and the reverse. A refused call degrades
@@ -41,6 +42,24 @@ limits:
 prefilter:
   enabled: true
   sample_rate: 0.02
+
+# Fetching untrusted URLs (#164).
+fetch:
+  max_html_bytes: 10000000         # pages, feeds, sitemaps, robots.txt
+  max_pdf_bytes: 50000000
+  max_redirects: 5
+  deadline_seconds: 60             # total per request, not per read
+  max_pdf_pages: 100               # pages read for text (OCR has its own cap)
+
+# Source yield, cadence, dormancy and ceilings (#171).
+sources:
+  window_days: 14
+  dormant_days: 30                # no on-beat report in this long: dormant (not polled)
+  low_yield: 0.05                 # below this on-beat share a source is polled every low_every-th run
+  low_every: 6
+  run_seconds: 600                # the poller schedule
+  max_per_beat: 40                # active sources found by discovery, per beat
+  max_total: 150
 
 # Extraction quality gate (#170): pages that are not articles are not stored as reports.
 quality:

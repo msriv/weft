@@ -1,7 +1,9 @@
 import { Kicker } from "@/components/bits";
+import Time from "@/components/Time";
 import ReportProblem from "@/components/ReportProblem";
 import { api } from "@/lib/api";
-import { RULE_NAMES } from "@/lib/format";
+import { RuleTable } from "@/components/Fields";
+import { RULES, ruleName } from "@/lib/format";
 
 type Method = {
   rules_version: number; provisional: Record<string, number>; rules: Record<string, Record<string, unknown>>;
@@ -33,17 +35,18 @@ export default async function MethodPage() {
       <p>Anomalies compare reports with other reports, never with &ldquo;the truth&rdquo;. No AI model flags anomalies. Anomalies stay provisional until at least {m.provisional.min_sources} sources from {m.provisional.min_perspectives} perspectives have reported and {m.provisional.min_hours_since_first_report} hours have passed.</p>
       {Object.entries(m.rules).map(([k, v]) => (
         <div className="card" key={k}>
-          <Kicker>{RULE_NAMES[k] ?? k}{v.enabled ? "" : " · not yet active"}</Kicker>
-          <pre style={{ margin: 0, fontSize: 12, color: "var(--body2)" }}>{Object.entries(v).filter(([n]) => n !== "enabled").map(([n, x]) => `${n}: ${JSON.stringify(x)}`).join("\n")}</pre>
+          <Kicker>{ruleName(k)}{v.enabled ? "" : " · not yet active"}</Kicker>
+          {RULES[k] && <p className="my6">{RULES[k].does}</p>}
+          <RuleTable rule={k} values={v} />
         </div>
       ))}
       <hr />
       <Kicker>Where we use AI models</Kicker>
       <p>{m.model_calls_note} Never used for: flagging anomalies, scoring sources, or deciding what a story is about.</p>
       <Kicker>How often each rule's flags were useful</Kicker>
-      <p className="muted" style={{ fontSize: 13 }}>The owner labels flags as useful or not. A rule only notifies once at least 20 labels say it is useful 70% of the time; until then its flags are provisional.</p>
+      <p className="muted fs13">The owner labels flags as useful or not. A rule only notifies once at least 20 labels say it is useful 70% of the time; until then its flags are provisional.</p>
       {m.rule_precision?.length ? m.rule_precision.map((p) => (
-        <div className="row" key={`${p.rule}:${p.rule_version}`}><b>{p.rule}</b><span className="muted">version {p.rule_version}</span><span>{p.useful} of {p.labelled} useful ({Math.round(p.precision * 100)}%)</span></div>
+        <div className="row" key={`${p.rule}:${p.rule_version}`}><b>{ruleName(p.rule)}</b><span className="muted">version {p.rule_version}</span><span>{p.useful} of {p.labelled} useful ({Math.round(p.precision * 100)}%)</span></div>
       )) : <p className="muted">No labels yet.</p>}
       {m.models.map((x) => <div className="row" key={x.job}><b>{x.job}</b><span className="muted">{x.model}</span><span>{x.how}</span></div>)}
       <hr />
@@ -51,9 +54,9 @@ export default async function MethodPage() {
       <p>Reader subscriptions and donations, when they start. No advertising, because ads reward exactly the engagement we&apos;re trying not to create. No funding from governments or parties covered in our stories.</p>
       <p className="muted">{m.gdelt_citation}</p>
       <hr />
-      <Kicker>Our own mistakes</Kicker>
+      <div id="corrections"><Kicker>Our own mistakes</Kicker></div>
       <p>Every correction Weft makes to its own groupings, translations or flags.</p>
-      {m.corrections.length ? m.corrections.map((c, i) => <div className="row" key={i}><span className="kicker">{c.day}</span><span className="pill">{c.kind}</span><span>{c.what}</span></div>) : <p className="muted">No corrections yet.</p>}
+      {m.corrections.length ? m.corrections.map((c, i) => <div className="row" key={i}><span className="kicker"><Time iso={c.day} /></span><span className="pill">{c.kind}</span><span>{c.what}</span></div>) : <p className="muted">No corrections yet.</p>}
       <ReportProblem kind="other" label="Report a problem" />
     </>
   );

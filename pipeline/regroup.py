@@ -341,7 +341,8 @@ def run(ctx: Ctx) -> int:
                         continue  # no answer: leave the pair as it is
                     if not answer:
                         ctx.db.execute(
-                            "MERGE (:MergeRejected {pair: ?})", (f"{a['id']}|{b['id']}",)
+                            "MERGE (n:MergeRejected {pair: ?}) ON CREATE SET n.created_at=?",
+                            (f"{a['id']}|{b['id']}", ctx.now),
                         )
                         continue
                 _merge(ctx, keep=a, drop=b, score=score)

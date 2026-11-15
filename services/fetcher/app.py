@@ -21,7 +21,8 @@ from services.fetcher.tasks import CloudTasksQueue
 from weft_core import config, store
 from weft_core import store as store_mod
 from weft_core.gcp import bigquery_client
-from weft_core.polite import PoliteClient
+from weft_core.polite import HostCooldowns, PoliteClient
+from weft_core.probes import add_probes
 
 
 class GcpStore:
@@ -152,6 +153,7 @@ def create_app(
     qcfg: dict[str, Any] | None = None,
 ) -> FastAPI:
     app = FastAPI()
+    add_probes(app, db)
 
     @app.post("/")
     async def push(request: Request) -> Response:
@@ -211,7 +213,9 @@ def _default_app() -> FastAPI:
     project = os.environ["PROJECT_ID"]
     db = store.from_env()
     sources = store.LiveSources(db)
-    http = PoliteClient(httpx.Client(timeout=30, follow_redirects=True))
+    http = PoliteClient(
+        httpx.Client(timeout=30, follow_redirects=True), cooldowns=HostCooldowns(db)
+    )
     publisher = pubsub_v1.PublisherClient()
     topic = publisher.topic_path(project, "items-extracted")
 

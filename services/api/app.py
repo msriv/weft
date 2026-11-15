@@ -37,6 +37,7 @@ from weft_core import (
 )
 from weft_core.cache import TtlCache
 from weft_core.models import BudgetExceeded, ModelRefused
+from weft_core.probes import add_probes
 
 STREAM_POLL_SECONDS = 5
 PUBLIC_TTL_SECONDS = 30
@@ -57,7 +58,7 @@ class Problem(BaseModel):
 class SourcePatch(BaseModel):
     country: str | None = None
     paywalled: bool | None = None
-    status: Literal["active", "rejected"] | None = None
+    status: Literal["active", "rejected", "dormant"] | None = None
     state_run: bool | None = None
     state_run_source: str | None = None
     owner_id: str | None = None
@@ -98,6 +99,7 @@ class ReaderPrefs(BaseModel):
     follows: list[str] = []
     frequency: str = "daily"
     email: str | None = None
+    last_visit: str | None = None  # Today shows what is new since this
 
 
 class Question(BaseModel):
@@ -138,6 +140,8 @@ def create_app(
     site: str = "",
 ) -> FastAPI:
     app = FastAPI(title="Weft API")
+    add_probes(app, db)
+
     lim = limits if limits is not None else config.pipeline()["limits"]
     limiter = limiter or Limiter()
     streams = Streams(lim["streams"]["per_client"], lim["streams"]["total"])
@@ -293,6 +297,11 @@ def create_app(
         sort: Literal["recent", "anomalies", "reports"] = "recent",
     ) -> list[dict[str, Any]]:
         return readmodel.list_stories(db, region, topic, sort)
+
+    @v1.get("/search")
+    def search(q: Annotated[str, Query(max_length=80)] = "") -> dict[str, list[dict[str, Any]]]:
+        """Stories, events, sources and people whose title or name contains `q`. Public stories only."""
+        return readmodel.search(db, q)
 
     @v1.get("/stories/{story_id}")
     def story(
@@ -511,6 +520,8 @@ def create_app(
             "country",
             "country_source",
             "paywalled",
+            "yield_14d",
+            "dormant_at",
             "status",
             "rejected_reason",
         )
@@ -661,6 +672,11 @@ def create_app(
         request.state.before = {k: current[0].get(k) for k in data}
         if "country" in data:  # also re-tags the source's reports
             store.set_country(db, source_id, data.pop("country"), "admin")
+        if data.get("status") == "active":
+            data["dormant_at"] = (
+                None  # an admin reactivation; discovery will not re-dorm it for 30 days
+            )
+            data["discovered_at"] = datetime.now(UTC).isoformat()
         if "paywalled" in data:
             data["paywalled_source"] = "admin"  # the fetcher never overrides a hand-set flag
         for col, val in data.items():  # col is a SourcePatch field name, never user text

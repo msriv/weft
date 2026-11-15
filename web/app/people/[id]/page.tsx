@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
 import { meta } from "@/lib/meta";
@@ -23,6 +24,7 @@ export default async function Person({ params }: { params: Promise<{ id: string 
   if (!a) notFound();
   return (
     <>
+      <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: a.actor.name }]} />
       <Kicker>Person · {a.actor.role ?? "public role not stated"}</Kicker>
       <h1>{a.actor.name}</h1>
       <p className="muted">Shown for statements made in official proceedings and releases, in their public role.</p>

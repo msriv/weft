@@ -134,6 +134,51 @@ def anomalies_for(
     ]
 
 
+def provisional_reason(db: Db, a: dict[str, Any]) -> str:
+    """Why an anomaly is still provisional, in words. Same tests as `rules.evaluate_event`."""
+    p = config.rules()["provisional"]
+    ev = graph.get(db, "events", a["event_id"]) if a.get("event_id") else None
+    reps = graph.select(db, "reports", "n.event_id=?", (a["event_id"],)) if ev else []
+    sources = len({r["source_id"] for r in reps})
+    persp = len({r["perspective"] for r in reps if r["perspective"] != "unattributed"})
+    if ev and sources < p["min_sources"]:
+        return f"Only {sources} {'source has' if sources == 1 else 'sources have'} reported so far; needs {p['min_sources']}."
+    if ev and persp < p["min_perspectives"]:
+        return f"Only {persp} {'perspective has' if persp == 1 else 'perspectives have'} reported so far; needs {p['min_perspectives']}."
+    if ev and datetime.now(UTC) - datetime.fromisoformat(ev["first_seen"]) < timedelta(
+        hours=p["min_hours_since_first_report"]
+    ):
+        return f"The first report was under {p['min_hours_since_first_report']} hours ago."
+    return "Owner labels have not yet shown this rule's flags to be useful."
+
+
+def with_evidence(db: Db, views: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Resolve each anomaly's evidence to outlet, country, time and link, and give the reason a
+    provisional one is provisional, so the card needs no further request."""
+    srcs = sources_by_id(db)
+    for v in views:
+        out = []
+        for eid in v["evidence_ids"]:
+            fig = graph.get(db, "figures", eid)
+            r = graph.get(db, "reports", fig["report_id"] if fig else eid)
+            if r is None:
+                continue
+            s = srcs.get(r["source_id"], {})
+            out.append(
+                {
+                    "id": r["id"],
+                    "outlet": s.get("name", r["source_id"]),
+                    "perspective": r["perspective"],
+                    "published_at": r["published_at"] or r["fetched_at"],
+                }
+            )
+        v["evidence"] = out
+        v["provisional_reason"] = (
+            provisional_reason(db, v) if v["status"] == "provisional" else None
+        )
+    return views
+
+
 # --- stories ----------------------------------------------------------------------------------
 
 
@@ -150,10 +195,12 @@ def story_card(db: Db, s: dict[str, Any], at: str | None = None) -> dict[str, An
     last = agg["last"]
     now = datetime.fromisoformat(at) if at else datetime.now(UTC)
     quiet = not last or now - datetime.fromisoformat(last) > QUIET_AFTER
+    beat = db.execute("MATCH (b:Beat {id: ?}) RETURN b.name AS n", (s["beat_id"],))
     return {
         "id": s["id"],
         "title": s["title"],
         "beat": s["beat_id"],
+        "beat_name": (beat[0]["n"] if beat else None) or s["beat_id"],
         "status": "quiet" if quiet else "developing",
         "reports": agg["reports"],
         "events": agg["events"],
@@ -183,6 +230,62 @@ def list_stories(
         "reports": lambda c: c["reports"],
     }.get(sort, lambda c: c["last_report_at"] or "")
     return sorted(cards, key=key, reverse=True)
+
+
+SEARCH_MIN = 2
+
+
+def search(db: Db, q: str, limit: int = 5) -> dict[str, list[dict[str, Any]]]:
+    """Header search: fixed read-only queries, no model, public stories only. Matches are a
+    case-insensitive contains on titles and names, grouped by kind."""
+    needle = q.strip().lower()[:80]
+    out: dict[str, list[dict[str, Any]]] = {
+        "stories": [],
+        "events": [],
+        "sources": [],
+        "people": [],
+    }
+    if len(needle) < SEARCH_MIN:
+        return out
+    limit = max(1, min(limit, 20))
+    out["stories"] = [
+        {"id": r["id"], "title": r["title"]}
+        for r in db.execute(
+            "MATCH (s:Story {public: 1}) WHERE toLower(s.title) CONTAINS ? "
+            "RETURN s.id AS id, s.title AS title ORDER BY s.title LIMIT ?",
+            (needle, limit),
+        )
+    ]
+    out["events"] = [
+        {"id": r["id"], "story_id": r["story_id"], "title": r["title"]}
+        for r in db.execute(
+            "MATCH (e:Event) WHERE e.valid_to IS NULL "
+            "MATCH (s:Story {public: 1}) WHERE s.id = e.story_id "
+            "MATCH (r:Report) WHERE r.id = e.label_report_id AND toLower(r.title) CONTAINS ? "
+            "RETURN e.id AS id, e.story_id AS story_id, r.title AS title ORDER BY r.title LIMIT ?",
+            (needle, limit),
+        )
+    ]
+    out["sources"] = [
+        {"id": r["id"], "title": r["name"]}
+        for r in db.execute(
+            "MATCH (n:Source) WHERE toLower(n.name) CONTAINS ? "
+            "RETURN n.id AS id, n.name AS name ORDER BY n.name LIMIT ?",
+            (needle, limit),
+        )
+    ]
+    out["people"] = [
+        {"id": r["id"], "title": r["name"]}
+        for r in db.execute(
+            "MATCH (a:Actor) WHERE toLower(a.name) CONTAINS ? "
+            "AND EXISTS { MATCH (st:Statement {actor_id: a.id}) "
+            "MATCH (d:Document {id: st.document_id}) MATCH (s:Story {public: 1}) "
+            "WHERE s.id = d.story_id } "
+            "RETURN a.id AS id, a.name AS name ORDER BY a.name LIMIT ?",
+            (needle, limit),
+        )
+    ]
+    return out
 
 
 WINDOW_DAYS = 7
@@ -228,7 +331,7 @@ def story_graph(
             groups[(r["event_id"], r["perspective"])].append(r)
     anomalies = [
         a
-        for a in anomalies_for(db, "n.story_id=?", (story_id,), at)
+        for a in with_evidence(db, anomalies_for(db, "n.story_id=?", (story_id,), at))
         if a["event_id"] in in_window or rep_ids & set(a["evidence_ids"])
     ]
     flagged = defaultdict(list)
@@ -524,7 +627,7 @@ def event_page(db: Db, event_id: str, at: str | None = None) -> dict[str, Any] |
         ],
         "figures": figs,
         "documents": docs,
-        "anomalies": anomalies_for(db, "n.event_id=?", (event_id,), at),
+        "anomalies": with_evidence(db, anomalies_for(db, "n.event_id=?", (event_id,), at)),
         "short_version": _split_sv(db, sv["payload"]) if sv else None,
         "parties": plist,
     }

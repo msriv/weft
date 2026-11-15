@@ -29,7 +29,7 @@ from pipeline import (
     weights,
 )
 from pipeline.ctx import Ctx
-from weft_core import config, graph
+from weft_core import config, graph, graphsize
 
 STAGES: dict[str, Callable[[Ctx], int]] = {
     "regroup": regroup.run,
@@ -108,13 +108,15 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     ctx = production_ctx()
     run_stages(ctx, args.stage, args.start)
+    if args.stage in (None, list(STAGES)[-1]):  # once per nightly run
+        graphsize.log(ctx.db)
     return 0
 
 
 def production_ctx() -> Ctx:
     import os
 
-    from pipeline.gcp import BqWarehouse, GcsText, bq_sink, pubsub_publish, versions_of
+    from pipeline.gcp import BqWarehouse, GcsBlobs, GcsText, bq_sink, pubsub_publish, versions_of
     from weft_core import config, store
     from weft_core.ledger import GraphLedger, limits
     from weft_core.models import ModelClient
@@ -147,6 +149,10 @@ def production_ctx() -> Ctx:
         ledger=ledger,
         warehouse=BqWarehouse(project),
         publish=pubsub_publish(project),
+        snapshots=GcsBlobs(os.environ["SNAPSHOT_BUCKET"])
+        if os.environ.get("SNAPSHOT_BUCKET")
+        else None,
+        raw_blobs=GcsBlobs(raw),
     )
 
 

@@ -7,6 +7,7 @@ A destructive rule (it deletes graph data) runs only after a good snapshot, so w
 still exists in a dated Parquet snapshot. Nothing here is decided by weight or by a model.
 """
 
+import importlib
 import json
 import os
 import uuid
@@ -34,6 +35,20 @@ class Warehouse(Protocol):
 Publish = Callable[[str, dict[str, Any]], None]  # (topic name, message)
 
 
+@dataclass(frozen=True)
+class Blob:
+    name: str
+    updated: datetime
+
+
+class Blobs(Protocol):
+    """One GCS bucket as autoclean sees it."""
+
+    def list(self, prefix: str = "", limit: int | None = None) -> list[Blob]: ...
+
+    def delete(self, name: str) -> None: ...
+
+
 @dataclass
 class Env:
     db: Db
@@ -42,6 +57,8 @@ class Env:
     raw_retention_days: int = 30
     warehouse: Warehouse | None = None
     publish: Publish | None = None
+    snapshots: Blobs | None = None  # the weft-snapshots bucket
+    raw: Blobs | None = None  # the weft-raw bucket
 
 
 @dataclass
@@ -114,12 +131,16 @@ def run_rule(
     snapshot_good: bool,
     warehouse: Warehouse | None = None,
     publish: Publish | None = None,
+    snapshots: Blobs | None = None,
+    raw: Blobs | None = None,
 ) -> dict[str, Any] | None:
     """Run one rule, write its `AutocleanRun` node, return the record (None if disabled)."""
     conf = settings(cfg, rule.name)
     if not conf.get("enabled", True):
         return None
-    env = Env(db, now, conf, int(cfg.get("raw_retention_days", 30)), warehouse, publish)
+    env = Env(
+        db, now, conf, int(cfg.get("raw_retention_days", 30)), warehouse, publish, snapshots, raw
+    )
     rec: dict[str, Any] = {
         "run_id": run_id,
         "rule": rule.name,
@@ -182,10 +203,12 @@ def run_all(
     warehouse: Warehouse | None = None,
     publish: Publish | None = None,
     cfg: dict[str, Any] | None = None,
+    snapshots: Blobs | None = None,
+    raw: Blobs | None = None,
 ) -> list[dict[str, Any]]:
     """Every registered rule, in registration order. One rule failing does not stop the rest."""
-    import weft_core.autoclean_graph
-    import weft_core.autoclean_rules  # noqa: F401
+    for module in ("rules", "graph", "expiry", "versions"):  # importing registers the rules
+        importlib.import_module(f"weft_core.autoclean_{module}")
 
     cfg = cfg or config.load("autoclean.yaml")
     # the bucket lifecycle and this follow one Terraform variable, so they cannot drift
@@ -207,6 +230,8 @@ def run_all(
             snapshot_good=good,
             warehouse=warehouse,
             publish=publish,
+            snapshots=snapshots,
+            raw=raw,
         )
         for r in RULES.values()
     ]

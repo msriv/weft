@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import { storyTitle } from "@/lib/crumbs";
 import ReportProblem from "@/components/ReportProblem";
 import { IssuerTag, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
 import { meta } from "@/lib/meta";
-import { day } from "@/lib/format";
+import Time from "@/components/Time";
 import type { Issuer } from "@/lib/types";
 
 type Doc = {
@@ -25,12 +27,13 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const d = await api<Doc>(`/v1/documents/${id}`);
   if (!d) notFound();
   const speakers = [...new Map(d.statements.map((s) => [s.actor_id, s])).values()];
+  const title = await storyTitle(d.document.story_id);
   return (
     <>
-      <Link href={`/s/${d.document.story_id}`} className="muted">← Back to the story</Link>
-      <Kicker>Official document · {d.document.kind} · {day(d.document.published_at)}</Kicker>
+      <Breadcrumbs items={[{ label: "Stories", href: "/stories" }, { label: title, href: `/s/${d.document.story_id}` }, ...(d.event ? [{ label: d.event.label ?? "Event", href: `/s/${d.document.story_id}/e/${d.event.id}` }] : []), { label: d.document.title }]} />
+      <Kicker>Official document · {d.document.kind} · <Time iso={d.document.published_at} /></Kicker>
       <h1>{d.document.title}</h1>
-      <div className="row" style={{ margin: "10px 0" }}>{d.issuer && <IssuerTag i={d.issuer} />}</div>
+      <div className="row my10">{d.issuer && <IssuerTag i={d.issuer} />}</div>
       {d.label && <p>{d.label}</p>}
       <a href={d.document.url} rel="noopener noreferrer">Original document ↗</a>
       <p className="muted">{d.document.summary}</p>
@@ -40,8 +43,8 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       <div className="row">{speakers.map((s) => <Link key={s.actor_id} className="pill on" href={`/people/${s.actor_id}`}>{s.actor}{s.role ? ` · ${s.role}` : ""}</Link>)}</div>
       <Kicker>Statements</Kicker>
       {d.statements.map((s) => (
-        <div className="card" key={s.id}>
-          <div className="kicker">{s.actor} · character {s.start}</div>
+        <div className="card" id={`st-${s.id}`} key={s.id}>
+          <div className="kicker">{s.actor}</div>
           <p>“{s.text}”</p>
         </div>
       ))}

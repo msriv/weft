@@ -66,6 +66,7 @@ def test_nothing_is_readable_until_the_admin_toggle() -> None:
         == 200
     )
     assert [s["id"] for s in c.get("/v1/stories").json()] == ["iran-israel-war"]
+    assert c.get("/v1/stories").json()[0]["beat_name"]  # a name for readers, never just the id
 
 
 def test_story_event_node_document_actor_world_method() -> None:
@@ -407,6 +408,59 @@ def test_open_questions_come_from_rules_and_leave_when_answered() -> None:
     ctx.db.execute("MATCH (n:Conflict) DETACH DELETE n")
     later = questions.open_questions(ctx.db, "iran-israel-war", datetime(2026, 11, 6, tzinfo=UTC))
     assert not any(q["kind"] == "conflict" for q in later)
+
+
+def test_search_finds_public_items_only() -> None:
+    c, ctx = build()
+    title = c.get("/v1/stories").json()
+    assert title == []
+    # before the admin toggle: stories, events and people are not searchable; sources are the public registry
+    r = c.get("/v1/search", params={"q": "iran"}).json()
+    assert r["stories"] == [] and r["events"] == [] and r["people"] == []
+    assert c.get("/v1/search", params={"q": "a"}).json() == {
+        "stories": [],
+        "events": [],
+        "sources": [],
+        "people": [],
+    }  # too short
+    assert (
+        c.put("/admin/stories/iran-israel-war/public", json={"public": True}, headers=H).status_code
+        == 200
+    )
+    story_title = c.get("/v1/stories").json()[0]["title"]
+    r = c.get("/v1/search", params={"q": story_title[:6].upper()}).json()
+    assert [s["id"] for s in r["stories"]] == ["iran-israel-war"]
+    people = c.get("/v1/search", params={"q": "rao"}).json()["people"]
+    assert [p["id"] for p in people] == ["anita-rao"]
+    from weft_core import store
+
+    name = store.all_sources(ctx.db)[0]["name"]
+    assert name in [
+        x["title"] for x in c.get("/v1/search", params={"q": name[:4]}).json()["sources"]
+    ]
+    ev = c.get("/v1/stories/iran-israel-war", params={"days": 0}).json()["events"][0]
+    found = c.get("/v1/search", params={"q": (ev["label"] or "")[:8]}).json()["events"]
+    assert ev["id"] in [e["id"] for e in found]
+
+
+def test_anomalies_carry_outlets_and_a_provisional_reason() -> None:
+    from weft_core import readmodel
+
+    _, ctx = build()
+    r = graph.get(ctx.db, "reports", "1")
+    assert r is not None
+    view = {
+        "id": "a",
+        "status": "provisional",
+        "event_id": r["event_id"],
+        "evidence_ids": ["1", "nope"],
+    }
+    [out] = readmodel.with_evidence(ctx.db, [view])
+    assert [e["id"] for e in out["evidence"]] == ["1"]  # unknown ids are dropped
+    assert out["evidence"][0]["outlet"] and out["evidence"][0]["perspective"]
+    assert "needs" in out["provisional_reason"]  # three reports are below the thresholds
+    [act] = readmodel.with_evidence(ctx.db, [{**view, "status": "active"}])
+    assert act["provisional_reason"] is None
 
 
 def test_story_graph_reads_only_the_window_and_no_vectors() -> None:

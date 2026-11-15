@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { DEFAULTS, loadPrefs, savePrefs, type Prefs } from "@/lib/prefs";
 import { Kicker } from "@/components/bits";
+import { perspectiveLabel } from "@/lib/format";
 import { pullPrefs, signIn, signOut, signedInAs, token } from "@/lib/account";
 
 type Card = { id: string; title: string; beat: string; perspectives: string[] };
@@ -44,7 +45,7 @@ export default function Welcome() {
       setError(false); setSaved(true);
     }}>
       <Kicker>Welcome</Kicker>
-      <h1>What do you want to follow?</h1>
+      <h1>Following and preferences</h1>
       <p className="muted">Stays in this browser unless you sign in. Nothing is tracked. Changes ordering and what the digest covers, never what is hidden.</p>
       <Kicker>Account</Kicker>
       {who ? (
@@ -66,7 +67,7 @@ export default function Welcome() {
       <Kicker>Perspectives you want to see first</Kicker>
       <div className="row">
         {regions.map((r) => (
-          <button type="button" key={r} aria-pressed={prefs.regions.includes(r)} className={`pill${prefs.regions.includes(r) ? " on" : ""}`} onClick={() => toggle("regions", r)}>{r}</button>
+          <button type="button" key={r} aria-pressed={prefs.regions.includes(r)} className={`pill${prefs.regions.includes(r) ? " on" : ""}`} onClick={() => toggle("regions", r)}>{perspectiveLabel(r)}</button>
         ))}
       </div>
       <Kicker>Email digest</Kicker>

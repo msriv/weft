@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Kicker } from "@/components/bits";
 import { adminHeaders } from "@/lib/account";
+import { Fields } from "@/components/Fields";
 
 type Story = { id: string; beat_id: string; title: string; public: boolean };
 type Item = { id: string; kind: string; payload: Record<string, unknown> };
@@ -195,11 +196,11 @@ export default function Admin() {
         }}>
           <Kicker>{b.name}{b.edited ? " · edited" : ""}</Kicker>
           <label className="muted" htmlFor={`p-${b.id}`}>Match any</label>
-          <textarea id={`p-${b.id}`} name="patterns" rows={3} style={{ width: "100%" }} defaultValue={b.patterns.join("\n")} />
+          <textarea id={`p-${b.id}`} name="patterns" rows={3} className="w100" defaultValue={b.patterns.join("\n")} />
           <label className="muted" htmlFor={`x-${b.id}`}>But not</label>
-          <textarea id={`x-${b.id}`} name="exclude" rows={2} style={{ width: "100%" }} defaultValue={b.exclude.join("\n")} />
+          <textarea id={`x-${b.id}`} name="exclude" rows={2} className="w100" defaultValue={b.exclude.join("\n")} />
           <label className="muted" htmlFor={`g-${b.id}`}>Outlet groups, one per line as source id = group. Leave empty to group outlets by country. Use this for domestic beats where every outlet shares one country.</label>
-          <textarea id={`g-${b.id}`} name="groups" rows={3} style={{ width: "100%" }} defaultValue={Object.entries(b.groups ?? {}).map(([k, v]) => `${k} = ${v}`).join("\n")} />
+          <textarea id={`g-${b.id}`} name="groups" rows={3} className="w100" defaultValue={Object.entries(b.groups ?? {}).map(([k, v]) => `${k} = ${v}`).join("\n")} />
           <button>Save</button>
         </form>
       ))}
@@ -216,7 +217,7 @@ export default function Admin() {
       {maybes.map((m) => (
         <div className="row" key={`${m.report_id}:${m.beat_id}`}>
           {m.url ? <a href={m.url} target="_blank" rel="noreferrer">{m.title ?? m.url}</a> : <span>{m.title ?? m.report_id}</span>}
-          <span className="muted">{m.beat_id} · {m.score.toFixed(2)}</span>
+          <span className="muted">{m.beat_id} · match {m.score.toFixed(2)}</span>
           {[true, false].map((on) => <button key={String(on)} onClick={() => act(`/beat-maybes/${encodeURIComponent(m.report_id)}`, { beat_id: m.beat_id, on_beat: on })}>{on ? "On beat" : "Off beat"}</button>)}
         </div>
       ))}
@@ -225,7 +226,7 @@ export default function Admin() {
       {review?.open.map((i) => (
         <div className="card" key={i.id}>
           <Kicker>{i.kind}</Kicker>
-          <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{JSON.stringify(i.payload, null, 1)}</pre>
+          <Fields data={i.payload} />
           <div className="row">
             {["good", "bad"].map((r) => <button key={r} onClick={() => act(`/review/${encodeURIComponent(i.id)}`, { rating: r, reviewer: "editor" })}>{r}</button>)}
           </div>

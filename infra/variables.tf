@@ -38,6 +38,18 @@ variable "admin_emails" {
   default     = []
 }
 
+variable "billing_account_id" {
+  description = "Billing account id for the project budget alerts (50/90/100%). Empty skips the budget."
+  type        = string
+  default     = ""
+}
+
+variable "graph_node_limit" {
+  description = "Node limit of the Neo4j AuraDB tier in use; the graph-size alert fires at 70% of it."
+  type        = number
+  default     = 200000
+}
+
 variable "alert_email" {
   description = "Recipient for alert policies."
   type        = string
@@ -115,6 +127,12 @@ variable "mail_from" {
 
 variable "firebase_api_key" {
   description = "Firebase web API key (public by design). Create it in the Firebase console once Identity Platform is enabled; leave empty to keep reader sign-in off."
+  type        = string
+  default     = ""
+}
+
+variable "bot_contact_url" {
+  description = "Public URL of the /bot page (what the crawler is and how to opt out), for example https://weft.example/bot. Sent in the User-Agent."
   type        = string
   default     = ""
 }

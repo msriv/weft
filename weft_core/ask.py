@@ -9,6 +9,7 @@ dropped and the reader is told.
 
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 from weft_core.models import ModelClient
@@ -19,9 +20,11 @@ from weft_core.textutil import cosine
 
 PROMPT = "ask@1"
 TOP_K = 8
+_WORDS = json.loads(
+    (Path(__file__).resolve().parent.parent / "config" / "banned_words.json").read_text()
+)
 VERDICT = re.compile(
-    r"\b(confirmed|false|debunked|verified|proven|fact[- ]checked|the truth|is true|is untrue)\b",
-    re.IGNORECASE,
+    r"\b(" + "|".join(w.replace("-", "[- ]") for w in _WORDS["words"]) + r")\b", re.IGNORECASE
 )
 INSTRUCTIONS = (
     "Answer the reader's question using ONLY the numbered passages in the quoted data. Write short "

@@ -8,13 +8,13 @@ export default async function OpenQuestions({ storyId }: { storyId: string }) {
   const qs = await api<Q[]>(`/v1/stories/${storyId}/questions`).catch(() => null);
   if (!qs) return null;
   return (
-    <aside className="card" aria-label="Open questions" style={{ width: 320 }}>
+    <aside className="card side" aria-label="Open questions">
       <Kicker>Open questions</Kicker>
-      <p className="muted" style={{ fontSize: 13 }}>What the coverage leaves open, found by written rules. Each question goes away when what would change it appears.</p>
+      <p className="muted fs13">What the coverage leaves open, found by written rules. Each question goes away when what would change it appears.</p>
       {qs.length ? qs.map((q, i) => (
-        <div key={i} style={{ marginTop: 10 }}>
-          <p style={{ margin: 0 }}><a href={`/s/${storyId}/e/${q.event_id}`}>{q.question}</a></p>
-          <p className="muted" style={{ fontSize: 13, margin: "2px 0" }}>Would change the picture: {q.would_change}</p>
+        <div key={i} className="mt10">
+          <p className="m0"><a href={`/s/${storyId}/e/${q.event_id}`}>{q.question}</a></p>
+          <p className="muted fs13 my2">Would change the picture: {q.would_change}</p>
         </div>
       )) : <p className="muted">None right now.</p>}
     </aside>
