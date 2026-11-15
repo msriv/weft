@@ -35,7 +35,7 @@ export default async function WorldPage({ searchParams }: { searchParams: Promis
               )}
             </div>
           ))}
-          {!byStory.size && <Empty>No public stories yet.</Empty>}
+          {!byStory.size && <Empty>No public stories yet. Stories appear here once collected and published.</Empty>}
           <hr />
           <Kicker>Coverage gaps</Kicker>
           <p className="muted">Places where we hold few reports on a story they are party to. This describes our coverage, not the story.</p>
