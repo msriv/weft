@@ -40,7 +40,7 @@ export default async function Stories({ searchParams }: { searchParams: Promise<
         {topics.map(([beat, title]) => <Link key={beat} className={`pill${q.topic === beat ? " on" : ""}`} href={link({ topic: beat })}>{title}</Link>)}
       </div>
       <div style={{ marginTop: 16 }}>
-        {shown?.length ? shown.map((s) => <StoryRow key={s.id} s={s} />) : <Empty>No public stories match.</Empty>}
+        {shown?.length ? shown.map((s) => <StoryRow key={s.id} s={s} />) : <Empty>{all?.length ? "No public stories match these filters." : "No public stories yet. Stories appear here once collected and published."}</Empty>}
       </div>
     </>
   );

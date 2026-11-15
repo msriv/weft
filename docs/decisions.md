@@ -129,3 +129,8 @@ Short record of what was decided and why. Add an entry before changing any of th
 **Conditions:** every rule ships in `dry_run` and is switched to `apply` in config after its counts look right. A rule over its cap (5% of its population or `max_rows`) aborts and alerts. Deletes of graph data run only after a good snapshot. Every run writes an `AutocleanRun` node per rule, shown in admin.
 **Replay history is kept forever** (Mihir, 2026-11-14): closed versions are never deleted by age; only lossless compaction (#151) is allowed.
 **Product rule 5 in BigQuery:** `model_calls.input` and `raw_items.raw_gcs_uri` are set to NULL past `raw_retention_days` (the same Terraform variable as the bucket lifecycle). Rule 4 keeps the model, revision, seed, template, input hash and output.
+
+## D24. Dataflow (Beam) and Redis are deferred
+**Decided:** The nightly batch stays plain Python in a Cloud Run job (D18), and the live story stream polls the graph. Apache Beam on Dataflow and Memorystore Redis are not built and not provisioned. The spec sections that mention them are marked "planned, not built".
+**Why:** The nightly input is a few thousand reports and the stream has a handful of readers; both services would add cost and moving parts for no gain at that size.
+**Revisit when:** For Redis fan-out, when open story streams regularly exceed what polling the graph can serve (about 100 at once, the configured cap) or API polling shows up in Neo4j load. For Dataflow, when a stage cannot finish inside the nightly window or one job instance cannot hold a night's reports in memory (the D18 trigger).
