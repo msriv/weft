@@ -378,7 +378,7 @@ def test_one_message_among_2000_stored_reports_reads_few_rows() -> None:
             counted["rows"] += len(out)
         return out
 
-    db.execute = counting  # type: ignore[method-assign]
+    db.execute = counting  # type: ignore[method-assign,assignment]
     process(msg("new", "b-ir", T + " again", L, "2026-11-06T01:00:00+00:00"), d)
     assert counted["rows"] < 50 and counted["queries"] < 60
 
