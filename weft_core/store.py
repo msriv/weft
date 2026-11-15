@@ -301,6 +301,16 @@ NODES: dict[str, dict[str, Any]] = {
         "calls": 0,
     },
     "ModelOutput": {"key": None, "output": None, "at": None},
+    "AdminLog": {  # who changed what in the admin (#166)
+        "id": None,
+        "at": None,
+        "actor": None,
+        "method": None,
+        "route": None,
+        "target": None,
+        "before": None,
+        "after": None,
+    },
     "BatchRun": {
         "run_id": None,
         "stage": None,

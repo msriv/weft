@@ -25,6 +25,7 @@ limits:
   ask: {per_minute: 5, per_day: 60}
   problem: {per_minute: 3, per_day: 20}
   subscription: {per_minute: 3, per_day: 10}
+  admin_auth: {per_minute: 10, per_day: 100}    # failed admin sign-ins per address
   auth: {per_minute: 10, per_day: 200}          # web sign-up/sign-in proxy
   streams: {per_client: 3, total: 100}          # open /stories/{id}/stream connections
   max_body_bytes: 20000

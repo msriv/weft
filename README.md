@@ -29,7 +29,7 @@ Seeding is part of startup, through the real pipeline and no hand-seeded sources
 
 Detective mode (D20) shows a side panel of clearly labelled speculation on each story page, made during the nightly run and checked against later reports; set `DETECTIVE=off` in `.env` to hide it.
 
-Stories start private. Flip one public with the admin toggle (`Authorization: Bearer $ADMIN_TOKEN` against the API) to see it on the site.
+Stories start private. Flip one public with the admin toggle to see it on the site. Sign up at http://localhost:3000/welcome as `owner@weft.local` (the emulator accepts any password); that address is the local admin, and the Admin link appears in the navigation. Scripts can call the API with the header `X-Admin-Token: $ADMIN_TOKEN` instead.
 
 Run a job now: `docker compose run --rm --no-deps --entrypoint "uv run --no-sync python -m pipeline.run" pipeline --stage anomalies`. Reset everything: `docker compose down -v`.
 

@@ -240,6 +240,7 @@ module "api" {
   })
   env = {
     PROJECT_ID     = var.project_id
+    ADMIN_EMAILS   = join(",", var.admin_emails)
     MODEL_BASE_URL = var.model_base_url
     MODEL_NAME     = var.model_name
     MODEL_REVISION = var.model_revision

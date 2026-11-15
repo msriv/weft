@@ -26,6 +26,12 @@ variable "fetcher_image" {
   type        = string
 }
 
+variable "admin_emails" {
+  description = "Editors allowed into the admin (matched against the email of a signed-in Firebase user)."
+  type        = list(string)
+  default     = []
+}
+
 variable "alert_email" {
   description = "Recipient for alert policies."
   type        = string

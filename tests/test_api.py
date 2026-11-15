@@ -9,7 +9,7 @@ from services.api.app import create_app
 from tests.test_pipeline import TEXTS, setup
 from weft_core import graph, store
 
-H = {"Authorization": "Bearer t0k"}
+H = {"X-Admin-Token": "t0k"}
 
 
 def build() -> tuple[TestClient, Ctx]:

@@ -9,6 +9,7 @@ import hmac
 import json
 import os
 import re
+import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
@@ -126,6 +127,7 @@ def create_app(
     limits: dict[str, Any] | None = None,
     proxy_secret: str = "",
     limiter: Limiter | None = None,
+    admin_emails: frozenset[str] = frozenset(),
 ) -> FastAPI:
     app = FastAPI(title="Weft API")
     lim = limits if limits is not None else config.pipeline()["limits"]
@@ -174,10 +176,54 @@ def create_app(
             )
         return JSONResponse({"detail": "The model is not available right now."}, status_code=503)
 
-    def admin(authorization: Annotated[str, Header()] = "") -> None:
-        # shortcut: one shared admin token for editors, replace with Firebase custom claims
-        if not admin_token or not hmac.compare_digest(authorization, f"Bearer {admin_token}"):
-            raise HTTPException(401, "admin token required")
+    def deny(request: Request, status: int, detail: str) -> HTTPException:
+        """Failed admin auth counts against the caller's address; past the limit it is a 429."""
+        c = lim["admin_auth"]
+        if (
+            wait := limiter.check("admin_auth", who(request), c["per_minute"], c["per_day"])
+        ) is not None:
+            return HTTPException(
+                429, "Too many requests. Try again later.", headers={"Retry-After": str(wait)}
+            )
+        return HTTPException(status, detail)
+
+    async def admin(
+        request: Request,
+        authorization: Annotated[str, Header()] = "",
+        x_admin_token: Annotated[str, Header()] = "",
+    ) -> AsyncIterator[None]:
+        """Admin = a signed-in user on the allowlist (or with an `admin` claim). The legacy token
+        is for scripts and CI, in a header the browser never sends. Every mutating call that
+        succeeds writes one AdminLog entry."""
+        actor = None
+        if admin_token and x_admin_token and hmac.compare_digest(x_admin_token, admin_token):
+            actor = "token"
+        elif claims := await asyncio.to_thread(
+            accounts.verify_claims, authorization.removeprefix("Bearer "), project
+        ):
+            email = str(claims.get("email") or "").lower()
+            if claims.get("admin") is True or email in admin_emails:
+                actor = email or str(claims["sub"])
+            else:
+                raise deny(request, 403, "not an admin")
+        if actor is None:
+            raise deny(request, 401, "admin sign-in required")
+        request.state.actor = actor
+        request.state.before = None
+        yield
+        if request.method not in ("GET", "HEAD"):
+            route = request.scope.get("route")
+            entry = {
+                "id": uuid.uuid4().hex,
+                "at": datetime.now(UTC).isoformat(),
+                "actor": actor,
+                "method": request.method,
+                "route": getattr(route, "path", request.url.path),
+                "target": json.dumps(request.path_params),
+                "after": (await request.body())[:4000].decode(errors="replace"),
+                "before": json.dumps(request.state.before) if request.state.before else None,
+            }
+            await asyncio.to_thread(store.create, db, "AdminLog", entry)
 
     def reader(authorization: Annotated[str, Header()] = "") -> str:
         uid = accounts.verify_token(authorization.removeprefix("Bearer "), project)
@@ -347,6 +393,19 @@ def create_app(
     # --- admin ---
     adm = APIRouter(prefix="/admin", dependencies=[Depends(admin)])
 
+    @adm.get("/me")
+    def admin_me(request: Request) -> dict[str, str]:
+        return {"actor": request.state.actor}
+
+    @adm.get("/log")
+    def admin_log() -> list[dict[str, Any]]:
+        """The last 50 admin changes: who, when, which route and target, what changed."""
+        return db.execute(
+            "MATCH (n:AdminLog) RETURN n.at AS at, n.actor AS actor, n.method AS method, "
+            "n.route AS route, n.target AS target, n.before AS before, n.after AS after "
+            "ORDER BY n.at DESC LIMIT 50"
+        )
+
     @adm.get("/stories")
     def all_stories() -> list[dict[str, Any]]:
         return store.stories(db, public_only=False)
@@ -466,13 +525,15 @@ def create_app(
         )
 
     @adm.put("/stories/{story_id}/public")
-    def set_public(story_id: str, body: Visibility) -> dict[str, Any]:
+    def set_public(story_id: str, body: Visibility, request: Request) -> dict[str, Any]:
+        was = [s["public"] for s in store.stories(db, public_only=False) if s["id"] == story_id]
+        request.state.before = {"public": was[0]} if was else None
         if not store.set_public(db, story_id, body.public):
             raise HTTPException(404, "no such story")
         return {"id": story_id, "public": body.public}
 
     @adm.patch("/sources/{source_id}")
-    def patch_source(source_id: str, body: SourcePatch) -> dict[str, Any]:
+    def patch_source(source_id: str, body: SourcePatch, request: Request) -> dict[str, Any]:
         """Set country, state_run or ownership. state_run and owner_id need their citation URL
         (product rule: facts are cited or stay 'unverified')."""
         data = body.model_dump(exclude_unset=True)
@@ -480,8 +541,9 @@ def create_app(
             raise HTTPException(422, "state_run needs state_run_source")
         if data.get("owner_id") and not data.get("ownership_source"):
             raise HTTPException(422, "owner_id needs ownership_source")
-        if not store.all_sources(db, "n.id=?", (source_id,)):
+        if not (current := store.all_sources(db, "n.id=?", (source_id,))):
             raise HTTPException(404, "no such source")
+        request.state.before = {k: current[0].get(k) for k in data}
         if "country" in data:  # also re-tags the source's reports
             store.set_country(db, source_id, data.pop("country"), "admin")
         for col, val in data.items():  # col is a SourcePatch field name, never user text
@@ -554,6 +616,9 @@ def app_from_env() -> FastAPI:
         accounts.FirestorePrefs(project),
         project,
         proxy_secret=os.environ.get("PROXY_SECRET", ""),
+        admin_emails=frozenset(
+            e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()
+        ),
     )
 
 

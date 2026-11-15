@@ -22,7 +22,7 @@ async function auth(action: string, body: object): Promise<Session> {
 }
 export const signIn = (email: string, password: string, create: boolean) => auth(create ? "signup" : "signin", { email, password });
 
-async function token(): Promise<string | null> {
+export async function token(): Promise<string | null> {
   let s = load();
   if (!s) return null;
   if (Date.now() > s.expiresAt) {
@@ -40,4 +40,13 @@ export async function pullPrefs(): Promise<Partial<Prefs> | null> {
 export async function pushPrefs(p: Prefs): Promise<void> {
   const t = await token();
   if (t) await fetch("/api/v1/me/prefs", { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${t}` }, body: JSON.stringify(p) });
+}
+
+// Admin = a signed-in user the API accepts on /admin/me. Nothing admin-related is stored in the browser.
+export async function adminHeaders(): Promise<Record<string, string> | null> {
+  const t = await token();
+  if (!t) return null;
+  const h = { authorization: `Bearer ${t}` };
+  const r = await fetch("/api/admin/me", { headers: h });
+  return r.ok ? h : null;
 }
