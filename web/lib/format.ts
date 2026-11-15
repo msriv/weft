@@ -6,7 +6,7 @@ countries.registerLocale(en);
 /** Names that read better than the ISO long form. */
 const SHORT: Record<string, string> = {
   US: "United States", GB: "United Kingdom", RU: "Russia", IR: "Iran", KR: "South Korea",
-  KP: "North Korea", SY: "Syria", VE: "Venezuela", TZ: "Tanzania", BO: "Bolivia", MD: "Moldova",
+  KP: "North Korea", SY: "Syria", VE: "Venezuela", TZ: "Tanzania", MK: "North Macedonia", BO: "Bolivia", MD: "Moldova",
 };
 
 /**
