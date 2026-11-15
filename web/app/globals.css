@@ -68,6 +68,21 @@ input, textarea, select { background: transparent; color: var(--text); border: 1
 @media (prefers-reduced-motion: reduce) { .fade-in { animation: none; } * { scroll-behavior: auto !important; } }
 img, svg, video, canvas { max-width: 100%; }
 @media (max-width: 640px) { h1 { font-size: 32px; } .nav { flex-wrap: wrap; gap: 12px; } }
+.nav-links { display: contents; }
+.nav-toggle { display: none; }
+@media (max-width: 640px) {
+  .nav-toggle { display: inline-block; margin-left: auto; }
+  .nav-links { display: none; flex-direction: column; width: 100%; order: 3; gap: 0; }
+  .nav[data-open="true"] .nav-links { display: flex; }
+  .nav-links a { padding: 12px 0; min-height: 44px; box-sizing: border-box; }
+  .nav-right { margin-left: 0; }
+}
+@media (pointer: coarse) {
+  .pill, .nav a, .nav a.account { min-height: 44px; display: inline-flex; align-items: center; }
+  .cell { width: 44px; height: 44px; }
+}
+details.adm > summary { font-family: var(--mono); font-size: var(--t-sm); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); padding: var(--s3) 0; min-height: 44px; border-top: 1px solid var(--hair); }
+details.adm .row { flex-wrap: wrap; }
 
 /* layout */
 .stack { display: grid; gap: 16px; }
@@ -231,3 +246,4 @@ details.report summary { padding: var(--s2) 0; cursor: pointer; }
 .skeleton { color: transparent; background: linear-gradient(90deg, var(--hair), transparent, var(--hair)); background-size: 200% 100%; animation: sk 1.4s linear infinite; }
 @keyframes sk { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+@media (max-width: 640px) { .row.ifs { flex-direction: column; } .row.ifs > * { width: 100%; } }

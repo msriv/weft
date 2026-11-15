@@ -94,7 +94,7 @@ export default function Admin() {
       <h1>Admin</h1>
       {!auth && <p>Admin needs a signed-in editor account. <Link href="/welcome">Sign in</Link>, then reload.</p>}
       {err && <p role="alert">{err}</p>}
-      <hr /><Kicker>Status</Kicker>
+      <details open className="adm"><summary>Status</summary>
       <Retry k="status" />
       {status && (
         <div className="grid g2">
@@ -120,7 +120,8 @@ export default function Admin() {
           </div>
         </div>
       )}
-      <hr /><Kicker>Pipeline runs (nightly batch, last 5){live ? " · running, refreshing every 10s" : ""}</Kicker>
+      </details>
+      <details open className="adm"><summary>Pipeline runs (nightly batch, last 5){live ? " · running, refreshing every 10s" : ""}</summary>
       <Retry k="runs" />
       {byRun.map((stages) => (
         <div className="card" key={stages[0].run_id}>
@@ -137,7 +138,8 @@ export default function Admin() {
         </div>
       ))}
       {auth && runs.length === 0 && <p className="muted">No pipeline runs yet. The first starts about 30 minutes after startup, then daily.</p>}
-      <hr /><Kicker>Autoclean (last runs). A rule in dry_run only counts; it changes nothing.</Kicker>
+      </details>
+      <details open className="adm"><summary>Autoclean (last runs). A rule in dry_run only counts; it changes nothing.</summary>
       {clean.slice(0, 30).map((r) => (
         <div className="row" key={`${r.run_id}:${r.rule}`}>
           <b>{r.rule}</b> <span className="muted">v{r.rule_version}</span>
@@ -149,7 +151,8 @@ export default function Admin() {
         </div>
       ))}
       {auth && clean.length === 0 && <p className="muted">No autoclean runs yet.</p>}
-      <hr /><Kicker>Stories. Public stories appear on the site; the rest return 404.</Kicker>
+      </details>
+      <details open className="adm"><summary>Stories. Public stories appear on the site; the rest return 404.</summary>
       <Retry k="stories" />
       {stories.map((s) => (
         <div className="row" key={s.id}>
@@ -157,7 +160,8 @@ export default function Admin() {
           <b>{s.title}</b><span className="muted">{s.beat_id}</span>
         </div>
       ))}
-      <hr /><Kicker>Sources. Country decides the perspective a report counts for; changing it re-tags that source's reports.</Kicker>
+      </details>
+      <details open className="adm"><summary>Sources. Country decides the perspective a report counts for; changing it re-tags that source's reports.</summary>
       <form className="row" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; void act("/sources", { url: new FormData(f).get("url") }).then(() => f.reset()); }}>
         <label htmlFor="add-src" className="muted">Add an outlet (checked and registered on the next discovery run, within the hour)</label>
         <input id="add-src" name="url" placeholder="https://example.com" required /> <button>Add</button>
@@ -187,7 +191,8 @@ export default function Admin() {
         <button className="small" disabled={srcQ.offset === 0} onClick={() => setSrcQ({ ...srcQ, offset: Math.max(0, srcQ.offset - PAGE) })}>Previous</button>
         <button className="small" disabled={srcQ.offset + PAGE >= srcTotal} onClick={() => setSrcQ({ ...srcQ, offset: srcQ.offset + PAGE })}>Next</button>
       </div>
-      <hr /><Kicker>Beats. A report joins a beat when any pattern matches its title or lede and no exclusion does. One regex per line; applies to new reports.</Kicker>
+      </details>
+      <details open className="adm"><summary>Beats. A report joins a beat when any pattern matches its title or lede and no exclusion does. One regex per line; applies to new reports.</summary>
       <Retry k="beats" />
       {beats.map((b) => (
         <form className="card" key={b.id} onSubmit={(e) => {
@@ -207,7 +212,8 @@ export default function Admin() {
           <button>Save</button>
         </form>
       ))}
-      <hr /><Kicker>Unplaced reports (newest {unplaced.length}). These matched no beat; use them to tune the terms above.</Kicker>
+      </details>
+      <details open className="adm"><summary>Unplaced reports (newest {unplaced.length}). These matched no beat; use them to tune the terms above.</summary>
       <Retry k="unplaced" />
       {unplaced.map((r) => (
         <div className="row" key={r.id}>
@@ -215,7 +221,8 @@ export default function Admin() {
           <span className="muted">{r.source_id}</span>
         </div>
       ))}
-      <hr /><Kicker>Maybe on a beat ({maybes.length}). Your answers tune beat relevance; they never move a report.</Kicker>
+      </details>
+      <details open className="adm"><summary>Maybe on a beat ({maybes.length}). Your answers tune beat relevance; they never move a report.</summary>
       <Retry k="maybes" />
       {maybes.map((m) => (
         <div className="row" key={`${m.report_id}:${m.beat_id}`}>
@@ -224,7 +231,8 @@ export default function Admin() {
           {[true, false].map((on) => <button key={String(on)} onClick={() => act(`/beat-maybes/${encodeURIComponent(m.report_id)}`, { beat_id: m.beat_id, on_beat: on })}>{on ? "On beat" : "Off beat"}</button>)}
         </div>
       ))}
-      <hr /><Kicker>Review sample (optional, never blocks publishing)</Kicker>
+      </details>
+      <details open className="adm"><summary>Review sample (optional, never blocks publishing)</summary>
       <Retry k="review" />
       {review?.open.map((i) => (
         <div className="card" key={i.id}>
@@ -236,7 +244,8 @@ export default function Admin() {
         </div>
       ))}
       {review && review.open.length === 0 && <p className="muted">Nothing to review.</p>}
-      <hr /><Kicker>Admin log (last 50 changes)</Kicker>
+      </details>
+      <details open className="adm"><summary>Admin log (last 50 changes)</summary>
       <Retry k="log" />
       {log.map((l, i) => (
         <div className="row" key={i}>
@@ -245,7 +254,8 @@ export default function Admin() {
         </div>
       ))}
       {log.length === 0 && <p className="muted">No changes yet.</p>}
-      <hr /><Kicker>Reader reports</Kicker>
+      </details>
+      <details open className="adm"><summary>Reader reports</summary>
       <Retry k="problems" />
       {problems.map((p) => (
         <div className="card" key={p.id}>
@@ -254,6 +264,7 @@ export default function Admin() {
         </div>
       ))}
       {problems.length === 0 && <p className="muted">No open reports.</p>}
+      </details>
     </>
   );
 }
