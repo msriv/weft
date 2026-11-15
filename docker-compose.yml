@@ -23,13 +23,15 @@ x-env: &env
   MODEL_NAME: ${MODEL_NAME:-}
   MODEL_REVISION: ${MODEL_REVISION:-}
   MODEL_PROVIDER: ${MODEL_PROVIDER:-}
-  ADMIN_TOKEN: ${ADMIN_TOKEN:-local-admin-token}
+  ADMIN_TOKEN: ${ADMIN_TOKEN:-local-admin-token}  # scripts only: sent as the X-Admin-Token header
+  ADMIN_EMAILS: ${ADMIN_EMAILS:-owner@weft.local}  # signed-in editors, comma separated
   SMTP_HOST: ${SMTP_HOST:-}
   SMTP_PORT: ${SMTP_PORT:-587}
   SMTP_USER: ${SMTP_USER:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   MAIL_FROM: ${MAIL_FROM:-}
   SITE_URL: http://localhost:3000
+  BOT_CONTACT_URL: ${BOT_CONTACT_URL:-http://localhost:3000/bot}
   DETECTIVE: ${DETECTIVE:-on}  # D20 speculation panel; never set in production Terraform
   FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
   FIRESTORE_EMULATOR_HOST: firebase:8080

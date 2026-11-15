@@ -9,7 +9,7 @@ import os
 import httpx
 
 from weft_core import discovery, portals, store
-from weft_core.polite import PoliteClient
+from weft_core.polite import HostCooldowns, PoliteClient
 
 
 def main() -> int:
@@ -17,10 +17,12 @@ def main() -> int:
     discovery.seed_beats(db)  # adds new seed terms; admin-edited beats are left alone
     with httpx.Client(timeout=30, follow_redirects=True) as http:
         gkg = discovery.latest_gkg(http, int(os.environ.get("GKG_FILES", "4")))
-        found = discovery.discover(db, PoliteClient(http), gkg)
+        found = discovery.discover(db, PoliteClient(http, cooldowns=HostCooldowns(db)), gkg)
         for domain, feeds in found.items():
             print(f"registered {domain}: {feeds}")
-        for domain, start in portals.discover_portals(db, PoliteClient(http)).items():
+        for domain, start in portals.discover_portals(
+            db, PoliteClient(http, cooldowns=HostCooldowns(db))
+        ).items():
             print(f"registered portal {domain}: {start}")
     return 0
 

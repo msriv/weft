@@ -13,7 +13,7 @@ from services.poller.poller import FeedState, Poller
 from weft_core import config, portals, sourceyield, store
 from weft_core.gcp import bigquery_client
 from weft_core.health import unhealthy
-from weft_core.polite import PoliteClient
+from weft_core.polite import HostCooldowns, PoliteClient
 
 
 class GcsState:
@@ -86,7 +86,7 @@ def main() -> int:
     with httpx.Client(timeout=30, follow_redirects=True) as http:
         pf = config.pipeline()["prefilter"]
         poller = Poller(
-            PoliteClient(http),
+            PoliteClient(http, cooldowns=HostCooldowns(db)),
             GcsState(os.environ["STATE_BUCKET"]),
             publish,
             store.beats(db) if pf["enabled"] else None,

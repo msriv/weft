@@ -359,6 +359,7 @@ NODES: dict[str, dict[str, Any]] = {
         "calls": 0,
     },
     "ModelOutput": {"key": None, "output": None, "at": None},
+    "Host": {"name": None, "cooldown_until": None, "strikes": None},  # per-host back-off (#179)
     "Lock": {"key": None, "at": None},  # write-lock rows for placement (#160)
     "Seen": {
         "key": None,
@@ -367,6 +368,16 @@ NODES: dict[str, dict[str, Any]] = {
         "fails": None,
         "last": None,
     },  # fetched URL / text hash keys (#161); stored or failed extractions (#150)
+    "AdminLog": {  # who changed what in the admin (#166)
+        "id": None,
+        "at": None,
+        "actor": None,
+        "method": None,
+        "route": None,
+        "target": None,
+        "before": None,
+        "after": None,
+    },
     "HashUrl": {"key": None, "hash": None, "at": None},  # urls that served one text (#170)
     "SourceDay": {"key": None, "source_id": None, "day": None, "items": 0, "stubs": 0},
     "BatchRun": {
@@ -396,6 +407,7 @@ UNIQUE = {
     "ModelSpend": "key",
     "ModelOutput": "key",
     "Lock": "key",
+    "Host": "name",
     "Seen": "key",
     "HashUrl": "key",
     "SourceDay": "key",
