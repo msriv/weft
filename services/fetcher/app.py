@@ -1,6 +1,7 @@
 """Cloud Run service: Pub/Sub push endpoint for `items-new`.
 
-Run with max instances 1 and concurrency 1 so there is one connection at a time.
+Run with max instances 1. Handlers are threads, so several hosts are fetched at once, but
+PoliteClient allows one connection per host at a time.
 """
 
 import base64
@@ -9,20 +10,24 @@ import os
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import Body, FastAPI, HTTPException, Request, Response
 from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.fetcher import refetch as refetch_mod
-from services.fetcher.fetcher import Store, fetch_item, seen_from_rows, seen_keys
+from services.fetcher.fetcher import FAIL_ATTEMPTS, Store, fetch_item, seen_from_rows, seen_keys
 from services.fetcher.tasks import CloudTasksQueue
 from weft_core import config, store
 from weft_core import store as store_mod
 from weft_core.gcp import bigquery_client
 from weft_core.polite import HostCooldowns, PoliteClient
 from weft_core.probes import add_probes
+
+MAX_DEFERRALS = (
+    8  # a host that is still cooling down after this many tasks is left to the next poll
+)
 
 
 class GcpStore:
@@ -83,6 +88,15 @@ class GcpStore:
                 "SET n.paywalled = 1, n.paywalled_source = 'auto'",
                 (source_id,),
             )
+
+    def mark_dead(self, url: str) -> None:
+        """A URL that answered 4xx: `seen` reports it for good, so no feed listing fetches it again."""
+        now = datetime.now(UTC).isoformat()
+        self._db.execute(
+            "UNWIND ? AS k MERGE (n:Seen {key: k}) ON CREATE SET n.at = ? "
+            "SET n.stored = coalesce(n.stored, false), n.fails = ?, n.last = ?",
+            (seen_keys(url, ""), now, FAIL_ATTEMPTS, now),
+        )
 
     def _mark_seen(self, raw_row: dict[str, Any]) -> None:
         """Record the item in the graph. A row without a text hash is a failed extraction."""
@@ -155,23 +169,27 @@ def create_app(
     app = FastAPI()
     add_probes(app, db)
 
-    @app.post("/")
-    async def push(request: Request) -> Response:
-        envelope = await request.json()
-        try:
-            msg = json.loads(base64.b64decode(envelope["message"]["data"]))
-            source = sources[msg["source_id"]]
-        except (KeyError, ValueError):
-            return Response(status_code=204)  # malformed or unknown source: drop, don't retry
+    def process(msg: dict[str, Any], source: dict[str, Any], base_url: str, attempt: int) -> None:
+        """Fetch one listed URL. A host in cooldown is not a failure: the item goes to a Cloud
+        Task for the end of the cooldown and the push is acknowledged (#159)."""
         try:
             result = fetch_item(msg, source, http, store, _all(sources), qcfg)
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+        status = result.status
+        if status == "skipped":
+            when = http.ready_at(msg["url"])
+            if queue_for is None:
+                raise HTTPException(status_code=503, detail="deferred")  # Pub/Sub retries
+            if attempt >= MAX_DEFERRALS:
+                status = "deferral_exhausted"
+            else:
+                when = when or datetime.now(UTC) + timedelta(seconds=60)
+                queue_for(base_url)({"fetch": msg, "attempt": attempt + 1}, when)
+                status = "deferred"
         # structured line; log-based metrics for the dashboards count these (infra/modules/monitoring)
         print(
-            json.dumps(
-                {"event": "item_processed", "source_id": msg["source_id"], "status": result.status}
-            )
+            json.dumps({"event": "item_processed", "source_id": msg["source_id"], "status": status})
         )
         if result.status == "foreign" and db is not None and result.message:
             from weft_core import domains, portals
@@ -182,16 +200,29 @@ def create_app(
         if result.message and publish:
             publish(result.message)  # stream worker picks it up
         if result.message and queue_for:
-            refetch_mod.schedule(result.message, queue_for(str(request.base_url)))
-        if result.status == "skipped":
-            raise HTTPException(status_code=503, detail="deferred")  # Pub/Sub retries with backoff
+            refetch_mod.schedule(result.message, queue_for(base_url))
+
+    # Plain `def` handlers run in the threadpool, so a slow or cooling host does not block the
+    # others; PoliteClient serialises requests per host.
+    @app.post("/")
+    def push(request: Request, envelope: Annotated[dict[str, Any], Body()]) -> Response:
+        try:
+            msg = json.loads(base64.b64decode(envelope["message"]["data"]))
+            source = sources[msg["source_id"]]
+        except (KeyError, ValueError):
+            return Response(status_code=204)  # malformed or unknown source: drop, don't retry
+        process(msg, source, str(request.base_url), 0)
         return Response(status_code=204)
 
     @app.post("/refetch")
-    async def refetch(request: Request) -> Response:
-        task = await request.json()
+    def refetch(request: Request, task: Annotated[dict[str, Any], Body()]) -> Response:
         try:
-            source = sources[task["source_id"]]
+            source = sources[
+                task["source_id"] if "fetch" not in task else task["fetch"]["source_id"]
+            ]
+            if "fetch" in task:
+                process(task["fetch"], source, str(request.base_url), int(task.get("attempt", 1)))
+                return Response(status_code=204)
             task["item_id"], task["url"], task["n"]
         except KeyError:
             return Response(status_code=204)
@@ -202,9 +233,9 @@ def create_app(
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         print(json.dumps({"event": "refetch", "source_id": task["source_id"], "outcome": outcome}))
-        if outcome == "skipped":
-            raise HTTPException(status_code=503, detail="deferred")  # Cloud Tasks retries
-        return Response(status_code=204)
+        if outcome == "skipped" and http.allowed(task["url"]):
+            raise HTTPException(status_code=503, detail="deferred")  # cooldown: Cloud Tasks retries
+        return Response(status_code=204)  # a robots block is permanent: do not retry
 
     return app
 
