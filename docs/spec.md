@@ -111,7 +111,7 @@ We don't use GDELT's tone scores or its event codes as labels. Both are machine-
 
 ### Raw storage
 
-Raw HTML, PDFs and captions go to `gs://weft-raw/{source}/{yyyy-mm-dd}/{sha256}`, with a 30-day lifecycle (legal review pending). Metadata goes to the BigQuery `raw_items` table. The dedupe key is canonical URL plus text hash.
+Raw HTML, PDFs and captions go to `gs://weft-raw/{item_id}.{ext}` (refetched versions `{item_id}.v{n}.{ext}`), with a 30-day lifecycle (legal review pending). Metadata goes to the BigQuery `raw_items` table. The dedupe key is canonical URL plus text hash.
 
 Pub/Sub topics: `items.new`, `items.extracted`, `documents.new`, `graph.changed`.
 

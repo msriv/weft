@@ -242,6 +242,19 @@ NODES: dict[str, dict[str, Any]] = {
         "last_sent": None,
     },
     "DailyDiff": {"day": None, "payload": None},
+    "AutocleanRun": {  # one per rule per autoclean run (#147)
+        "run_id": None,
+        "rule": None,
+        "rule_version": None,
+        "mode": None,
+        "matched": 0,
+        "changed": 0,
+        "sample_ids": "[]",
+        "started_at": None,
+        "ended_at": None,
+        "status": None,  # ok / dry_run / aborted / skipped / failed
+        "note": None,
+    },
     "Prediction": {
         "id": None,
         "story_id": None,

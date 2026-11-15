@@ -347,3 +347,11 @@ def test_one_report_costs_a_bounded_number_of_queries() -> None:
     nlp.entities.extract = many  # type: ignore[method-assign]
     process(msg("q1", "a-il", T, L, "2026-11-06T01:00:00+00:00"), d)
     assert len(runs) < 40  # 30 entities would be 30+ queries one by one
+
+
+def test_push_unknown_source_is_retried_not_dropped() -> None:
+    _, d, sent = setup()
+    c = TestClient(create_app(d))
+    m = msg("y", "no-such-source", "T", "T.", "2026-11-06T01:00:00+00:00")
+    r = c.post("/", json={"message": {"data": base64.b64encode(json.dumps(m).encode()).decode()}})
+    assert r.status_code == 503 and not sent  # Pub/Sub retries, then dead-letters
