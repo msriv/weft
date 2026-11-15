@@ -2,7 +2,7 @@
 FROM python:3.12-slim
 # Tesseract for scanned PDFs (fetcher.ocr_page)
 RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr && rm -rf /var/lib/apt/lists/*
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.32@sha256:df4cae8f3a96d175e2e5f992e597550000edbe78fdc2594d5cd8de1a217f504c /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 # Shared download cache, one build at a time (sharing=locked): later builds reuse the first one's
@@ -12,4 +12,7 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked uv sync --frozen --
 COPY weft_core weft_core
 COPY services services
 COPY config config
+RUN useradd --system --uid 10001 --no-create-home app
+ENV UV_CACHE_DIR=/tmp/uv-cache
+USER app
 CMD ["uv", "run", "--no-sync", "uvicorn", "services.fetcher.app:app", "--host", "0.0.0.0", "--port", "8080"]

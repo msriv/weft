@@ -22,7 +22,7 @@ from jsonschema import ValidationError, validate
 from pipeline.ctx import Ctx
 from services.stream_worker.worker import IDF_WINDOW, attach_score, story_idf
 from weft_core import clustering, graph
-from weft_core.models import ModelClient
+from weft_core.models import ModelClient, ModelRefused
 from weft_core.textutil import cosine
 
 SCHEMA = {
@@ -49,15 +49,19 @@ def parse(out: str) -> bool:
     return bool(obj["same_event"])
 
 
-def merge_check(model: ModelClient, a: str, b: str) -> bool:
-    return parse(
-        model.complete(
+def merge_check(model: ModelClient, a: str, b: str) -> bool | None:
+    """None when the model gave no answer (daily cap, empty): callers degrade, never record a no."""
+    try:
+        out = model.complete(
             prompt_template="merge-check@1",
             instructions=INSTRUCTIONS,
             data=json.dumps({"group_a": a, "group_b": b}),
+            max_tokens=100,
             json_schema=SCHEMA,
         )
-    )
+    except ModelRefused:
+        return None
+    return parse(out)
 
 
 def _digest(reports: list[dict[str, Any]]) -> str:
@@ -201,7 +205,8 @@ def split(ctx: Ctx) -> int:
             db_ = _digest([reps[i] for i in b])
             if ctx.model is None or not ctx.budget(story_id, "regroup").take(da + db_):
                 return True  # degrade: follow the score
-            return merge_check(ctx.model, da, db_)
+            answer = merge_check(ctx.model, da, db_)
+            return True if answer is None else answer  # no answer: follow the score
 
         clusters = average_link(
             len(reps),
@@ -331,7 +336,10 @@ def run(ctx: Ctx) -> int:
                     data = _digest(ra) + _digest(rb)
                     if ctx.model is None or not ctx.budget(story_id, "regroup").take(data):
                         continue  # degrade: leave the pair as it is
-                    if not merge_check(ctx.model, _digest(ra), _digest(rb)):
+                    answer = merge_check(ctx.model, _digest(ra), _digest(rb))
+                    if answer is None:
+                        continue  # no answer: leave the pair as it is
+                    if not answer:
                         ctx.db.execute(
                             "MERGE (:MergeRejected {pair: ?})", (f"{a['id']}|{b['id']}",)
                         )

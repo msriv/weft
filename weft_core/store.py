@@ -14,6 +14,7 @@ import json
 import os
 import re
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -48,6 +49,7 @@ NODES: dict[str, dict[str, Any]] = {
         "crawl": None,
         "feeds": "[]",
         "sitemaps": "[]",
+        "link_domains": "[]",  # extra domains this outlet legitimately publishes on (#169)
         "healthy": 1,
         "paywalled": 0,
         "min_interval": 10.0,
@@ -305,7 +307,23 @@ NODES: dict[str, dict[str, Any]] = {
         "perspectives": "[]",
     },
     "SeriesPoint": {"series_id": None, "day": None, "value": None, "source": None},
-    "Seen": {"key": None, "at": None},  # fetched URL / text hash keys (#161)
+    "ModelSpend": {
+        "key": None,
+        "day": None,
+        "caller": None,
+        "tokens": 0,
+        "cost_usd": 0.0,
+        "calls": 0,
+    },
+    "ModelOutput": {"key": None, "output": None, "at": None},
+    "Lock": {"key": None, "at": None},  # write-lock rows for placement (#160)
+    "Seen": {
+        "key": None,
+        "at": None,
+        "stored": None,
+        "fails": None,
+        "last": None,
+    },  # fetched URL / text hash keys (#161); stored or failed extractions (#150)
     "BatchRun": {
         "run_id": None,
         "stage": None,
@@ -331,6 +349,9 @@ UNIQUE = {
     "EntityLink": "name",
     "ReaderReport": "id",
     "Prediction": "id",
+    "ModelSpend": "key",
+    "ModelOutput": "key",
+    "Lock": "key",
     "Seen": "key",
 }
 INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
@@ -338,6 +359,33 @@ INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id"
 
 class Db(Protocol):
     def execute(self, query: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]: ...
+
+
+def atomic[T](db: "Db", fn: Callable[["Db"], T]) -> T:
+    """Run `fn` in one transaction when the store has them (Neo4j: managed, retried on
+    deadlock or leader change, so `fn` may run more than once and must not publish or call out).
+    Stores without `write` run it directly."""
+    write = getattr(db, "write", None)
+    return write(fn) if write else fn(db)
+
+
+def lock(db: "Db", key: str) -> None:
+    """Take a write lock until the transaction ends. Two writers of one key run one at a time."""
+    db.execute("MERGE (l:Lock {key: ?}) SET l.at = ?", (key, _now()))
+
+
+class _Tx:
+    """A Db whose queries run inside one open transaction."""
+
+    def __init__(self, tx: Any) -> None:
+        self._tx = tx
+
+    def execute(self, query: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        q, params = _params(query, args)
+        return [r.data() for r in self._tx.run(q, params)]
+
+    def write[T](self, fn: Callable[["Db"], T]) -> T:
+        return fn(self)
 
 
 def _params(query: str, args: tuple[Any, ...]) -> tuple[str, dict[str, Any]]:
@@ -359,6 +407,10 @@ class Neo4jDb:
         q, params = _params(query, args)
         records, _, _ = self._driver.execute_query(q, params, database_=self._database)
         return [r.data() for r in records]
+
+    def write[T](self, fn: Callable[[Db], T]) -> T:
+        with self._driver.session(database=self._database) as session:
+            return session.execute_write(lambda tx: fn(_Tx(tx)))
 
     def close(self) -> None:
         self._driver.close()
@@ -653,6 +705,8 @@ def active_sources(db: Db) -> list[dict[str, Any]]:
             "id": r["id"],
             "name": r["name"],
             "homepage": r["homepage"],
+            "domain": r["domain"],
+            "link_domains": json.loads(r.get("link_domains") or "[]"),
             "languages": json.loads(r["languages"]),
             "type": r["type"],
             "feeds": json.loads(r["feeds"]),
@@ -670,10 +724,10 @@ def active_sources(db: Db) -> list[dict[str, Any]]:
 
 
 def create_story(db: Db, id: str, beat_id: str, title: str) -> None:
-    create(
-        db,
-        "Story",
-        {"id": id, "beat_id": beat_id, "title": title, "public": 0, "created_at": _now()},
+    # MERGE: two workers placing the first reports of a beat at once both get here
+    db.execute(
+        "MERGE (n:Story {id: ?}) ON CREATE SET n += ?",
+        (id, {"beat_id": beat_id, "title": title, "public": 0, "created_at": _now()}),
     )
 
 
@@ -715,6 +769,15 @@ class LiveSources(dict[str, dict[str, Any]]):
     def __init__(self, db: Db) -> None:
         super().__init__()
         self._db = db
+        self._loaded = 0.0
+
+    def all(self) -> list[dict[str, Any]]:
+        """Every active source, reloaded at most once a minute (for domain attribution)."""
+        if not self or time.monotonic() - self._loaded > 60:
+            self.clear()
+            self.update({s["id"]: s for s in active_sources(self._db)})
+            self._loaded = time.monotonic()
+        return list(self.values())
 
     def __missing__(self, key: str) -> dict[str, Any]:
         self.clear()
