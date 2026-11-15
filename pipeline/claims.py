@@ -15,7 +15,7 @@ from jsonschema import ValidationError, validate
 
 from pipeline.ctx import Ctx
 from weft_core import attribution, graph
-from weft_core.models import ModelClient
+from weft_core.models import ModelClient, ModelRefused
 from weft_core.textutil import sentences
 
 SCHEMA = {
@@ -54,12 +54,16 @@ def extract(
         return []
     if not allow(numbered):
         return None
-    out = model.complete(
-        prompt_template="claim-extract@1",
-        instructions=INSTRUCTIONS,
-        data=numbered,
-        json_schema=SCHEMA,
-    )
+    try:
+        out = model.complete(
+            prompt_template="claim-extract@1",
+            instructions=INSTRUCTIONS,
+            data=numbered,
+            max_tokens=1000,
+            json_schema=SCHEMA,
+        )
+    except ModelRefused:
+        return None  # daily cap or empty answer: unread, like a vetoed call
     return [spans[i] for i in pick(out, len(spans))]
 
 

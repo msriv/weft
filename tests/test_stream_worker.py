@@ -1,7 +1,9 @@
 import base64
 import json
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from services.stream_worker.app import create_app
@@ -258,6 +260,93 @@ def test_attach_score_weighs_rare_entities_and_vetoes_beat_wide_ones() -> None:
     assert (
         later["entity_counts"]["Kessar"] == 3 and later["last_seen"] == "2026-11-06T05:00:00+00:00"
     )
+
+
+T = "Iran fires missiles at Israel, Tehran says it targeted military bases"
+L = "Israel air defences intercepted missiles from Iran overnight."
+
+
+def double_current(db: Neo4jDb) -> list[dict[str, Any]]:
+    """Ids that have more than one current version (must always be empty)."""
+    return db.execute(
+        "MATCH (n) WHERE n.id IS NOT NULL AND n.valid_to IS NULL AND n.valid_from IS NOT NULL "
+        "WITH labels(n)[0] AS l, n.id AS id, count(n) AS c WHERE c > 1 RETURN l, id, c"
+    )
+
+
+def test_failure_after_the_event_write_leaves_the_graph_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db, d, sent = setup()
+    process(msg("1", "a-il", T, L, "2026-11-06T01:00:00+00:00"), d)
+    real = graph.put
+
+    def boom(db_: Any, table: str, row: dict[str, Any], at: str | None = None) -> None:
+        if table == "reports":
+            raise RuntimeError("crash between the event and the report")
+        real(db_, table, row, at)
+
+    monkeypatch.setattr("services.stream_worker.worker.graph.put", boom)
+    with pytest.raises(RuntimeError):
+        process(msg("2", "b-ir", T, L, "2026-11-06T02:00:00+00:00"), d)
+    monkeypatch.setattr("services.stream_worker.worker.graph.put", real)
+    (ev,) = graph.select(db, "events")
+    assert ev["n_reports"] == 1 and len(sent) == 1  # nothing written, nothing published
+    assert (
+        process(msg("2", "b-ir", T, L, "2026-11-06T02:00:00+00:00"), d) == "attached"
+    )  # redelivery
+    (ev,) = graph.select(db, "events")
+    assert ev["n_reports"] == 2 == len(graph.reports_of_event(db, ev["id"]))
+    assert double_current(db) == []
+
+
+def test_parallel_near_identical_reports_make_one_event() -> None:
+    db, d, _ = setup()
+    srcs = ["a-il", "b-ir", "c-com"]
+    with ThreadPoolExecutor(8) as pool:
+        out = list(
+            pool.map(
+                lambda i: process(
+                    msg(f"r{i}", srcs[i % 3], T, L, f"2026-11-06T01:{i:02d}:00+00:00"), d
+                ),
+                range(20),
+            )
+        )
+    assert len(out) == 20
+    (ev,) = graph.select(db, "events")
+    assert ev["n_reports"] == 20 == len(graph.reports_of_event(db, ev["id"]))
+    assert len(graph.select(db, "reports")) == 20
+    assert double_current(db) == []
+
+
+def test_same_message_delivered_twice_at_once_writes_one_report() -> None:
+    db, d, sent = setup()
+    m = msg("dup", "a-il", T, L, "2026-11-06T01:00:00+00:00")
+    with ThreadPoolExecutor(2) as pool:
+        out = sorted(pool.map(lambda _: process(m, d), range(2)))
+    assert out == ["duplicate", "new_event"]
+    assert len(graph.select(db, "reports")) == 1 and len(sent) == 1
+    assert double_current(db) == []
+
+
+def test_one_report_costs_a_bounded_number_of_queries() -> None:
+    db, d, _ = setup()
+    runs: list[str] = []
+    inner = db.execute
+
+    def counted(q: str, a: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        runs.append(q)
+        return inner(q, a)
+
+    db.execute = counted  # type: ignore[method-assign,assignment]
+    nlp = d.nlp
+
+    def many(text: str) -> list[tuple[str, str]]:
+        return [(f"Entity{i}", "X") for i in range(30)]
+
+    nlp.entities.extract = many  # type: ignore[method-assign]
+    process(msg("q1", "a-il", T, L, "2026-11-06T01:00:00+00:00"), d)
+    assert len(runs) < 40  # 30 entities would be 30+ queries one by one
 
 
 def test_push_unknown_source_is_retried_not_dropped() -> None:
