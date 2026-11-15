@@ -107,7 +107,11 @@ def answer_from(
     )
     out = json.loads(
         model.complete(
-            prompt_template=PROMPT, instructions=INSTRUCTIONS, data=data, json_schema=SCHEMA
+            prompt_template=PROMPT,
+            instructions=INSTRUCTIONS,
+            data=data,
+            max_tokens=1500,
+            json_schema=SCHEMA,
         )
     )
     sentences: list[dict[str, Any]] = []

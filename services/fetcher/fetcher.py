@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
@@ -17,7 +18,7 @@ from typing import Any, Protocol
 import pdfplumber
 import trafilatura
 
-from weft_core import portals, rules
+from weft_core import domains, portals, rules
 from weft_core.polite import PoliteClient
 from weft_core.urls import normalize_url
 
@@ -74,13 +75,17 @@ def seen_from_rows(rows: list[tuple[str | None, datetime]], now: datetime) -> bo
 
 @dataclass
 class Result:
-    status: str  # stored | duplicate | skipped | blocked | extract_failed
+    status: str  # stored | duplicate | skipped | blocked | extract_failed | foreign
     item_id: str | None = None
     message: dict[str, Any] | None = None  # `items-extracted` payload, set when stored
 
 
 def fetch_item(
-    msg: dict[str, Any], source: dict[str, Any], http: PoliteClient, store: Store
+    msg: dict[str, Any],
+    source: dict[str, Any],
+    http: PoliteClient,
+    store: Store,
+    sources: list[dict[str, Any]] | None = None,
 ) -> Result:
     if store.seen(msg["url"], ""):
         return Result("duplicate")  # feeds repeat entries every poll: never re-download them
@@ -89,7 +94,14 @@ def fetch_item(
         if not http.allowed(msg["url"]):
             return Result("blocked")  # robots.txt: permanent, so the caller must not retry
         return Result("skipped")  # cooldown or 429: caller retries later
-    return ingest(msg, resp.content, resp.headers.get("content-type", ""), resp.status_code, store)
+    return ingest(
+        msg,
+        resp.content,
+        resp.headers.get("content-type", ""),
+        resp.status_code,
+        store,
+        owner=(lambda url: domains.attribute(url, source, sources)) if sources else None,
+    )
 
 
 def interval(source: dict[str, Any]) -> float:
@@ -119,6 +131,7 @@ def ingest(
     store: Store,
     *,
     versioned: bool = False,
+    owner: Callable[[str], str | None] | None = None,
 ) -> Result:
     """Extract and store one document.
 
@@ -129,6 +142,11 @@ def ingest(
     d, ext = _extract(content, msg["url"], content_type)
     text = d.get("text") or ""
     canonical = normalize_url(d.get("url") or msg["url"])
+    if owner is not None:  # after redirects the page may belong to another source (#169)
+        sid = owner(canonical)
+        if sid is None:
+            return Result("foreign", None, {"canonical": canonical})
+        msg = {**msg, "source_id": sid}
     item_id = hashlib.sha256(canonical.encode()).hexdigest()[:32]
     if not text.strip():
         # keep a record that extraction failed, for the extraction-failures dashboard

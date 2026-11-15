@@ -15,7 +15,7 @@ from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from weft_core import (
@@ -31,6 +31,7 @@ from weft_core import (
     review,
     store,
 )
+from weft_core.models import ModelRefused
 
 STREAM_POLL_SECONDS = 5
 
@@ -54,6 +55,7 @@ class SourcePatch(BaseModel):
     state_run_source: str | None = None
     owner_id: str | None = None
     ownership_source: str | None = None
+    link_domains: list[str] | None = None
 
 
 class NewSource(BaseModel):
@@ -122,6 +124,11 @@ def create_app(
     project: str = "",
 ) -> FastAPI:
     app = FastAPI(title="Weft API")
+
+    @app.exception_handler(ModelRefused)
+    def _model_refused(_: Request, exc: ModelRefused) -> JSONResponse:
+        # Daily model cap reached, or the provider gave nothing: ask is unavailable, not wrong.
+        return JSONResponse({"detail": "The model is not available right now."}, status_code=503)
 
     def admin(authorization: Annotated[str, Header()] = "") -> None:
         # shortcut: one shared admin token for editors, replace with Firebase custom claims
@@ -436,6 +443,8 @@ def create_app(
         if "country" in data:  # also re-tags the source's reports
             store.set_country(db, source_id, data.pop("country"), "admin")
         for col, val in data.items():  # col is a SourcePatch field name, never user text
+            if isinstance(val, list):  # stored as JSON text, like feeds and sitemaps
+                val = json.dumps(val)
             db.execute(
                 f"MATCH (n:Source {{id: ?}}) SET n.{col}=?",
                 (source_id, int(val) if isinstance(val, bool) else val),
@@ -507,16 +516,22 @@ def _asker(db: store.Db) -> Callable[[str], dict[str, Any]] | None:
     if "MODEL_BASE_URL" not in os.environ:
         return None
     from pipeline.gcp import bq_sink
-    from weft_core import ask
+    from weft_core import ask, config
+    from weft_core.ledger import GraphLedger, limits
     from weft_core.models import ModelClient
     from weft_core.nlp import default_embedder
 
+    tokens, cost = limits(config.pipeline(), "ask")
     model = ModelClient(
         base_url=os.environ["MODEL_BASE_URL"],
         api_key=os.environ["MODEL_API_KEY"],
         model=os.environ["MODEL_NAME"],
         revision=os.environ["MODEL_REVISION"],
         log=bq_sink(os.environ["PROJECT_ID"]),
+        ledger=GraphLedger(db),
+        caller="ask",
+        daily_tokens=tokens,
+        daily_cost_usd=cost,
     )
     embedder = default_embedder()
     return lambda q: ask.answer(db, embedder, model, q)
