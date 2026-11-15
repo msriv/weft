@@ -12,6 +12,12 @@ stream:
   near_dup_jaccard: 0.80
   near_dup_window_hours: 72
 
+# Poller prefilter (#163): feed entries whose title and summary match no beat are not fetched.
+# A small random sample still flows, so the admin "unplaced" view sees what the beats miss.
+prefilter:
+  enabled: true
+  sample_rate: 0.02
+
 nightly:
   regroup_days: 14
   split_days: 3                  # re-cluster this many days from scratch; older events frozen (#105)
@@ -30,3 +36,29 @@ nightly:
   token_budget_per_beat: 400000  # stages degrade (fewer merge checks) rather than overspend
   token_shares: {regroup: 0.2, claims: 0.6, detective: 0.2}  # of the beat budget, per stage
   review_sample_rate: 0.01
+
+# Nightly stage order: the single source of truth. pipeline/run.py runs them in this order and
+# Terraform (infra/modules/nightly) builds the Cloud Workflow from it (#156). `needs` lists
+# stages whose failure makes this one skip; every other stage still runs after a failure.
+# tests/test_stage_list.py guards the names against pipeline/run.py STAGES.
+stages:
+  - {name: regroup, needs: []}
+  - {name: threads, needs: [regroup]}
+  - {name: origins, needs: [regroup]}
+  - {name: claims, needs: [regroup]}
+  - {name: figures, needs: [claims]}
+  - {name: claim_groups, needs: [claims]}
+  - {name: conflicts, needs: [claim_groups]}
+  - {name: short_version, needs: [regroup]}
+  - {name: statements, needs: [claims]}
+  - {name: links, needs: [regroup]}
+  - {name: anomalies, needs: [origins, figures, conflicts, statements, links]}
+  - {name: weights, needs: []}
+  - {name: detective, needs: [claims, anomalies]}
+  - {name: series, needs: []}
+  - {name: domains, needs: []}
+  - {name: directions, needs: [series, domains]}
+  - {name: snapshot, needs: []}
+  - {name: profiles, needs: []}
+  - {name: review_sample, needs: []}
+  - {name: notify, needs: []}
