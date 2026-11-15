@@ -9,7 +9,7 @@ import json
 import os
 import re
 from collections.abc import AsyncIterator, Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
@@ -17,9 +17,11 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+from services.api.limits import Limiter, Streams, client_key
 from services.api.streams import ChangeHub
 from weft_core import (
     accounts,
+    config,
     detective,
     digest,
     directions,
@@ -32,7 +34,7 @@ from weft_core import (
     store,
 )
 from weft_core.cache import TtlCache
-from weft_core.models import ModelRefused
+from weft_core.models import BudgetExceeded, ModelRefused
 
 STREAM_POLL_SECONDS = 5
 PUBLIC_TTL_SECONDS = 30
@@ -47,7 +49,7 @@ class Problem(BaseModel):
     kind: str
     ref_id: str | None = None
     message: str
-    email: str | None = None
+    email: str | None = Field(default=None, max_length=254)
 
 
 class SourcePatch(BaseModel):
@@ -82,9 +84,9 @@ class Feedback(BaseModel):
 
 
 class Subscription(BaseModel):
-    email: str
-    frequency: str
-    follows: list[str] = []
+    email: str = Field(max_length=254)
+    frequency: str = Field(max_length=10)
+    follows: list[str] = Field(default=[], max_length=50)
 
 
 class ReaderPrefs(BaseModel):
@@ -125,8 +127,43 @@ def create_app(
     asker: Callable[[str], dict[str, Any]] | None = None,
     prefs: accounts.Prefs | None = None,
     project: str = "",
+    limits: dict[str, Any] | None = None,
+    proxy_secret: str = "",
+    limiter: Limiter | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Weft API")
+    lim = limits if limits is not None else config.pipeline()["limits"]
+    limiter = limiter or Limiter()
+    streams = Streams(lim["streams"]["per_client"], lim["streams"]["total"])
+
+    @app.middleware("http")
+    async def cap_body(request: Request, call_next: Callable[[Request], Any]) -> Any:
+        size = request.headers.get("content-length", "0")
+        if size.isdigit() and int(size) > lim["max_body_bytes"]:
+            return JSONResponse({"detail": "request too large"}, status_code=413)
+        return await call_next(request)
+
+    def who(request: Request) -> str:
+        peer = request.client.host if request.client else "unknown"
+        return client_key(dict(request.headers), peer, proxy_secret)
+
+    def throttle(name: str) -> Callable[[Request], None]:
+        def dep(request: Request) -> None:
+            c = lim[name]
+            key = who(request)
+            if name == "ask" and (
+                uid := accounts.verify_token(
+                    request.headers.get("authorization", "").removeprefix("Bearer "), project
+                )
+            ):
+                key = f"user:{uid}"  # signed-in readers are limited as themselves, not by address
+            if (wait := limiter.check(name, key, c["per_minute"], c["per_day"])) is not None:
+                raise HTTPException(
+                    429, "Too many requests. Try again later.", headers={"Retry-After": str(wait)}
+                )
+
+        return dep
+
     hub = ChangeHub(lambda sid, since: readmodel.changes(db, sid, since), STREAM_POLL_SECONDS)
     public = TtlCache(PUBLIC_TTL_SECONDS)
 
@@ -163,7 +200,16 @@ def create_app(
 
     @app.exception_handler(ModelRefused)
     def _model_refused(_: Request, exc: ModelRefused) -> JSONResponse:
-        # Daily model cap reached, or the provider gave nothing: ask is unavailable, not wrong.
+        if isinstance(exc, BudgetExceeded):  # the day's ask budget is spent: no model call was made
+            now = datetime.now(UTC)
+            wait = int(
+                (now.replace(hour=0, minute=0, second=0) + timedelta(days=1) - now).total_seconds()
+            )
+            return JSONResponse(
+                {"detail": "Ask has reached its limit for today."},
+                status_code=429,
+                headers={"Retry-After": str(wait)},
+            )
         return JSONResponse({"detail": "The model is not available right now."}, status_code=503)
 
     def admin(authorization: Annotated[str, Header()] = "") -> None:
@@ -192,7 +238,9 @@ def create_app(
 
     @v1.get("/stories")
     def stories(
-        region: str | None = None, topic: str | None = None, sort: str = "recent"
+        region: str | None = None,
+        topic: str | None = None,
+        sort: Literal["recent", "anomalies", "reports"] = "recent",
     ) -> list[dict[str, Any]]:
         return readmodel.list_stories(db, region, topic, sort)
 
@@ -272,9 +320,14 @@ def create_app(
     def today(
         follow: Annotated[list[str] | None, Query()] = None, since: str | None = None
     ) -> dict[str, Any]:
+        if since is not None:
+            try:
+                datetime.fromisoformat(since)
+            except ValueError as exc:
+                raise HTTPException(422, "since must be an ISO date or time") from exc
         return readmodel.today(db, follow, since)
 
-    @v1.post("/reports-problem", status_code=201)
+    @v1.post("/reports-problem", status_code=201, dependencies=[Depends(throttle("problem"))])
     def report_problem(body: Problem) -> dict[str, Any]:
         try:
             return {
@@ -286,19 +339,25 @@ def create_app(
     @v1.get("/stories/{story_id}/stream")
     async def stream(story_id: str, request: Request) -> StreamingResponse:
         found(readmodel.public_story(db, story_id))
+        key = who(request)
+        if not streams.acquire(key):
+            raise HTTPException(429, "Too many open streams.", headers={"Retry-After": "30"})
 
         async def events() -> AsyncIterator[str]:
-            async for m in hub.subscribe(story_id):  # one poll per story, shared by all readers
-                if await request.is_disconnected():
-                    break
-                if m is None:
-                    yield ": keepalive\n\n"
-                else:
-                    yield f"event: {m['type']}\ndata: {json.dumps(m['data'])}\n\n"
+            try:
+                async for m in hub.subscribe(story_id):  # one poll per story, shared by all readers
+                    if await request.is_disconnected():
+                        break
+                    if m is None:
+                        yield ": keepalive\n\n"
+                    else:
+                        yield f"event: {m['type']}\ndata: {json.dumps(m['data'])}\n\n"
+            finally:
+                streams.release(key)
 
         return StreamingResponse(events(), media_type="text/event-stream")
 
-    @v1.put("/subscription")
+    @v1.put("/subscription", dependencies=[Depends(throttle("subscription"))])
     def subscribe(body: Subscription) -> dict[str, bool]:
         try:
             digest.subscribe(db, body.email, body.frequency, body.follows)
@@ -310,7 +369,7 @@ def create_app(
     def unsubscribe(token: str) -> dict[str, bool]:
         return {"unsubscribed": bool(found(digest.unsubscribe(db, token) or None))}
 
-    @v1.post("/ask")
+    @v1.post("/ask", dependencies=[Depends(throttle("ask"))])
     def ask(body: Question) -> dict[str, Any]:
         if asker is None:
             raise HTTPException(503, "ask is not configured")
@@ -541,7 +600,12 @@ def app_from_env() -> FastAPI:
     graph.init(db)
     project = os.environ["PROJECT_ID"]
     return create_app(
-        db, os.environ["ADMIN_TOKEN"], _asker(db), accounts.FirestorePrefs(project), project
+        db,
+        os.environ["ADMIN_TOKEN"],
+        _asker(db),
+        accounts.FirestorePrefs(project),
+        project,
+        proxy_secret=os.environ.get("PROXY_SECRET", ""),
     )
 
 
