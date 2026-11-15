@@ -16,6 +16,12 @@ variable "raw_retention_days" {
   default     = 30
 }
 
+variable "autoclean_schedule" {
+  description = "Cron (UTC) for the autoclean job. Daily by default; weekly is \"0 6 * * 0\". Runs after the 01:00 nightly and its 4-hour window."
+  type        = string
+  default     = "0 6 * * *"
+}
+
 variable "poller_image" {
   description = "Poller image, e.g. <region>-docker.pkg.dev/<project>/weft/poller:<tag>. Built in CI, not by hand."
   type        = string
