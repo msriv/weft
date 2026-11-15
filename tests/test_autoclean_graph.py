@@ -229,7 +229,11 @@ def test_other_orphan_rules_delete_only_orphans() -> None:
     ]
     for stmt in q:
         c.db.execute(stmt)
-    names = [n for n in ac.RULES if n.startswith("orphan_") and n != "orphan_report_children"]
+    names = [
+        n
+        for n in ac.RULES
+        if n.startswith("orphan_") and n.endswith("_children") and n != "orphan_report_children"
+    ]
     ex = {n: {"max_rows": 100} for n in names}
     out = go(c, *names, extra=ex)
     assert all(out[n]["status"] == "ok" for n in names), {n: out[n]["note"] for n in names}
@@ -287,6 +291,7 @@ def test_healthy_graph_is_untouched_by_every_integrity_rule() -> None:
             "dangling_group_ref",
         )
         or n.startswith("orphan_")
+        and n.endswith("_children")
     ]
     out = go(c, *names)
     assert {n: out[n]["changed"] for n in names} == dict.fromkeys(names, 0)

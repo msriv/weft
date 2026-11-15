@@ -58,6 +58,9 @@ NODES: dict[str, dict[str, Any]] = {
         "discovered_via": None,
         "discovered_at": None,
         "verified_at": None,
+        "yield_14d": None,  # on-beat reports / reports in the window; set by sourceyield.refresh
+        "dormant_at": None,
+        "disc_rel": None,  # relevance the candidate had when it was registered (#171)
     },
     "PortalCandidate": {"domain": None, "hits": 0, "example_url": None, "last_seen": None},
     "Story": {"id": None, "beat_id": None, "title": None, "public": 0, "created_at": None},
@@ -223,7 +226,13 @@ NODES: dict[str, dict[str, Any]] = {
         "resolution": None,
     },
     "Correction": {"day": None, "kind": None, "what": None, "created_at": None},
-    "Translation": {"key": None, "lang": None, "text": None, "created_at": None},
+    "Translation": {
+        "key": None,
+        "lang": None,
+        "text": None,
+        "created_at": None,
+        "last_used": None,  # a cache hit stamps it; autoclean drops entries unused for 90 days
+    },
     "ReviewItem": {
         "id": None,
         "kind": None,
@@ -264,8 +273,8 @@ NODES: dict[str, dict[str, Any]] = {
     "Counter": {"name": None, "n": 0},
     "Cites": {"report_id": None, "url_key": None, "document_id": None},
     "Quotes": {"figure_id": None, "statement_id": None, "containment": None, "edit_ratio": None},
-    "MergeRejected": {"pair": None},
-    "NliCache": {"key": None, "c": None, "e": None},
+    "MergeRejected": {"pair": None, "created_at": None},
+    "NliCache": {"key": None, "c": None, "e": None, "created_at": None},
     "DomainCandidate": {
         "domain": None,
         "beat_id": None,
@@ -604,11 +613,17 @@ def add_candidate_hits(
 
 
 def candidates(db: Db, beat_id: str, min_hits: int, limit: int) -> list[str]:
+    return [c[0] for c in scored_candidates(db, beat_id, min_hits, limit)]
+
+
+def scored_candidates(db: Db, beat_id: str, min_hits: int, limit: int) -> list[tuple[str, float]]:
+    """(domain, mean relevance) best first."""
     return [
-        r["domain"]
+        (r["domain"], float(r["rel"] or 0.0))
         for r in db.execute(
             "MATCH (n:DomainCandidate {beat_id: ?}) WHERE n.hits >= ? "
-            "RETURN n.domain AS domain ORDER BY "
+            "RETURN n.domain AS domain, CASE WHEN n.hits > 0 THEN coalesce(n.rel_sum, "
+            "toFloat(n.hits)) / n.hits ELSE 0.0 END AS rel ORDER BY "
             # mean relevance x distinct days seen (#107); hits break ties
             "CASE WHEN n.hits > 0 THEN coalesce(n.rel_sum, toFloat(n.hits)) / n.hits "
             "* size(coalesce(n.days, [1])) ELSE 0.0 END DESC, "
@@ -657,6 +672,7 @@ def register_source(
     type: str = "news",
     crawl: dict[str, Any] | None = None,
     languages: list[str] | None = None,
+    relevance: float | None = None,
 ) -> None:
     """Insert a discovered source, or re-probe result for a rejected one. Ownership and
     state_run stay null: nothing here cites them. An active source is never touched."""
@@ -680,6 +696,7 @@ def register_source(
         "verified_at": None if rejected else _now(),
         "type": type,
         "crawl": crawl or None,
+        "disc_rel": relevance,
         **({"languages": languages} if languages else {}),
     }
     if existing:  # keeps fields the admin set, such as country
@@ -769,6 +786,7 @@ def active_sources(db: Db) -> list[dict[str, Any]]:
             "feeds": json.loads(r["feeds"]),
             "sitemaps": json.loads(r["sitemaps"]),
             "paywalled": bool(r["paywalled"]),
+            "yield": r.get("yield_14d"),
             "rate_limit": {"requests": 1, "per_seconds": r["min_interval"]},
         }
         if r["crawl"]:

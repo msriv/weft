@@ -25,6 +25,7 @@ TABLES = [
     "figures",
     "short_versions",
     "anomalies",
+    "documents",
 ]
 
 
@@ -50,12 +51,15 @@ def _parquet(rows: list[dict[str, Any]]) -> bytes:
 
 def export(ctx: Ctx, sink: Sink, tables: list[str] = TABLES) -> int:
     day = ctx.now[:10]
-    n = 0
+    n, counts = 0, {}
     for t in tables:
         rows = _valid_at(ctx, t, ctx.now)
+        counts[t] = len(rows)
         if rows:
             sink.write(f"{day}/{t}.parquet", _parquet(rows))
             n += len(rows)
+    # last, so a day without it is a night that stopped half way (autoclean tells them apart)
+    sink.write(f"{day}/_SUCCESS", json.dumps(counts, sort_keys=True).encode())
     return n
 
 
