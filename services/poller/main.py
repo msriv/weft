@@ -9,7 +9,7 @@ import httpx
 from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.poller.poller import FeedState, Poller
-from weft_core import store
+from weft_core import config, store
 from weft_core.gcp import bigquery_client
 from weft_core.health import unhealthy
 from weft_core.polite import PoliteClient
@@ -33,6 +33,17 @@ class GcsState:
         self._blob(url).upload_from_string(json.dumps(state.__dict__))
 
 
+HEALTH_WINDOW_DAYS = 30  # far longer than the 6 h health age; keeps the scan to recent partitions
+
+
+def health_query(table: str) -> str:
+    return (
+        f"SELECT source_id, MAX(IF(ok, checked_at, NULL)) AS last_ok FROM `{table}` "
+        f"WHERE checked_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {HEALTH_WINDOW_DAYS} DAY) "
+        "GROUP BY 1"
+    )
+
+
 def record_and_report(project: str, results: dict[str, str | None]) -> list[str]:
     """Append this run to `source_health`, then log one ERROR per unhealthy source."""
     bq = bigquery_client(project)
@@ -44,7 +55,7 @@ def record_and_report(project: str, results: dict[str, str | None]) -> list[str]
     ]
     if errs := bq.insert_rows_json(table, rows):
         raise RuntimeError(f"insert into source_health failed: {errs}")
-    q = f"SELECT source_id, MAX(IF(ok, checked_at, NULL)) AS last_ok FROM `{table}` GROUP BY 1"
+    q = health_query(table)
     last_ok = {r.source_id: r.last_ok for r in bq.query(q).result()}
     bad = unhealthy(last_ok, now)
     for sid in bad:
@@ -67,9 +78,17 @@ def main() -> int:
 
     db = store.from_env()
     with httpx.Client(timeout=30, follow_redirects=True) as http:
-        results = Poller(PoliteClient(http), GcsState(os.environ["STATE_BUCKET"]), publish).run(
-            store.active_sources(db)
+        pf = config.pipeline()["prefilter"]
+        poller = Poller(
+            PoliteClient(http),
+            GcsState(os.environ["STATE_BUCKET"]),
+            publish,
+            store.beats(db) if pf["enabled"] else None,
+            pf["sample_rate"],
         )
+        results = poller.run(store.active_sources(db))
+    for sid, st in sorted(poller.stats.items()):
+        print(json.dumps({"event": "poll_source", "source_id": sid, **st}), flush=True)
     for sid, err in results.items():
         if err:
             print(f"poll failed: {sid}: {err}", file=sys.stderr)
