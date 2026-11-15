@@ -115,19 +115,26 @@ def production_ctx() -> Ctx:
     import os
 
     from pipeline.gcp import BqWarehouse, GcsText, bq_sink, pubsub_publish, versions_of
-    from weft_core import store
+    from weft_core import config, store
+    from weft_core.ledger import GraphLedger, limits
     from weft_core.models import ModelClient
     from weft_core.nlp import default_nlp
 
     db = store.from_env()
     graph.init(db)
     project = os.environ["PROJECT_ID"]
+    ledger = GraphLedger(db)
+    tokens, cost = limits(config.pipeline(), "pipeline")
     model = ModelClient(
         base_url=os.environ["MODEL_BASE_URL"],
         api_key=os.environ["MODEL_API_KEY"],
         model=os.environ["MODEL_NAME"],
         revision=os.environ["MODEL_REVISION"],
         log=bq_sink(project),
+        ledger=ledger,
+        caller="pipeline",
+        daily_tokens=tokens,
+        daily_cost_usd=cost,
     )
     raw = os.environ["RAW_BUCKET"]
     return Ctx(
@@ -137,6 +144,7 @@ def production_ctx() -> Ctx:
         GcsText(raw).text,
         model,
         versions_of=versions_of(raw, db),
+        ledger=ledger,
         warehouse=BqWarehouse(project),
         publish=pubsub_publish(project),
     )
