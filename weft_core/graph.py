@@ -59,15 +59,14 @@ def _dec(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def put(db: Db, table: str, row: dict[str, Any], at: str | None = None) -> None:
-    """Close the current version of row['id'] and open a new one, in one statement: a crash can
-    no longer close a version without opening the next. Two pushes at the same moment can still
-    both open one; autoclean's `duplicate_current` rule closes the extra (#149)."""
+    """Close the current version of row['id'] and open a new one, in one query, so a reader never
+    sees an id with no current version."""
     at = at or now()
     label = LABELS[table]
     db.execute(
-        f"OPTIONAL MATCH (o:{label} {{id: ?}}) WHERE o.valid_to IS NULL SET o.valid_to=? "
+        f"OPTIONAL MATCH (o:{label} {{id: ?}}) WHERE o.valid_to IS NULL SET o.valid_to = ? "
         f"WITH count(o) AS closed CREATE (n:{label}) SET n = ?",
-        (row["id"], at, store.clean({**row, "valid_from": at, "valid_to": None})),
+        (row["id"], at, store._clean({**row, "valid_from": at, "valid_to": None})),
     )
 
 

@@ -230,6 +230,10 @@
   "valid_to",
   "value"
  ],
+ "Lock": [
+  "at",
+  "key"
+ ],
  "MergeRejected": [
   "pair"
  ],
@@ -330,6 +334,13 @@
   "ref_id",
   "reviewer",
   "sampled_at"
+ ],
+ "Seen": [
+  "at",
+  "fails",
+  "key",
+  "last",
+  "stored"
  ],
  "SeriesPoint": [
   "day",
