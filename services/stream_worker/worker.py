@@ -34,7 +34,8 @@ class Deps:
     cfg: dict[str, Any]  # config/pipeline.yaml
     publish: Callable[[dict[str, Any]], None] = lambda m: None
     model: ModelClient | None = None
-    cache: TtlCache = field(default_factory=lambda: TtlCache(60.0))  # config stream.cache_ttl_seconds
+    # config stream.cache_ttl_seconds
+    cache: TtlCache = field(default_factory=lambda: TtlCache(60.0))
 
 
 def _source(d: "Deps", source_id: str) -> dict[str, Any] | None:
