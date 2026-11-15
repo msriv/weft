@@ -103,6 +103,15 @@ nightly:
   token_shares: {regroup: 0.2, claims: 0.6, detective: 0.2}  # of the beat budget, per stage
   review_sample_rate: 0.01
 
+# Admin status view (#176): plain states from fixed thresholds.
+status:
+  ingest_slow_minutes: 60         # newest stored report older than this: slow
+  ingest_stopped_minutes: 360     # older than this: stopped
+  stage_slow_hours: 30            # last nightly stage start older than this: slow
+  stage_stopped_hours: 54
+  silent_source_days: 7           # an active source with no stored report for this long is listed as silent
+
+
 # Nightly stage order: the single source of truth. pipeline/run.py runs them in this order and
 # Terraform (infra/modules/nightly) builds the Cloud Workflow from it (#156). `needs` lists
 # stages whose failure makes this one skip; every other stage still runs after a failure.
