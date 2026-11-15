@@ -151,3 +151,53 @@ def test_crawl_delay_slows_a_fast_source() -> None:
     before = clock.t
     c.get("https://a.example/2", 10, {})
     assert clock.t - before >= 30
+
+
+def test_a_cooldown_on_one_host_does_not_delay_another() -> None:
+    clock = Clock()
+
+    def h(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/robots.txt":
+            return httpx.Response(404)
+        return httpx.Response(429) if req.url.host == "a.test" else httpx.Response(200, text="ok")
+
+    c = client(h, clock)
+    assert c.get("https://a.test/1", 10.0, {}) is None  # A is cooling down
+    before = clock.t
+    assert c.get("https://b.test/1", 10.0, {}) is not None
+    assert clock.t == before  # B did not wait for A, and had no earlier request to wait for
+    assert c.ready_at("https://a.test/2") is not None and c.ready_at("https://b.test/2") is None
+
+
+def test_concurrent_requests_to_one_host_never_overlap_and_keep_the_interval() -> None:
+    import threading
+    import time
+
+    active, peak, starts = 0, 0, []
+    guard = threading.Lock()
+
+    def h(req: httpx.Request) -> httpx.Response:
+        nonlocal active, peak
+        if req.url.path == "/robots.txt":
+            return httpx.Response(404)
+        with guard:
+            active += 1
+            peak = max(peak, active)
+            starts.append(time.monotonic())
+        time.sleep(0.02)
+        with guard:
+            active -= 1
+        return httpx.Response(200, text="ok")
+
+    c = PoliteClient(httpx.Client(transport=httpx.MockTransport(h)), limits=LIMITS)
+    threads = [
+        threading.Thread(target=c.get, args=(f"https://a.test/{i}", 0.1, {})) for i in range(3)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert peak == 1
+    assert (
+        len(starts) == 3 and min(b - a for a, b in zip(sorted(starts), sorted(starts)[1:])) >= 0.09
+    )

@@ -24,9 +24,13 @@ MSG = {"source_id": "x", "url": "https://x.test/story/1?utm=1"}
 class MemStore:
     def __init__(self) -> None:
         self.rows: list[tuple[dict[str, Any], dict[str, Any], bytes]] = []
+        self.dead: set[str] = set()
+
+    def mark_dead(self, url: str) -> None:
+        self.dead.add(url)
 
     def seen(self, canonical_url: str | None, text_hash: str) -> bool:
-        return any(
+        return canonical_url in self.dead or any(
             canonical_url in (r[0]["canonical_url"], r[0]["url"]) or r[0]["text_hash"] == text_hash
             for r in self.rows
         )
@@ -279,3 +283,87 @@ def test_failed_extraction_is_retried_daily_up_to_three_times() -> None:
     assert seen_from_rows([*two, failed(timedelta(days=3))], now)  # third failure: give up
     # a retry that worked: the stored row wins over the earlier failure
     assert seen_from_rows([failed(timedelta(days=2)), ("abc", now)], now)
+
+
+def _count(handler_status: int) -> tuple[PoliteClient, list[str]]:
+    calls: list[str] = []
+
+    def h(req: httpx.Request) -> httpx.Response:
+        calls.append(req.url.path)
+        return (
+            httpx.Response(404) if req.url.path == "/robots.txt" else httpx.Response(handler_status)
+        )
+
+    return PoliteClient(httpx.Client(transport=httpx.MockTransport(h)), sleep=lambda s: None), calls
+
+
+def test_a_404_is_acknowledged_once_logged_dead_and_not_fetched_again(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    store = MemStore()
+    http, calls = _count(404)
+    c = TestClient(create_app(store, http, {"x": SRC}))
+    assert _push(c, MSG).status_code == 204  # not a 502: Pub/Sub must not redeliver it
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert line["status"] == "dead"
+    assert _push(c, MSG).status_code == 204  # the feed lists it again: a duplicate, no request
+    assert calls.count("/story/1") == 1
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["status"] == "duplicate"
+
+
+@pytest.mark.parametrize("status", [410, 403, 451])
+def test_other_permanent_4xx_are_dead(status: int) -> None:
+    http, _ = _count(status)
+    assert fetch_item(MSG, SRC, http, MemStore()).status == "dead"
+
+
+@pytest.mark.parametrize("status", [408, 500, 502])
+def test_transient_statuses_are_retried(status: int) -> None:
+    http, _ = _count(status)
+    with pytest.raises(httpx.HTTPStatusError):
+        fetch_item(MSG, SRC, http, MemStore())
+
+
+def test_a_cooling_host_is_acknowledged_and_one_task_is_scheduled(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    http, _ = _count(429)
+    tasks: list[tuple[dict[str, Any], Any]] = []
+    c = TestClient(
+        create_app(
+            MemStore(),
+            http,
+            {"x": SRC},
+            queue_for=lambda base: lambda body, when: tasks.append((body, when)),
+        )
+    )
+    assert _push(c, MSG).status_code == 204  # no 503: the redelivery storm is gone
+    assert len(tasks) == 1 and tasks[0][0]["fetch"] == MSG and tasks[0][0]["attempt"] == 1
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["status"] == "deferred"
+    # the task comes back to /refetch with the same message; the host is still cooling
+    assert c.post("/refetch", json=tasks[0][0]).status_code == 204
+    assert len(tasks) == 2 and tasks[1][0]["attempt"] == 2
+
+
+def test_deferral_stops_after_the_limit() -> None:
+    from services.fetcher.app import MAX_DEFERRALS
+
+    http, _ = _count(429)
+    tasks: list[Any] = []
+    c = TestClient(
+        create_app(MemStore(), http, {"x": SRC}, queue_for=lambda b: lambda *a: tasks.append(a))
+    )
+    assert c.post("/refetch", json={"fetch": MSG, "attempt": MAX_DEFERRALS}).status_code == 204
+    assert tasks == []
+
+
+def test_a_refetch_blocked_by_robots_is_not_retried() -> None:
+    def h(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="User-agent: *\nDisallow: /")
+
+    http = PoliteClient(httpx.Client(transport=httpx.MockTransport(h)), sleep=lambda s: None)
+    db = types.SimpleNamespace(execute=lambda *a, **k: [])
+    files = types.SimpleNamespace(save_version=lambda *a: None)
+    c = TestClient(create_app(MemStore(), http, {"x": SRC}, db=db, files=files))
+    task = {"item_id": "i", "source_id": "x", "url": MSG["url"], "n": 1}
+    assert c.post("/refetch", json=task).status_code == 204

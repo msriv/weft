@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any, Protocol
 
+import httpx
 import pdfplumber
 import trafilatura
 
@@ -47,6 +48,7 @@ class Store(Protocol):
     # Optional (GcpStore has them): per-source outcome counts and same-text-under-many-URLs.
     # def note_outcome(self, source_id: str, stub: bool, cfg: dict) -> None
     # def boilerplate(self, text_hash: str, url: str, limit: int) -> bool
+    # def mark_dead(self, url: str) -> None   # a URL that answered 4xx: never fetched again
 
     def save(
         self, raw_row: dict[str, Any], extracted_row: dict[str, Any], content: bytes, ext: str
@@ -80,7 +82,7 @@ def seen_from_rows(rows: list[tuple[str | None, datetime]], now: datetime) -> bo
 
 @dataclass
 class Result:
-    # refused | too_large | unsupported | stored | duplicate | skipped | blocked | extract_failed | foreign | thin | stub | title | boilerplate
+    # refused | too_large | unsupported | dead | stored | duplicate | skipped | blocked | extract_failed | foreign | thin | stub | title | boilerplate
     status: str
     item_id: str | None = None
     message: dict[str, Any] | None = None  # `items-extracted` payload, set when stored
@@ -100,6 +102,14 @@ def fetch_item(
         resp = http.get(msg["url"], interval(source), {})
     except Refused as exc:  # permanent: the log says why, and Pub/Sub must not retry
         return Result(exc.reason if exc.reason in ("too_large", "unsupported") else "refused")
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code >= 500 or exc.response.status_code == 408:
+            raise  # transient: the push is retried, then dead-lettered
+        if mark := getattr(store, "mark_dead", None):
+            mark(
+                msg["url"]
+            )  # 404, 410, 403, 451 ...: permanent, so the feed's next listing is a duplicate
+        return Result("dead")
     if resp is None:
         if not http.allowed(msg["url"]):
             return Result("blocked")  # robots.txt: permanent, so the caller must not retry
