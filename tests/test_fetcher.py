@@ -364,6 +364,6 @@ def test_a_refetch_blocked_by_robots_is_not_retried() -> None:
     http = PoliteClient(httpx.Client(transport=httpx.MockTransport(h)), sleep=lambda s: None)
     db = types.SimpleNamespace(execute=lambda *a, **k: [])
     files = types.SimpleNamespace(save_version=lambda *a: None)
-    c = TestClient(create_app(MemStore(), http, {"x": SRC}, db=db, files=files))  # type: ignore[arg-type]
+    c = TestClient(create_app(MemStore(), http, {"x": SRC}, db=db, files=files))
     task = {"item_id": "i", "source_id": "x", "url": MSG["url"], "n": 1}
     assert c.post("/refetch", json=task).status_code == 204

@@ -193,8 +193,10 @@ def test_concurrent_requests_to_one_host_never_overlap_and_keep_the_interval() -
     threads = [
         threading.Thread(target=c.get, args=(f"https://a.test/{i}", 0.1, {})) for i in range(3)
     ]
-    [t.start() for t in threads]
-    [t.join() for t in threads]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
     assert peak == 1
     assert (
         len(starts) == 3 and min(b - a for a, b in zip(sorted(starts), sorted(starts)[1:])) >= 0.09
