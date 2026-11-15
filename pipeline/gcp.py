@@ -1,5 +1,6 @@
 """GCP bindings for the nightly job: raw copy -> text, and the `model_calls` sink."""
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -68,3 +69,48 @@ def bq_sink(project: str, dataset: str = "weft"):  # type: ignore[no-untyped-def
             raise RuntimeError(f"model_calls insert failed: {errs}")
 
     return sink
+
+
+class BqWarehouse:
+    """`weft_core.autoclean.Warehouse` on BigQuery. `{ds}` in the SQL is the dataset."""
+
+    def __init__(self, project: str, dataset: str = "weft") -> None:
+        self._client = bigquery_client(project)
+        self._ds = f"{project}.{dataset}"
+
+    def _job(self, sql: str, params: dict[str, Any]):  # type: ignore[no-untyped-def]
+        from google.cloud import bigquery
+
+        def typed(k: str, v: Any) -> bigquery.ScalarQueryParameter:
+            kind = (
+                "TIMESTAMP"
+                if isinstance(v, datetime)
+                else "INT64"
+                if isinstance(v, int)
+                else "STRING"
+            )
+            return bigquery.ScalarQueryParameter(k, kind, v)
+
+        cfg = bigquery.QueryJobConfig(query_parameters=[typed(k, v) for k, v in params.items()])
+        return self._client.query(sql.replace("{ds}", self._ds), job_config=cfg)
+
+    def query(self, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        return [dict(r) for r in self._job(sql, params).result()]
+
+    def execute(self, sql: str, params: dict[str, Any]) -> int:
+        job = self._job(sql, params)
+        job.result()
+        return int(job.num_dml_affected_rows or 0)
+
+
+def pubsub_publish(project: str):  # type: ignore[no-untyped-def]
+    from google.cloud import pubsub_v1  # type: ignore[attr-defined]
+
+    publisher = pubsub_v1.PublisherClient()
+
+    def publish(topic: str, message: dict[str, Any]) -> None:
+        publisher.publish(
+            publisher.topic_path(project, topic), json.dumps(message).encode()
+        ).result()
+
+    return publish
