@@ -230,12 +230,35 @@
   "valid_to",
   "value"
  ],
+ "HashUrl": [
+  "at",
+  "hash",
+  "key"
+ ],
  "Lock": [
   "at",
   "key"
  ],
  "MergeRejected": [
   "pair"
+ ],
+ "MinhashBand": [
+  "at",
+  "band",
+  "report_id"
+ ],
+ "ModelOutput": [
+  "at",
+  "key",
+  "output"
+ ],
+ "ModelSpend": [
+  "caller",
+  "calls",
+  "cost_usd",
+  "day",
+  "key",
+  "tokens"
  ],
  "NliCache": [
   "c",
@@ -358,26 +381,38 @@
   "country",
   "country_source",
   "crawl",
+  "disc_rel",
   "discovered_at",
   "discovered_via",
   "domain",
+  "dormant_at",
   "feeds",
   "healthy",
   "homepage",
   "id",
   "languages",
+  "link_domains",
   "min_interval",
   "name",
   "owner_id",
   "ownership_source",
   "paywalled",
+  "paywalled_source",
   "rejected_reason",
   "sitemaps",
   "state_run",
   "state_run_source",
   "status",
   "type",
-  "verified_at"
+  "verified_at",
+  "yield_14d"
+ ],
+ "SourceDay": [
+  "day",
+  "items",
+  "key",
+  "source_id",
+  "stubs"
  ],
  "SourceWeight": [
   "day",
