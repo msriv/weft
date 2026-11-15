@@ -19,7 +19,10 @@ INSTRUCTIONS = (
 
 def translate(db: Db, model: ModelClient, text: str, dst: str) -> str:
     key = hashlib.sha256(f"{dst}\n{text}".encode()).hexdigest()
-    cached = db.execute("MATCH (n:Translation {key: ?}) RETURN n.text AS text", (key,))
+    cached = db.execute(
+        "MATCH (n:Translation {key: ?}) SET n.last_used=? RETURN n.text AS text",
+        (key, datetime.now(UTC).isoformat()),
+    )
     if cached:
         return str(cached[0]["text"])
     out = model.complete(
