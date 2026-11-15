@@ -67,21 +67,21 @@ services:
       interval: 5s
       retries: 30
   gcs:
-    image: fsouza/fake-gcs-server
+    image: fsouza/fake-gcs-server:1.56.1  # pinned to the version that `latest` was on 2026-11-15
     command: ["-scheme", "http", "-port", "4443", "-backend", "memory"]
   bigquery:
-    image: ghcr.io/goccy/bigquery-emulator:latest
+    image: ghcr.io/goccy/bigquery-emulator:0.8.1  # the emulator is unstable across releases: bump on purpose, not by accident
     # on disk so a restart keeps the tables init made; restart because it can crash under load
     command: ["--project=weft-local", "--dataset=weft", "--database=/data/bq.db"]
     volumes: ["bigquery:/data"]
     restart: unless-stopped
   pubsub:
-    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:593.0.0-emulators
     command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085"]
   firebase:  # Firebase Auth + Firestore emulators (reader accounts and preferences)
     build: ./local/firebase
   tasks:
-    image: ghcr.io/aertje/cloud-tasks-emulator:latest
+    image: ghcr.io/aertje/cloud-tasks-emulator:2.0.1
     command: ["-host", "0.0.0.0", "-port", "8123", "-initial-queue", "projects/weft-local/locations/local/queues/refetch"]
 
   init:
