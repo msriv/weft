@@ -9,7 +9,7 @@ import httpx
 from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.poller.poller import FeedState, Poller
-from weft_core import store
+from weft_core import config, store
 from weft_core.gcp import bigquery_client
 from weft_core.health import unhealthy
 from weft_core.polite import PoliteClient
@@ -82,9 +82,17 @@ def main() -> int:
 
     db = store.from_env()
     with httpx.Client(timeout=30, follow_redirects=True) as http:
-        results = Poller(PoliteClient(http), GcsState(os.environ["STATE_BUCKET"]), publish).run(
-            store.active_sources(db)
+        pf = config.pipeline()["prefilter"]
+        poller = Poller(
+            PoliteClient(http),
+            GcsState(os.environ["STATE_BUCKET"]),
+            publish,
+            store.beats(db) if pf["enabled"] else None,
+            pf["sample_rate"],
         )
+        results = poller.run(store.active_sources(db))
+    for sid, st in sorted(poller.stats.items()):
+        print(json.dumps({"event": "poll_source", "source_id": sid, **st}), flush=True)
     for sid, err in results.items():
         if err:
             print(f"poll failed: {sid}: {err}", file=sys.stderr)
