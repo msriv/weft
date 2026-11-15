@@ -164,8 +164,9 @@ def ingest(
         boiler = getattr(store, "boilerplate", None)
         if reason is None and boiler and boiler(text_hash, canonical, qcfg["boilerplate_urls"]):
             reason = "boilerplate"
-        if getattr(store, "note_outcome", None):
-            store.note_outcome(msg["source_id"], reason in ("thin", "stub"), qcfg)
+        note = getattr(store, "note_outcome", None)
+        if note:
+            note(msg["source_id"], reason in ("thin", "stub"), qcfg)
         if reason:
             return Result(reason, item_id)  # the status is the reason, in the item_processed log
 
