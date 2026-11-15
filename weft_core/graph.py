@@ -59,13 +59,16 @@ def _dec(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def put(db: Db, table: str, row: dict[str, Any], at: str | None = None) -> None:
-    """Close the current version of row['id'] and open a new one."""
+    """Close the current version of row['id'] and open a new one, in one statement: a crash can
+    no longer close a version without opening the next. Two pushes at the same moment can still
+    both open one; autoclean's `duplicate_current` rule closes the extra (#149)."""
     at = at or now()
     label = LABELS[table]
     db.execute(
-        f"MATCH (n:{label} {{id: ?}}) WHERE n.valid_to IS NULL SET n.valid_to=?", (row["id"], at)
+        f"OPTIONAL MATCH (o:{label} {{id: ?}}) WHERE o.valid_to IS NULL SET o.valid_to=? "
+        f"WITH count(o) AS closed CREATE (n:{label}) SET n = ?",
+        (row["id"], at, store.clean({**row, "valid_from": at, "valid_to": None})),
     )
-    store.create(db, label, {**row, "valid_from": at, "valid_to": None})
 
 
 def asof(at: str | None) -> tuple[str, tuple[Any, ...]]:
