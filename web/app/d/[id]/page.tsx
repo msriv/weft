@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import ReportProblem from "@/components/ReportProblem";
 import { IssuerTag, Kicker } from "@/components/bits";
 import { api } from "@/lib/api";
+import { meta } from "@/lib/meta";
 import { day } from "@/lib/format";
 import type { Issuer } from "@/lib/types";
 
@@ -12,6 +13,12 @@ type Doc = {
   statements: { id: string; actor_id: string; actor: string; role: string | null; text: string; start: number }[];
   event: { id: string; label: string | null } | null;
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const p = await params;
+  const x = await api<Doc>(`/v1/documents/${p.id}`);
+  return meta(x?.document.title, "An official document, labelled by its issuer.");
+}
 
 export default async function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

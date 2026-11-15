@@ -30,6 +30,8 @@ limits:
   max_body_bytes: 20000
 
 
+
+
 # Poller prefilter (#163): feed entries whose title and summary match no beat are not fetched.
 # A small random sample still flows, so the admin "unplaced" view sees what the beats miss.
 prefilter:

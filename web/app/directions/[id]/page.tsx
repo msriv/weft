@@ -3,7 +3,14 @@ import { notFound } from "next/navigation";
 import { Kicker } from "@/components/bits";
 import { DomainCardView, SpeculationRow } from "@/components/Directions";
 import { api } from "@/lib/api";
+import { meta } from "@/lib/meta";
 import type { DomainCard } from "@/lib/types";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const p = await params;
+  const x = await api<DomainCard & { disclaimer: string }>(`/v1/directions/${encodeURIComponent(decodeURIComponent(p.id))}`);
+  return meta(x?.label, "Coverage direction for this subject.");
+}
 
 export default async function DirectionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
