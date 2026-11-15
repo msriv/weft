@@ -5,7 +5,7 @@ countries.registerLocale(en);
 
 /** Perspective code (usually an ISO 3166 country) to a readable name. */
 export function perspectiveName(code: string): string {
-  if (code === "unattributed") return "Country not known";
+  if (code === "unattributed") return "No country recorded";
   return countries.getName(code, "en") ?? code;
 }
 
