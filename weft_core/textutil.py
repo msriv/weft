@@ -45,6 +45,21 @@ def minhash(sh: Iterable[str]) -> list[int]:
     return [min((_h(f"a{i}") % PRIME * x + _h(f"b{i}")) % PRIME for x in hs) for i in range(N_PERM)]
 
 
+BAND_ROWS = 4  # 16 bands of 4: two signatures at 0.80 Jaccard share a band 99.98% of the time
+
+
+def bands(sig: Sequence[int]) -> list[str]:
+    """LSH band keys of a MinHash signature. Reports sharing a key are near-duplicate
+    candidates; only those are compared in full (#162)."""
+    return [
+        f"{i // BAND_ROWS}:"
+        + hashlib.sha1(
+            ",".join(map(str, sig[i : i + BAND_ROWS])).encode(), usedforsecurity=False
+        ).hexdigest()[:12]
+        for i in range(0, len(sig), BAND_ROWS)
+    ]
+
+
 def minhash_similarity(a: Sequence[int], b: Sequence[int]) -> float:
     return sum(x == y for x, y in zip(a, b, strict=True)) / len(a)
 

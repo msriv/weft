@@ -100,7 +100,6 @@ NODES: dict[str, dict[str, Any]] = {
         **V,
     },
     "ReportEntity": {"report_id": None, "name": None, "kind": None, "wikidata_id": None},
-    "EntityLink": {"name": None, "wikidata_id": None},
     "Copy": {"report_id": None, "copy_of": None, "jaccard": None},
     "Claim": {
         "id": None,
@@ -241,8 +240,39 @@ NODES: dict[str, dict[str, Any]] = {
         "token": None,
         "created_at": None,
         "last_sent": None,
+        "last_sent_at": None,
     },
     "DailyDiff": {"day": None, "payload": None},
+    "BeatProfile": {
+        "beat_id": None,
+        "centroid": None,
+        "entities": None,
+        "n": None,
+        "updated_at": None,
+    },
+    "BeatMaybe": {  # a report that nearly matched a beat; a label makes it eval data (#107)
+        "report_id": None,
+        "beat_id": None,
+        "score": None,
+        "created_at": None,
+        "label": None,
+        "labelled_at": None,
+    },
+    "Counter": {"name": None, "n": 0},
+    "Cites": {"report_id": None, "url_key": None, "document_id": None},
+    "Quotes": {"figure_id": None, "statement_id": None, "containment": None, "edit_ratio": None},
+    "MergeRejected": {"pair": None},
+    "NliCache": {"key": None, "c": None, "e": None},
+    "DomainCandidate": {
+        "domain": None,
+        "beat_id": None,
+        "hits": 0,
+        "first_seen": None,
+        "last_seen": None,
+        "rel_sum": None,
+        "days": None,
+        "requested": None,
+    },
     "AutocleanRun": {  # one per rule per autoclean run (#147)
         "run_id": None,
         "rule": None,
@@ -307,6 +337,7 @@ NODES: dict[str, dict[str, Any]] = {
         "perspectives": "[]",
     },
     "SeriesPoint": {"series_id": None, "day": None, "value": None, "source": None},
+    "MinhashBand": {"report_id": None, "band": None, "at": None},  # LSH index of Report.minhash
     "ModelSpend": {
         "key": None,
         "day": None,
@@ -346,7 +377,6 @@ UNIQUE = {
     "ReviewItem": "id",
     "Subscription": "email",
     "DailyDiff": "day",
-    "EntityLink": "name",
     "ReaderReport": "id",
     "Prediction": "id",
     "ModelSpend": "key",
@@ -354,7 +384,16 @@ UNIQUE = {
     "Lock": "key",
     "Seen": "key",
 }
-INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
+INDEXED = [
+    "band",
+    "id",
+    "event_id",
+    "story_id",
+    "report_id",
+    "source_id",
+    "document_id",
+    "actor_id",
+]
 
 
 class Db(Protocol):
@@ -457,6 +496,16 @@ def _schema(db: Db, query: str, attempts: int = 5) -> None:
             if i == attempts - 1:
                 raise
             time.sleep(0.2 * (i + 1))
+
+
+def expected_indexes() -> set[tuple[str, str]]:
+    """(label, property) of every range index `init` creates; unique constraints own theirs."""
+    return {
+        (label, p)
+        for label, props in NODES.items()
+        for p in INDEXED
+        if p in props and UNIQUE.get(label) != p
+    }
 
 
 def init(db: Db) -> None:
