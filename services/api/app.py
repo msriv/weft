@@ -16,7 +16,7 @@ from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from services.api.limits import Limiter, Streams, client_key
@@ -86,6 +86,7 @@ class Feedback(BaseModel):
 
 
 class Subscription(BaseModel):
+    token: str | None = Field(default=None, max_length=100)  # from any digest mail, to change
     email: str = Field(max_length=254)
     frequency: str = Field(max_length=10)
     follows: list[str] = Field(default=[], max_length=50)
@@ -133,6 +134,8 @@ def create_app(
     proxy_secret: str = "",
     limiter: Limiter | None = None,
     admin_emails: frozenset[str] = frozenset(),
+    mailer: Callable[[str, str, str], None] | None = None,
+    site: str = "",
 ) -> FastAPI:
     app = FastAPI(title="Weft API")
     lim = limits if limits is not None else config.pipeline()["limits"]
@@ -405,16 +408,51 @@ def create_app(
         return StreamingResponse(events(), media_type="text/event-stream")
 
     @v1.put("/subscription", dependencies=[Depends(throttle("subscription"))])
-    def subscribe(body: Subscription) -> dict[str, bool]:
+    def subscribe(
+        body: Subscription, authorization: Annotated[str, Header()] = ""
+    ) -> dict[str, bool]:
+        """A new address is stored pending and gets one confirmation mail. Changing an existing
+        one needs its token (from a digest mail) or a signed-in account with that email."""
+        claims = accounts.verify_claims(authorization.removeprefix("Bearer "), project)
         try:
-            digest.subscribe(db, body.email, body.frequency, body.follows)
+            new = digest.subscribe(
+                db,
+                body.email,
+                body.frequency,
+                body.follows,
+                body.token,
+                str(claims.get("email")) if claims and claims.get("email") else None,
+            )
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
-        return {"subscribed": True}
+        except PermissionError as exc:
+            raise HTTPException(403, "use the link in a digest mail, or sign in") from exc
+        if new and mailer:
+            mailer(body.email.strip().lower(), *digest.confirmation_mail(site, new[0]))
+        return {"subscribed": True, "pending": bool(new)}
 
-    @v1.get("/unsubscribe")
-    def unsubscribe(token: str) -> dict[str, bool]:
-        return {"unsubscribed": bool(found(digest.unsubscribe(db, token) or None))}
+    def page(title: str, action: str, token: str, button: str) -> HTMLResponse:
+        if not digest.exists(db, token):
+            raise HTTPException(404, "not found")
+        return HTMLResponse(digest.action_page(title, action, token, button))
+
+    @v1.get("/unsubscribe", response_class=HTMLResponse)
+    def unsubscribe_page(token: str) -> HTMLResponse:
+        return page("Unsubscribe from the Weft digest", "unsubscribe", token, "Unsubscribe")
+
+    @v1.post("/unsubscribe", response_class=HTMLResponse)
+    def unsubscribe(token: str) -> HTMLResponse:
+        found(digest.unsubscribe(db, token) or None)
+        return HTMLResponse("<!doctype html><meta charset=utf-8><p>You are unsubscribed.</p>")
+
+    @v1.get("/confirm", response_class=HTMLResponse)
+    def confirm_page(token: str) -> HTMLResponse:
+        return page("Confirm your Weft digest", "confirm", token, "Confirm")
+
+    @v1.post("/confirm", response_class=HTMLResponse)
+    def confirm(token: str) -> HTMLResponse:
+        found(digest.confirm(db, token) or None)
+        return HTMLResponse("<!doctype html><meta charset=utf-8><p>Confirmed. Thank you.</p>")
 
     @v1.post("/ask", dependencies=[Depends(throttle("ask"))])
     def ask(body: Question) -> dict[str, Any]:
@@ -595,6 +633,8 @@ def create_app(
         request.state.before = {k: current[0].get(k) for k in data}
         if "country" in data:  # also re-tags the source's reports
             store.set_country(db, source_id, data.pop("country"), "admin")
+        if "paywalled" in data:
+            data["paywalled_source"] = "admin"  # the fetcher never overrides a hand-set flag
         for col, val in data.items():  # col is a SourcePatch field name, never user text
             if isinstance(val, list):  # stored as JSON text, like feeds and sitemaps
                 val = json.dumps(val)
@@ -670,7 +710,17 @@ def app_from_env() -> FastAPI:
         admin_emails=frozenset(
             e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()
         ),
+        mailer=_mailer(),
+        site=os.environ.get("SITE_URL", ""),
     )
+
+
+def _mailer() -> Callable[[str, str, str], None] | None:
+    if not os.environ.get("SMTP_HOST"):
+        return None
+    from pipeline.notify import smtp_send
+
+    return smtp_send
 
 
 def _asker(db: store.Db) -> Callable[[str], dict[str, Any]] | None:
