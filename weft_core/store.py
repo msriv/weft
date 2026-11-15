@@ -239,6 +239,8 @@ NODES: dict[str, dict[str, Any]] = {
         "token": None,
         "created_at": None,
         "last_sent": None,
+        "status": "pending",  # pending -> confirmed; bouncing after 3 hard send failures (#167)
+        "fails": 0,
     },
     "DailyDiff": {"day": None, "payload": None},
     "Prediction": {
