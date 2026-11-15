@@ -32,7 +32,8 @@ class GcsHashes:
 
 def main() -> int:
     project = os.environ["PROJECT_ID"]
-    gcp = GcpStore(project, os.environ["RAW_BUCKET"])
+    db = store.from_env()
+    gcp = GcpStore(project, os.environ["RAW_BUCKET"], db)
     publisher = pubsub_v1.PublisherClient()
     topic = publisher.topic_path(project, "documents-new")
 
@@ -44,7 +45,7 @@ def main() -> int:
     with httpx.Client(timeout=60, follow_redirects=True) as http:
         polite = PoliteClient(http)
         # portals come from automated discovery in the store (weft_core.portals), not from YAML
-        for s in (s for s in store.active_sources(store.from_env()) if "crawl" in s):
+        for s in (s for s in store.active_sources(db) if "crawl" in s):
             try:
                 print(s["id"], crawl_source(s, polite, gcp, state, publish))
             except httpx.HTTPError as exc:

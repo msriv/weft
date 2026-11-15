@@ -14,6 +14,7 @@ import json
 import os
 import re
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -241,6 +242,19 @@ NODES: dict[str, dict[str, Any]] = {
         "last_sent": None,
     },
     "DailyDiff": {"day": None, "payload": None},
+    "AutocleanRun": {  # one per rule per autoclean run (#147)
+        "run_id": None,
+        "rule": None,
+        "rule_version": None,
+        "mode": None,
+        "matched": 0,
+        "changed": 0,
+        "sample_ids": "[]",
+        "started_at": None,
+        "ended_at": None,
+        "status": None,  # ok / dry_run / aborted / skipped / failed
+        "note": None,
+    },
     "Prediction": {
         "id": None,
         "story_id": None,
@@ -292,6 +306,14 @@ NODES: dict[str, dict[str, Any]] = {
         "perspectives": "[]",
     },
     "SeriesPoint": {"series_id": None, "day": None, "value": None, "source": None},
+    "Lock": {"key": None, "at": None},  # write-lock rows for placement (#160)
+    "Seen": {
+        "key": None,
+        "at": None,
+        "stored": None,
+        "fails": None,
+        "last": None,
+    },  # fetched URL / text hash keys (#161); stored or failed extractions (#150)
     "BatchRun": {
         "run_id": None,
         "stage": None,
@@ -317,12 +339,41 @@ UNIQUE = {
     "EntityLink": "name",
     "ReaderReport": "id",
     "Prediction": "id",
+    "Lock": "key",
+    "Seen": "key",
 }
 INDEXED = ["id", "event_id", "story_id", "report_id", "source_id", "document_id", "actor_id"]
 
 
 class Db(Protocol):
     def execute(self, query: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]: ...
+
+
+def atomic[T](db: "Db", fn: Callable[["Db"], T]) -> T:
+    """Run `fn` in one transaction when the store has them (Neo4j: managed, retried on
+    deadlock or leader change, so `fn` may run more than once and must not publish or call out).
+    Stores without `write` run it directly."""
+    write = getattr(db, "write", None)
+    return write(fn) if write else fn(db)
+
+
+def lock(db: "Db", key: str) -> None:
+    """Take a write lock until the transaction ends. Two writers of one key run one at a time."""
+    db.execute("MERGE (l:Lock {key: ?}) SET l.at = ?", (key, _now()))
+
+
+class _Tx:
+    """A Db whose queries run inside one open transaction."""
+
+    def __init__(self, tx: Any) -> None:
+        self._tx = tx
+
+    def execute(self, query: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        q, params = _params(query, args)
+        return [r.data() for r in self._tx.run(q, params)]
+
+    def write[T](self, fn: Callable[["Db"], T]) -> T:
+        return fn(self)
 
 
 def _params(query: str, args: tuple[Any, ...]) -> tuple[str, dict[str, Any]]:
@@ -344,6 +395,10 @@ class Neo4jDb:
         q, params = _params(query, args)
         records, _, _ = self._driver.execute_query(q, params, database_=self._database)
         return [r.data() for r in records]
+
+    def write[T](self, fn: Callable[[Db], T]) -> T:
+        with self._driver.session(database=self._database) as session:
+            return session.execute_write(lambda tx: fn(_Tx(tx)))
 
     def close(self) -> None:
         self._driver.close()
@@ -655,10 +710,10 @@ def active_sources(db: Db) -> list[dict[str, Any]]:
 
 
 def create_story(db: Db, id: str, beat_id: str, title: str) -> None:
-    create(
-        db,
-        "Story",
-        {"id": id, "beat_id": beat_id, "title": title, "public": 0, "created_at": _now()},
+    # MERGE: two workers placing the first reports of a beat at once both get here
+    db.execute(
+        "MERGE (n:Story {id: ?}) ON CREATE SET n += ?",
+        (id, {"beat_id": beat_id, "title": title, "public": 0, "created_at": _now()}),
     )
 
 
