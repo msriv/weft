@@ -127,3 +127,30 @@ def test_run_reports_failing_source_and_continues() -> None:
     good = {**SRC, "id": "good", "feeds": ["https://x.test/rss"]}
     res = p.run([bad, good])
     assert res["bad"] and res["good"] is None and len(out) == 2
+
+
+def test_second_poll_of_the_same_feed_publishes_nothing_and_a_new_entry_alone() -> None:
+    body = [RSS]
+    p, out, _ = make(
+        lambda r: httpx.Response(404 if r.url.path == "/robots.txt" else 200, content=body[0])
+    )
+    assert p.poll_feed(SRC, "https://x.test/rss") == 2
+    assert p.poll_feed(SRC, "https://x.test/rss") == 0
+    body[0] = RSS.replace(
+        b"</channel>",
+        b"<item><title>C</title><link>https://x.test/c?utm_source=z</link></item></channel>",
+    )
+    assert p.poll_feed(SRC, "https://x.test/rss") == 1
+    assert [m["url"] for m in out] == [
+        "https://x.test/a", "https://x.test/b", "https://x.test/c?utm_source=z",
+    ]  # fmt: skip
+
+
+def test_tracking_parameters_do_not_make_an_entry_new() -> None:
+    body = [RSS]
+    p, _, _ = make(
+        lambda r: httpx.Response(404 if r.url.path == "/robots.txt" else 200, content=body[0])
+    )
+    p.poll_feed(SRC, "https://x.test/rss")
+    body[0] = RSS.replace(b"x.test/a<", b"x.test/a?utm_source=tw&fbclid=1<")
+    assert p.poll_feed(SRC, "https://x.test/rss") == 0
