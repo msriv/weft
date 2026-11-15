@@ -1,5 +1,7 @@
 import base64
+import contextlib
 import json
+import types
 from typing import Any
 
 import httpx
@@ -194,6 +196,68 @@ def test_redirect_to_the_feeds_own_article_is_stored_and_a_foreign_one_is_not() 
     store3 = MemStore()
     r3 = fetch_item(MSG, src, client(httpx.Response(200, text=moved)), store3, [src, other])
     assert r3.status == "stored" and store3.rows[0][0]["source_id"] == "y"
+
+
+def _page(headers: dict[str, str], body: bytes = b"x") -> httpx.Response:
+    return httpx.Response(200, headers=headers, content=body)
+
+
+def test_private_addresses_and_redirects_to_them_are_refused() -> None:
+    from weft_core.polite import Refused
+
+    for host in ("127.0.0.1", "10.0.0.5", "169.254.169.254"):
+        with pytest.raises(Refused, match="address"):
+            client(_page({"content-type": "text/html"})).get(f"http://{host}/a", 0, {})
+    http = client(httpx.Response(302, headers={"location": "http://169.254.169.254/latest"}))
+    msg = {"source_id": "x", "url": "https://x.test/r"}
+    assert fetch_item(msg, SRC, http, MemStore()).status == "refused"
+
+
+def test_scheme_and_redirect_limit() -> None:
+    from weft_core.polite import Refused
+
+    with pytest.raises(Refused, match="scheme"):
+        client(_page({})).get("file:///etc/passwd", 0, {})
+    loop = httpx.Response(302, headers={"location": "https://x.test/again"})
+    with pytest.raises(Refused, match="redirects"):
+        client(loop).get("https://x.test/a", 0, {})
+
+
+def test_oversize_body_stops_early_and_is_permanent() -> None:
+    big = _page({"content-type": "text/html"}, b"a" * 200)
+    http = client(big)
+    http._limits = {**http._limits, "max_html_bytes": 100}
+    msg = {"source_id": "x", "url": "https://x.test/big"}
+    store = MemStore()
+    assert fetch_item(msg, SRC, http, store).status == "too_large" and not store.rows
+
+
+def test_unsupported_type_never_reaches_the_extractor() -> None:
+    msg = {"source_id": "x", "url": "https://x.test/img"}
+    store = MemStore()
+    r = fetch_item(msg, SRC, client(_page({"content-type": "image/png"}, b"\x89PNG")), store)
+    assert r.status == "unsupported" and not store.rows
+
+
+def test_xml_with_entity_declarations_is_rejected() -> None:
+    from weft_core.polite import Refused
+
+    bomb = b'<?xml version="1.0"?><!DOCTYPE l [<!ENTITY a "aaaa">]><urlset>&a;</urlset>'
+    with pytest.raises(Refused, match="entity"):
+        client(_page({"content-type": "application/xml"}, bomb)).get("https://x.test/s.xml", 0, {})
+
+
+def test_pdf_is_cut_at_the_page_cap_and_still_stored(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pdfplumber
+
+    from services.fetcher import fetcher
+
+    page = types.SimpleNamespace(extract_text=lambda: "Sentence 0 of the filing.")
+    pdf = types.SimpleNamespace(pages=[page] * 2000, metadata={"Title": "Filing"})
+    ctx = contextlib.nullcontext(pdf)
+    monkeypatch.setattr(pdfplumber, "open", lambda f: ctx)
+    d, ext = fetcher._extract(b"%PDF", "https://x.test/a.pdf", "application/pdf")
+    assert ext == "pdf" and d["text"].count("Sentence 0 ") == fetcher.MAX_PDF_PAGES
 
 
 def test_failed_extraction_is_retried_daily_up_to_three_times() -> None:
