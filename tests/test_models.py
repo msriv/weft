@@ -170,6 +170,22 @@ def test_daily_cap_refuses_without_a_request() -> None:
     assert len(seen) == 1
 
 
+def test_budget_lines_are_logged_for_alerts(capsys: pytest.CaptureFixture[str]) -> None:
+    log: list[ModelCall] = []
+    c, _, _ = _scripted(
+        [_ok(prompt_tokens=50, completion_tokens=40), _ok("b"), _ok("c")],
+        log,
+        ledger=MemoryLedger(),
+        daily_tokens=100,
+    )
+    c.complete(prompt_template="t@1", instructions="x", data="one", max_tokens=50)  # 90% used
+    c.complete(prompt_template="t@1", instructions="x", data="two", max_tokens=50)
+    c.complete(prompt_template="t@1", instructions="x", data="three", max_tokens=50)
+    err = capsys.readouterr().err
+    assert err.count('"event": "budget_high"') == 1  # once, not on every call
+    assert '"severity": "WARNING"' in err
+
+
 def test_identical_call_is_answered_from_the_ledger() -> None:
     log: list[ModelCall] = []
     c, seen, _ = _scripted([_ok("first")], log, ledger=MemoryLedger())

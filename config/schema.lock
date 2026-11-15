@@ -240,6 +240,7 @@
   "key"
  ],
  "MergeRejected": [
+  "created_at",
   "pair"
  ],
  "MinhashBand": [
@@ -262,6 +263,7 @@
  ],
  "NliCache": [
   "c",
+  "created_at",
   "e",
   "key"
  ],
@@ -381,9 +383,11 @@
   "country",
   "country_source",
   "crawl",
+  "disc_rel",
   "discovered_at",
   "discovered_via",
   "domain",
+  "dormant_at",
   "feeds",
   "healthy",
   "homepage",
@@ -402,7 +406,8 @@
   "state_run_source",
   "status",
   "type",
-  "verified_at"
+  "verified_at",
+  "yield_14d"
  ],
  "SourceDay": [
   "day",
@@ -454,6 +459,7 @@
   "created_at",
   "key",
   "lang",
+  "last_used",
   "text"
  ]
 }
