@@ -70,8 +70,8 @@ img, svg, video, canvas { max-width: 100%; }
 
 /* layout */
 .stack { display: grid; gap: 16px; }
-.story-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: start; }
-.side { width: 320px; max-width: 100%; }
+.story-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.side { width: 100%; }
 .globe-layout { grid-template-columns: minmax(280px, 560px) 1fr; align-items: start; }
 .globe-svg { width: 100%; touch-action: none; cursor: grab; }
 .spark { display: flex; gap: 2px; align-items: flex-end; height: 24px; }
@@ -145,4 +145,18 @@ table { display: block; overflow-x: auto; max-width: 100%; }
   .narrow-only { display: block; }
   .events-first { order: -1; }
   .wrap { padding-left: 16px; padding-right: 16px; }
+}
+
+/* story graph (#183) */
+.graph-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); align-items: start; }
+.graph-grid.has-panel { grid-template-columns: minmax(0, 1fr) 300px; }
+.graph-panel { margin: 0; position: sticky; top: var(--s4); }
+.tip { position: absolute; z-index: 3; width: 240px; margin: 0; padding: var(--s2) var(--s3); background: var(--bg); transform: translate(-50%, calc(-100% - 28px)); pointer-events: none; }
+.node:focus-visible circle { stroke: var(--text); stroke-width: 3; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); align-items: center; }
+.legend .mark { vertical-align: middle; margin-right: 6px; }
+input.replay { flex: 1; min-width: 160px; accent-color: var(--text); }
+@media (max-width: 900px) {
+  .graph-grid.has-panel { grid-template-columns: minmax(0, 1fr); }
+  .graph-panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 5; border-radius: 12px 12px 0 0; background: var(--bg); max-height: 50vh; overflow: auto; }
 }

@@ -106,13 +106,13 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
       ) : (
         <div className="graph-mode">
           <div className="wide-only">
-            <StoryGraph storyId={id} nodes={g.nodes} edges={g.edges} perspectives={g.perspectives} anomalies={g.anomalies} />
+            <StoryGraph storyId={id} nodes={g.nodes} edges={g.edges} perspectives={g.perspectives} anomalies={g.anomalies} events={g.events} />
           </div>
           {/* phones: the event list comes first; the graph is one tap away and scrolls sideways at a readable size */}
           <details className="narrow-only graph-details">
             <summary>Show the network graph</summary>
             <div className="scroll-x"><div className="graph-min">
-              <StoryGraph storyId={id} nodes={g.nodes} edges={g.edges} perspectives={g.perspectives} anomalies={g.anomalies} />
+              <StoryGraph storyId={id} nodes={g.nodes} edges={g.edges} perspectives={g.perspectives} anomalies={g.anomalies} events={g.events} />
             </div></div>
           </details>
           <section aria-label="Events" className="mt24 events-first">

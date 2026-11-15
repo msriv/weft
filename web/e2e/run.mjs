@@ -4,10 +4,10 @@
 import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 
-const PAGES = ["/", "/today", "/stories", "/sources", "/s/kessar-strait", "/s/kessar-strait?view=list", "/s/kessar-strait/e/e1", "/ask", "/welcome", "/method"];
+const PAGES = ["/", "/today", "/stories", "/sources", "/s/kessar-strait", "/s/kessar-strait?view=list", "/s/kessar-strait/e/e1", "/s/busy", "/ask", "/welcome", "/method"];
 const procs = [
   spawn("node", ["e2e/stub-api.mjs", "8099"], { stdio: "inherit" }),
-  spawn("npx", ["next", "start", "-p", "3099"], { stdio: "inherit", env: { ...process.env, API_URL: "http://localhost:8099" } }),
+  spawn("node", ["node_modules/next/dist/bin/next", "start", "-p", "3099"], { stdio: "inherit", env: { ...process.env, API_URL: "http://localhost:8099" } }),
 ];
 const stop = () => procs.forEach((p) => p.kill());
 process.on("exit", stop);

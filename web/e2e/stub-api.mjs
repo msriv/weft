@@ -67,10 +67,18 @@ const routes = {
   "/v1/today": { day: "2026-11-14", since: iso(13), changes: [], new_events: [{ id: "e2", story_id: "kessar-strait", title: STORY.title, beat: "kessar", label: "Talks announced", label_source: null, first_seen: iso(12), reports: 7, outlets: 2, perspectives: ["KE", "AL"], new_documents: 0 }], new_anomalies: [anomaly], breaking: [STORY], blind_spots: [], followed: [] },
   "/v1/sources": [S.post, S.wire, S.rev],
 };
+// A busy story: 70 groups, 5 perspectives, 7 days, for layout checks.
+const P5 = ["AL", "VE", "KE", "OR", "TA"];
+const busyNodes = Array.from({ length: 70 }, (_, i) => ({
+  id: `b${i}`, kind: "report_group", event_id: `e${i % 6}`, at: `2026-11-${String(8 + ((i * 3) % 7)).padStart(2, "0")}T0${i % 9}:00:00Z`,
+  anomalies: i === 4 ? ["a1"] : [], perspective: P5[(i * 7) % 5], count: 1 + ((i * 13) % 40), sources: ["The Aldoria Post"], report_ids: [],
+}));
+routes["/v1/stories/busy"] = { ...graph, story: { ...STORY, id: "busy", title: "A busy story", perspectives: P5 }, perspectives: P5, nodes: busyNodes, edges: [],
+  events: Array.from({ length: 6 }, (_, i) => ({ id: `e${i}`, label: `Event ${i + 1} of the busy story`, first_seen: iso(8 + i), reports: 10, perspectives: P5 })) };
 const port = Number(process.argv[2] ?? 8080);
 createServer((req, res) => {
   const path = new URL(req.url, "http://x").pathname;
-  const body = routes[path] ?? (path === "/v1/directions" ? { domains: [], facets: [], notice: "", disclaimer: "", calibration: {} } : null);
+  const body = routes[path.replace(/\?.*/, "")] ?? (path === "/v1/directions" ? { domains: [], facets: [], notice: "", disclaimer: "", calibration: {} } : null);
   res.writeHead(body ? 200 : 404, { "content-type": "application/json" });
   res.end(JSON.stringify(body ?? { detail: "not found" }));
 }).listen(port, () => console.log(`stub api on ${port}`));
