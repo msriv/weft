@@ -5,12 +5,19 @@ import json
 import os
 from typing import Any
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from google.cloud import pubsub_v1  # type: ignore[attr-defined]
 
 from services.stream_worker.worker import Deps, process, process_document
 from weft_core import config, graph, store
 from weft_core.nlp import default_nlp
+
+
+def _retry_if_unknown(status: str) -> None:
+    """The source may have been registered seconds ago: nack so Pub/Sub retries with backoff,
+    and dead-letters the message after max_delivery_attempts instead of dropping it (#150)."""
+    if status == "unknown_source":
+        raise HTTPException(status_code=503, detail="unknown source")
 
 
 def create_app(deps: Deps) -> FastAPI:
@@ -26,6 +33,7 @@ def create_app(deps: Deps) -> FastAPI:
             return Response(status_code=204)  # malformed: drop, don't retry
         status = process(msg, deps)
         print(json.dumps({"event": "stream_item", "source_id": msg["source_id"], "status": status}))
+        _retry_if_unknown(status)
         return Response(status_code=204)
 
     @app.post("/documents")
@@ -42,6 +50,7 @@ def create_app(deps: Deps) -> FastAPI:
                 {"event": "stream_document", "source_id": msg["source_id"], "status": status}
             )
         )
+        _retry_if_unknown(status)
         return Response(status_code=204)
 
     return app

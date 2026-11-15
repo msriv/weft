@@ -147,7 +147,11 @@ def test_seen_check_uses_the_graph_not_a_bigquery_job() -> None:
             if q.startswith("UNWIND"):
                 self.keys |= set(args[0])
                 return []
-            return [{"k": k} for k in args[0] if k in self.keys][:1]
+            return [
+                {"stored": True, "fails": 0, "last": "2026-01-01T00:00:00+00:00"}
+                for k in args[0]
+                if k in self.keys
+            ][:1]
 
     s = object.__new__(GcpStore)
     s._bq, s._db = Bq(), Db()  # type: ignore[assignment]
@@ -190,3 +194,24 @@ def test_redirect_to_the_feeds_own_article_is_stored_and_a_foreign_one_is_not() 
     store3 = MemStore()
     r3 = fetch_item(MSG, src, client(httpx.Response(200, text=moved)), store3, [src, other])
     assert r3.status == "stored" and store3.rows[0][0]["source_id"] == "y"
+
+
+def test_failed_extraction_is_retried_daily_up_to_three_times() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from services.fetcher.fetcher import seen_from_rows
+
+    now = datetime(2026, 11, 14, 12, tzinfo=UTC)
+
+    def failed(ago: timedelta) -> tuple[str | None, datetime]:
+        return None, now - ago
+
+    assert not seen_from_rows([], now)
+    assert seen_from_rows([("abc", now - timedelta(days=9))], now)  # stored item
+    assert seen_from_rows([failed(timedelta(hours=2))], now)  # too soon to retry
+    assert not seen_from_rows([failed(timedelta(hours=25))], now)  # a day on: try again
+    two = [failed(timedelta(days=2)), failed(timedelta(days=1, hours=1))]
+    assert not seen_from_rows(two, now)
+    assert seen_from_rows([*two, failed(timedelta(days=3))], now)  # third failure: give up
+    # a retry that worked: the stored row wins over the earlier failure
+    assert seen_from_rows([failed(timedelta(days=2)), ("abc", now)], now)

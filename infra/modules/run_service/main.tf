@@ -51,6 +51,11 @@ variable "public" {
 
 locals {
   pushed = var.push_topic != "" || length(var.extra_pushes) > 0
+  # one dead-letter topic per push subscription (#150)
+  dead = merge(
+    var.push_topic == "" ? {} : { main = var.name },
+    { for k, _ in var.extra_pushes : k => "${var.name}-${k}" }
+  )
 }
 
 resource "google_project_service" "run" {
@@ -146,6 +151,10 @@ resource "google_pubsub_subscription" "push" {
     minimum_backoff = "10s"
     maximum_backoff = "600s"
   }
+  dead_letter_policy {
+    dead_letter_topic     = module.dead["main"].topic_id
+    max_delivery_attempts = 10
+  }
   push_config {
     push_endpoint = google_cloud_run_v2_service.svc.uri
     oidc_token {
@@ -164,12 +173,23 @@ resource "google_pubsub_subscription" "extra" {
     minimum_backoff = "10s"
     maximum_backoff = "600s"
   }
+  dead_letter_policy {
+    dead_letter_topic     = module.dead[each.key].topic_id
+    max_delivery_attempts = 10
+  }
   push_config {
     push_endpoint = "${google_cloud_run_v2_service.svc.uri}${each.value.path}"
     oidc_token {
       service_account_email = google_service_account.push[0].email
     }
   }
+}
+
+module "dead" {
+  for_each   = local.dead
+  source     = "../dead_letter"
+  project_id = var.project_id
+  name       = each.value
 }
 
 output "uri" { value = google_cloud_run_v2_service.svc.uri }

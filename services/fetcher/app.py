@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 
 from services.fetcher import refetch as refetch_mod
-from services.fetcher.fetcher import Store, fetch_item, seen_keys
+from services.fetcher.fetcher import Store, fetch_item, seen_from_rows, seen_keys
 from services.fetcher.tasks import CloudTasksQueue
 from weft_core import config, store
 from weft_core import store as store_mod
@@ -38,9 +38,19 @@ class GcpStore:
 
     def seen(self, canonical_url: str | None, text_hash: str) -> bool:
         keys = seen_keys(canonical_url, text_hash)
-        return bool(keys) and bool(
-            self._db.execute("MATCH (n:Seen) WHERE n.key IN ? RETURN n.key AS k LIMIT 1", (keys,))
+        if not keys:
+            return False
+        rows = self._db.execute(
+            "MATCH (n:Seen) WHERE n.key IN ? RETURN n.stored AS stored, n.fails AS fails, n.last AS last",
+            (keys,),
         )
+        # a stored item is seen; a failed extraction is retried daily, up to three times (#150)
+        pairs: list[tuple[str | None, datetime]] = []
+        for r in rows:
+            if r["stored"]:
+                pairs.append(("stored", datetime.now(UTC)))
+            pairs += [(None, datetime.fromisoformat(r["last"]))] * int(r["fails"] or 0)
+        return seen_from_rows(pairs, datetime.now(UTC))
 
     def boilerplate(self, text_hash: str, url: str, limit: int) -> bool:
         """True once one text has been served under `limit` distinct URLs of the same source."""
@@ -74,11 +84,20 @@ class GcpStore:
             )
 
     def _mark_seen(self, raw_row: dict[str, Any]) -> None:
+        """Record the item in the graph. A row without a text hash is a failed extraction."""
+        stored = bool(raw_row.get("text_hash"))
         keys = seen_keys(raw_row["url"], raw_row.get("text_hash") or "")
         keys += seen_keys(raw_row["canonical_url"], "")
         self._db.execute(
-            "UNWIND ? AS k MERGE (n:Seen {key: k}) ON CREATE SET n.at = ?",
-            (sorted(set(keys)), raw_row["fetched_at"]),
+            "UNWIND ? AS k MERGE (n:Seen {key: k}) ON CREATE SET n.at = ?, n.fails = 0 "
+            "SET n.stored = coalesce(n.stored, false) OR ?, n.fails = n.fails + ?, n.last = ?",
+            (
+                sorted(set(keys)),
+                raw_row["fetched_at"],
+                stored,
+                0 if stored else 1,
+                raw_row["fetched_at"],
+            ),
         )
 
     def save_version(self, item_id: str, n: int, content: bytes, ext: str) -> None:
