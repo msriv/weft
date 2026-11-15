@@ -1,0 +1,425 @@
+{
+ "Actor": [
+  "id",
+  "name",
+  "role",
+  "wikidata_id"
+ ],
+ "Anomaly": [
+  "detail",
+  "event_id",
+  "evidence_ids",
+  "id",
+  "inputs",
+  "rule",
+  "rule_version",
+  "status",
+  "story_id",
+  "subject_id",
+  "subject_kind",
+  "summary",
+  "valid_from",
+  "valid_to"
+ ],
+ "AnomalyFeedback": [
+  "anomaly_id",
+  "at",
+  "inputs",
+  "label",
+  "rule",
+  "rule_version"
+ ],
+ "AnomalyLog": [
+  "anomaly_id",
+  "at",
+  "change",
+  "rule",
+  "rule_version",
+  "seq",
+  "status"
+ ],
+ "AutocleanRun": [
+  "changed",
+  "ended_at",
+  "matched",
+  "mode",
+  "note",
+  "rule",
+  "rule_version",
+  "run_id",
+  "sample_ids",
+  "started_at",
+  "status"
+ ],
+ "BatchRun": [
+  "ended_at",
+  "error",
+  "rows_out",
+  "run_id",
+  "stage",
+  "started_at",
+  "status"
+ ],
+ "Beat": [
+  "edited",
+  "exclude",
+  "groups",
+  "id",
+  "languages",
+  "name",
+  "parties",
+  "patterns",
+  "places"
+ ],
+ "BeatMaybe": [
+  "beat_id",
+  "created_at",
+  "label",
+  "labelled_at",
+  "report_id",
+  "score"
+ ],
+ "BeatProfile": [
+  "beat_id",
+  "centroid",
+  "entities",
+  "n",
+  "updated_at"
+ ],
+ "Cites": [
+  "document_id",
+  "report_id",
+  "url_key"
+ ],
+ "Claim": [
+  "content_end",
+  "content_start",
+  "cue",
+  "embedding",
+  "end_char",
+  "event_id",
+  "group_id",
+  "id",
+  "lang",
+  "report_id",
+  "speaker",
+  "speaker_end",
+  "speaker_kind",
+  "speaker_start",
+  "stance",
+  "start_char",
+  "text",
+  "valid_from",
+  "valid_to"
+ ],
+ "ClaimGroup": [
+  "embedding",
+  "event_id",
+  "id",
+  "label",
+  "n_reports",
+  "perspectives",
+  "valid_from",
+  "valid_to"
+ ],
+ "Conflict": [
+  "event_id",
+  "group_a",
+  "group_b",
+  "nli_score",
+  "valid_from",
+  "valid_to"
+ ],
+ "Copy": [
+  "copy_of",
+  "jaccard",
+  "report_id"
+ ],
+ "Correction": [
+  "created_at",
+  "day",
+  "kind",
+  "what"
+ ],
+ "Counter": [
+  "n",
+  "name"
+ ],
+ "DailyDiff": [
+  "day",
+  "payload"
+ ],
+ "Document": [
+  "event_id",
+  "id",
+  "issuer_id",
+  "kind",
+  "lang",
+  "published_at",
+  "story_id",
+  "summary",
+  "text_hash",
+  "title",
+  "url",
+  "valid_from",
+  "valid_to"
+ ],
+ "Domain": [
+  "currency",
+  "dropped",
+  "facet",
+  "id",
+  "label",
+  "last_above_at",
+  "last_called_at",
+  "proposed",
+  "score",
+  "status",
+  "subject",
+  "subject_kind",
+  "updated_at"
+ ],
+ "DomainCandidate": [
+  "beat_id",
+  "days",
+  "domain",
+  "first_seen",
+  "hits",
+  "last_seen",
+  "rel_sum",
+  "requested"
+ ],
+ "DomainDriver": [
+  "day",
+  "domain_id",
+  "group_id",
+  "n_origins",
+  "perspectives",
+  "score"
+ ],
+ "Event": [
+  "centroid",
+  "entities",
+  "entity_counts",
+  "first_seen",
+  "follows",
+  "grouping_confidence",
+  "id",
+  "label_report_id",
+  "last_seen",
+  "n_reports",
+  "story_id",
+  "thread_id",
+  "thread_label",
+  "valid_from",
+  "valid_to"
+ ],
+ "Figure": [
+  "end_char",
+  "event_id",
+  "hedge",
+  "id",
+  "kind",
+  "quantity",
+  "report_id",
+  "speaker",
+  "start_char",
+  "text",
+  "unit",
+  "valid_from",
+  "valid_to",
+  "value"
+ ],
+ "Lock": [
+  "at",
+  "key"
+ ],
+ "MergeRejected": [
+  "pair"
+ ],
+ "NliCache": [
+  "c",
+  "e",
+  "key"
+ ],
+ "PortalCandidate": [
+  "domain",
+  "example_url",
+  "hits",
+  "last_seen"
+ ],
+ "Prediction": [
+  "base_rate",
+  "based_on",
+  "checked_at",
+  "confirm_if",
+  "domain_id",
+  "drivers",
+  "evidence",
+  "expected_by",
+  "id",
+  "kind",
+  "made_at",
+  "model",
+  "op",
+  "origin",
+  "probability",
+  "prompt",
+  "reference_class",
+  "refute_if",
+  "series_id",
+  "status",
+  "story_id",
+  "text",
+  "threshold",
+  "useful"
+ ],
+ "Quotes": [
+  "containment",
+  "edit_ratio",
+  "figure_id",
+  "statement_id"
+ ],
+ "ReaderReport": [
+  "created_at",
+  "email",
+  "id",
+  "kind",
+  "message",
+  "ref_id",
+  "resolution",
+  "status"
+ ],
+ "Report": [
+  "claims_extracted",
+  "correction_note",
+  "embedding",
+  "event_id",
+  "fetched_at",
+  "grouping_confidence",
+  "id",
+  "lang",
+  "minhash",
+  "origin_id",
+  "perspective",
+  "published_at",
+  "source_id",
+  "story_id",
+  "summary",
+  "text_hash",
+  "title",
+  "type",
+  "url",
+  "valid_from",
+  "valid_to"
+ ],
+ "ReportEntity": [
+  "kind",
+  "name",
+  "report_id",
+  "wikidata_id"
+ ],
+ "ReportVersion": [
+  "fetched_at",
+  "n",
+  "report_id",
+  "text_hash"
+ ],
+ "ReviewItem": [
+  "id",
+  "kind",
+  "payload",
+  "rated_at",
+  "rating",
+  "ref_id",
+  "reviewer",
+  "sampled_at"
+ ],
+ "Seen": [
+  "at",
+  "fails",
+  "key",
+  "last",
+  "stored"
+ ],
+ "SeriesPoint": [
+  "day",
+  "series_id",
+  "source",
+  "value"
+ ],
+ "ShortVersion": [
+  "id",
+  "payload",
+  "valid_from",
+  "valid_to"
+ ],
+ "Source": [
+  "country",
+  "country_source",
+  "crawl",
+  "discovered_at",
+  "discovered_via",
+  "domain",
+  "feeds",
+  "healthy",
+  "homepage",
+  "id",
+  "languages",
+  "min_interval",
+  "name",
+  "owner_id",
+  "ownership_source",
+  "paywalled",
+  "rejected_reason",
+  "sitemaps",
+  "state_run",
+  "state_run_source",
+  "status",
+  "type",
+  "verified_at"
+ ],
+ "SourceWeight": [
+  "day",
+  "factors",
+  "insufficient",
+  "n_reports",
+  "source_id",
+  "weight"
+ ],
+ "Statement": [
+  "actor_id",
+  "document_id",
+  "end_char",
+  "id",
+  "start_char",
+  "text"
+ ],
+ "Story": [
+  "beat_id",
+  "created_at",
+  "id",
+  "public",
+  "title"
+ ],
+ "StoryParty": [
+  "citation",
+  "party",
+  "story_id"
+ ],
+ "Subscription": [
+  "created_at",
+  "email",
+  "follows",
+  "frequency",
+  "last_sent",
+  "last_sent_at",
+  "token"
+ ],
+ "Translation": [
+  "created_at",
+  "key",
+  "lang",
+  "text"
+ ]
+}
