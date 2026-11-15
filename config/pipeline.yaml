@@ -30,6 +30,29 @@ prefilter:
   enabled: true
   sample_rate: 0.02
 
+# Extraction quality gate (#170): pages that are not articles are not stored as reports.
+quality:
+  min_chars: 300
+  min_sentences: 3                # a short news brief of 3 sentences passes
+  stub_share: 0.5                 # share of sentences that are stub text
+  boilerplate_urls: 3             # same text from one source under this many URLs: boilerplate
+  paywall_share: 0.5              # share of a source's items in 7 days that are stubs ...
+  paywall_min_items: 20           # ... once it has this many: flag the source as paywalled
+  stub_patterns:
+    en:
+      - subscribe (now )?to (continue|read|keep)
+      - sign in to (read|continue|view)
+      - log in to (read|continue|view)
+      - already a subscriber
+      - (enable|turn on) javascript
+      - javascript (is )?(required|disabled)
+      - verify (that )?you are (a )?human
+      - are you a robot
+      - (we use|this site uses) cookies
+      - accept (all )?cookies
+      - (page|article) (was )?not found
+      - this content is (only )?available to subscribers
+
 nightly:
   regroup_days: 14
   split_days: 3                  # re-cluster this many days from scratch; older events frozen (#105)
