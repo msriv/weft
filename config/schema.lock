@@ -5,6 +5,16 @@
   "role",
   "wikidata_id"
  ],
+ "AdminLog": [
+  "actor",
+  "after",
+  "at",
+  "before",
+  "id",
+  "method",
+  "route",
+  "target"
+ ],
  "Anomaly": [
   "detail",
   "event_id",
@@ -234,6 +244,11 @@
   "at",
   "hash",
   "key"
+ ],
+ "Host": [
+  "cooldown_until",
+  "name",
+  "strikes"
  ],
  "Lock": [
   "at",

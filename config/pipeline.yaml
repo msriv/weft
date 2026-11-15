@@ -14,6 +14,7 @@ stream:
   veto_min_reports: 20           # entity veto once the story has this many reports in 30 days
   near_dup_jaccard: 0.80
   near_dup_window_hours: 72
+  event_inplace_minutes: 10      # an attach within this long of the event's last write updates it in place (#151)
 
 # Spend limits per UTC day across all services (#157). Each caller gets its share, so the
 # public /v1/ask can never use up the pipeline's tokens and the reverse. A refused call degrades
@@ -28,6 +29,7 @@ limits:
   ask: {per_minute: 5, per_day: 60}
   problem: {per_minute: 3, per_day: 20}
   subscription: {per_minute: 3, per_day: 10}
+  admin_auth: {per_minute: 10, per_day: 100}    # failed admin sign-ins per address
   auth: {per_minute: 10, per_day: 200}          # web sign-up/sign-in proxy
   streams: {per_client: 3, total: 100}          # open /stories/{id}/stream connections
   max_body_bytes: 20000
@@ -40,6 +42,14 @@ limits:
 prefilter:
   enabled: true
   sample_rate: 0.02
+
+# Fetching untrusted URLs (#164).
+fetch:
+  max_html_bytes: 10000000         # pages, feeds, sitemaps, robots.txt
+  max_pdf_bytes: 50000000
+  max_redirects: 5
+  deadline_seconds: 60             # total per request, not per read
+  max_pdf_pages: 100               # pages read for text (OCR has its own cap)
 
 # Source yield, cadence, dormancy and ceilings (#171).
 sources:

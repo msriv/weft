@@ -32,6 +32,12 @@ variable "fetcher_image" {
   type        = string
 }
 
+variable "admin_emails" {
+  description = "Editors allowed into the admin (matched against the email of a signed-in Firebase user)."
+  type        = list(string)
+  default     = []
+}
+
 variable "billing_account_id" {
   description = "Billing account id for the project budget alerts (50/90/100%). Empty skips the budget."
   type        = string
@@ -121,6 +127,12 @@ variable "mail_from" {
 
 variable "firebase_api_key" {
   description = "Firebase web API key (public by design). Create it in the Firebase console once Identity Platform is enabled; leave empty to keep reader sign-in off."
+  type        = string
+  default     = ""
+}
+
+variable "bot_contact_url" {
+  description = "Public URL of the /bot page (what the crawler is and how to opt out), for example https://weft.example/bot. Sent in the User-Agent."
   type        = string
   default     = ""
 }

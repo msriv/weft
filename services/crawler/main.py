@@ -11,7 +11,7 @@ from google.cloud import pubsub_v1, storage  # type: ignore[attr-defined]
 from services.crawler.crawler import crawl_source
 from services.fetcher.app import GcpStore
 from weft_core import store
-from weft_core.polite import PoliteClient
+from weft_core.polite import HostCooldowns, PoliteClient
 
 
 class GcsHashes:
@@ -43,7 +43,7 @@ def main() -> int:
     state = GcsHashes(os.environ["STATE_BUCKET"])
     failed = 0
     with httpx.Client(timeout=60, follow_redirects=True) as http:
-        polite = PoliteClient(http)
+        polite = PoliteClient(http, cooldowns=HostCooldowns(db))
         # portals come from automated discovery in the store (weft_core.portals), not from YAML
         for s in (s for s in store.active_sources(db) if "crawl" in s):
             try:
