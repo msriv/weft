@@ -29,6 +29,13 @@ limits:
   streams: {per_client: 3, total: 100}          # open /stories/{id}/stream connections
   max_body_bytes: 20000
 
+
+# Poller prefilter (#163): feed entries whose title and summary match no beat are not fetched.
+# A small random sample still flows, so the admin "unplaced" view sees what the beats miss.
+prefilter:
+  enabled: true
+  sample_rate: 0.02
+
 nightly:
   regroup_days: 14
   split_days: 3                  # re-cluster this many days from scratch; older events frozen (#105)
