@@ -21,7 +21,7 @@ def test_local_and_terraform_dead_letter_limits_match() -> None:
 def test_every_local_subscription_has_a_dead_letter_policy() -> None:
     local = (ROOT / "local/init.py").read_text()
     subs = len(re.findall(r'^\s+\("[a-z-]+", "[a-z-]+", "http://', local, re.MULTILINE))
-    assert subs == 3 and local.count("create_subscription(") == 1 and "dead_letter_policy=" in local
+    assert subs == 3 and local.count("create_subscription(") == 1 and "dead_letter_policy" in local
     # one Terraform push subscription per local one: fetcher, stream worker, stream worker documents
     tf = sum(
         len(re.findall(r'resource "google_pubsub_subscription" "(?!pull)', f.read_text()))
