@@ -175,6 +175,17 @@ def create_app(
         try:
             result = fetch_item(msg, source, http, store, _all(sources), qcfg)
         except httpx.HTTPError as exc:
+            # Say which URL and why: the 502 alone shows only "not an acknowledgement" in Pub/Sub.
+            print(
+                json.dumps(
+                    {
+                        "event": "fetch_error",
+                        "url": msg.get("url"),
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "attempt": attempt,
+                    }
+                )
+            )
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         status = result.status
         if status == "skipped":
