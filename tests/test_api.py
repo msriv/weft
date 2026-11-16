@@ -178,6 +178,13 @@ def test_ask_cites_retrieved_passages_and_drops_verdicts() -> None:
     assert "1 statement(s) were left out" in out["note"]  # the bare verdict, and the reader is told
     assert out["cites"][0]["published_at"]
     assert out["cites"] and out["cites"][0]["id"] == out["sentences"][0]["cites"][0]
+    one = ask.retrieve(ctx.db, ctx.nlp.embedder, q, "iran-israel-war")
+    assert one and {r["report_id"] for r in one} <= {
+        r["report_id"] for r in ask.retrieve(ctx.db, ctx.nlp.embedder, q)
+    }
+    assert (
+        ask.retrieve(ctx.db, ctx.nlp.embedder, q, "no-such-story") == []
+    )  # scoped: no other story leaks in
     _, hidden = build()  # nothing public: nothing retrievable
     assert ask.retrieve(hidden.db, hidden.nlp.embedder, "strike") == []
     c = TestClient(create_app(ctx.db, "t0k"))

@@ -55,17 +55,25 @@ SCHEMA: dict[str, Any] = {
 NONE = "No source in our coverage answers this."
 
 
-def retrieve(db: Db, embedder: Embedder, question: str) -> list[dict[str, Any]]:
-    """Fixed template: every current claim of public stories, nearest to the question first.
-    shortcut: cosine in Python over all claims; move to a Neo4j vector index past ~100k claims."""
+def retrieve(
+    db: Db, embedder: Embedder, question: str, story_id: str | None = None
+) -> list[dict[str, Any]]:
+    """Fixed template: every current claim of public stories (of one story when `story_id` is
+    given), nearest to the question first. Still two fixed templates; the id is a parameter.
+    shortcut: cosine in Python over all claims; move to a Neo4j vector index (D25)."""
     rows = db.execute(
         "MATCH (c:Claim) WHERE c.valid_to IS NULL "
         "MATCH (r:Report {id: c.report_id}) WHERE r.valid_to IS NULL "
-        "MATCH (s:Story {id: r.story_id, public: 1}) "
-        "RETURN c.id AS id, c.text AS text, c.report_id AS report_id, c.start_char AS start_char, "
+        + (
+            "MATCH (s:Story {id: ?, public: 1}) WHERE r.story_id = s.id "
+            if story_id
+            else "MATCH (s:Story {id: r.story_id, public: 1}) "
+        )
+        + "RETURN c.id AS id, c.text AS text, c.report_id AS report_id, c.start_char AS start_char, "
         "c.end_char AS end_char, c.embedding AS embedding, r.url AS url, r.title AS title, "
         "r.source_id AS source_id, r.perspective AS perspective, "
         "coalesce(r.published_at, r.fetched_at) AS published_at",
+        (story_id,) if story_id else (),
     )
     q = embedder.embed(question)
     for r in rows:
@@ -80,8 +88,10 @@ def graph_sources(db: Db) -> list[dict[str, Any]]:
     return db.execute("MATCH (n:Source) RETURN n.id AS id, n.name AS name")
 
 
-def answer(db: Db, embedder: Embedder, model: ModelClient, question: str) -> dict[str, Any]:
-    return answer_from(model, question, retrieve(db, embedder, question))
+def answer(
+    db: Db, embedder: Embedder, model: ModelClient, question: str, story_id: str | None = None
+) -> dict[str, Any]:
+    return answer_from(model, question, retrieve(db, embedder, question, story_id))
 
 
 def answer_from(

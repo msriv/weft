@@ -60,7 +60,7 @@ def test_day_limit() -> None:
     ],
 )
 def test_third_call_in_a_minute_is_429_with_retry_after(method: str, path: str, body: Any) -> None:
-    c = client(lambda q: {"sentences": [], "cites": []})
+    c = client(lambda q, s=None: {"sentences": [], "cites": []})
     codes = [getattr(c, method)(path, json=body).status_code for _ in range(3)]
     assert codes[2] == 429 and codes[0] != 429
     r = getattr(c, method)(path, json=body)
@@ -68,7 +68,7 @@ def test_third_call_in_a_minute_is_429_with_retry_after(method: str, path: str, 
 
 
 def test_forged_client_address_does_not_dodge_the_limit() -> None:
-    c = client(lambda q: {"sentences": [], "cites": []})
+    c = client(lambda q, s=None: {"sentences": [], "cites": []})
     body = {"question": "who reported it?"}
     for i in range(3):
         r = c.post("/v1/ask", json=body, headers={"x-weft-client-ip": f"9.9.9.{i}"})
@@ -76,7 +76,7 @@ def test_forged_client_address_does_not_dodge_the_limit() -> None:
 
 
 def test_signed_proxy_address_separates_readers() -> None:
-    c = client(lambda q: {"sentences": [], "cites": []}, secret="s3")
+    c = client(lambda q, s=None: {"sentences": [], "cites": []}, secret="s3")
     body = {"question": "who reported it?"}
     seen = [
         c.post(
@@ -112,7 +112,7 @@ def test_daily_ask_cap_is_429_and_makes_no_model_request() -> None:
         transport=httpx.MockTransport(handler), ledger=ledger, caller="ask", daily_tokens=1000,
     )  # fmt: skip
 
-    def asker(q: str) -> dict[str, Any]:
+    def asker(q: str, story: str | None = None) -> dict[str, Any]:
         model.complete(prompt_template="ask@1", instructions="i", data=q, max_tokens=10)
         return {}
 
@@ -121,7 +121,7 @@ def test_daily_ask_cap_is_429_and_makes_no_model_request() -> None:
 
 
 def test_other_model_failures_are_503() -> None:
-    def empty(q: str) -> dict[str, Any]:
+    def empty(q: str, story: str | None = None) -> dict[str, Any]:
         raise EmptyOutput("none")
 
     assert client(empty).post("/v1/ask", json={"question": "who reported it?"}).status_code == 503

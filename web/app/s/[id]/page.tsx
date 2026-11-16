@@ -4,6 +4,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { AnomalyCard, Empty, Kicker } from "@/components/bits";
 import Conflict from "@/components/Conflict";
 import DetectivePanel from "@/components/DetectivePanel";
+import Dock from "@/components/Dock";
 import FollowButton from "@/components/FollowButton";
 import LiveFeed from "@/components/LiveFeed";
 import OpenQuestions from "@/components/OpenQuestions";
@@ -165,9 +166,9 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
       {tab === "questions" && (
         <div className="stack">
           <OpenQuestions storyId={id} />
-          <DetectivePanel storyId={id} />
         </div>
       )}
+      {!g.as_of && <Dock storyId={id} speculation={await DetectivePanel({ storyId: id })} />}
     </>
   );
 }

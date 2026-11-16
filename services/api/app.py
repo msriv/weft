@@ -112,6 +112,7 @@ class ReaderPrefs(BaseModel):
 
 class Question(BaseModel):
     question: str = Field(min_length=3, max_length=500)
+    story_id: str | None = Field(default=None, max_length=200)  # limit the answer to one story
 
 
 class Rating(BaseModel):
@@ -137,7 +138,7 @@ def found(x: Any) -> Any:
 def create_app(
     db: store.Db,
     admin_token: str,
-    asker: Callable[[str], dict[str, Any]] | None = None,
+    asker: Callable[[str, str | None], dict[str, Any]] | None = None,
     prefs: accounts.Prefs | None = None,
     project: str = "",
     limits: dict[str, Any] | None = None,
@@ -475,7 +476,7 @@ def create_app(
     def ask(body: Question) -> dict[str, Any]:
         if asker is None:
             raise HTTPException(503, "ask is not configured")
-        return asker(body.question)
+        return asker(body.question, body.story_id)
 
     app.include_router(v1)
 
@@ -775,7 +776,7 @@ def _mailer() -> Callable[[str, str, str], None] | None:
     return smtp_send
 
 
-def _asker(db: store.Db) -> Callable[[str], dict[str, Any]] | None:
+def _asker(db: store.Db) -> Callable[[str, str | None], dict[str, Any]] | None:
     if "MODEL_BASE_URL" not in os.environ:
         return None
     from pipeline.gcp import bq_sink
@@ -797,4 +798,4 @@ def _asker(db: store.Db) -> Callable[[str], dict[str, Any]] | None:
         daily_cost_usd=cost,
     )
     embedder = default_embedder()
-    return lambda q: ask.answer(db, embedder, model, q)
+    return lambda q, story_id: ask.answer(db, embedder, model, q, story_id)
