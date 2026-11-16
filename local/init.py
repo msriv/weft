@@ -59,14 +59,18 @@ for name, topic, url in (
         except AlreadyExists:
             pass
     try:
+        # `request=` because the flattened keyword form has no dead_letter_policy.
         sub.create_subscription(
-            name=sub.subscription_path(PROJECT, name),
-            topic=topics[topic],
-            push_config=pubsub_v1.types.PushConfig(push_endpoint=url),
-            ack_deadline_seconds=120,
-            dead_letter_policy=pubsub_v1.types.DeadLetterPolicy(
-                dead_letter_topic=dead, max_delivery_attempts=MAX_DELIVERY_ATTEMPTS
-            ),
+            request={
+                "name": sub.subscription_path(PROJECT, name),
+                "topic": topics[topic],
+                "push_config": {"push_endpoint": url},
+                "ack_deadline_seconds": 120,
+                "dead_letter_policy": {
+                    "dead_letter_topic": dead,
+                    "max_delivery_attempts": MAX_DELIVERY_ATTEMPTS,
+                },
+            }
         )
     except AlreadyExists:
         pass
