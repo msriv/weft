@@ -1120,6 +1120,8 @@ export interface components {
         Question: {
             /** Question */
             question: string;
+            /** Story Id */
+            story_id?: string | null;
         };
         /** Rating */
         Rating: {

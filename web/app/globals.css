@@ -247,3 +247,16 @@ details.report summary { padding: var(--s2) 0; cursor: pointer; }
 @keyframes sk { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 @media (max-width: 640px) { .row.ifs { flex-direction: column; } .row.ifs > * { width: 100%; } }
+
+/* story dock (components/Dock.tsx): sticky Ask and Speculation tabs */
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--bg, #0b0d10); border-top: 1px solid var(--border-strong); }
+.dock-spacer { height: 56px; }
+.dock-bar { display: flex; gap: var(--s3); max-width: 1160px; margin: 0 auto; padding: 6px 24px; }
+.dock-bar button { flex: 0 0 auto; min-width: 120px; }
+.dock-bar button[aria-expanded="true"] { border-color: var(--text); color: var(--text); }
+.dock-panel { max-width: 1160px; margin: 0 auto; padding: var(--s3) 24px; max-height: 60vh; overflow-y: auto; border-bottom: 1px solid var(--hair); }
+.dock-panel[hidden] { display: none; }
+.ask-chat { display: flex; flex-direction: column; }
+.ask-chat > form { order: 99; position: sticky; bottom: 0; background: var(--bg, #0b0d10); padding-top: var(--s2); }
+.ask-turn { border-bottom: 1px solid var(--hair); padding-bottom: var(--s2); }
+.ask-turn details summary { cursor: pointer; padding: 10px 0; min-height: 44px; box-sizing: border-box; }

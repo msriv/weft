@@ -762,6 +762,18 @@
             "minLength": 3,
             "title": "Question",
             "type": "string"
+          },
+          "story_id": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Id"
           }
         },
         "required": [
