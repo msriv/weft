@@ -73,8 +73,10 @@ services:
     command: ["-scheme", "http", "-port", "4443", "-backend", "memory"]
   bigquery:
     image: ghcr.io/goccy/bigquery-emulator:0.8.1  # the emulator is unstable across releases: bump on purpose, not by accident
-    # on disk so a restart keeps the tables init made; restart because it can crash under load
-    command: ["--project=weft-local", "--dataset=weft", "--database=/data/bq.db"]
+    # on disk so a restart keeps the tables init made; restart because it can crash under load.
+    # No --dataset: with a saved database the emulator tries to create it again on every start,
+    # fails with UNIQUE constraint and crash-loops. local/init.py creates the dataset instead.
+    command: ["--project=weft-local", "--database=/data/bq.db"]
     volumes: ["bigquery:/data"]
     restart: unless-stopped
   pubsub:
