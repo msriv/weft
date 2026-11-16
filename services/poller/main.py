@@ -46,7 +46,9 @@ HEALTH_WINDOW_DAYS = 30  # far longer than the 6 h health age; keeps the scan to
 
 def health_query(table: str) -> str:
     return (
-        f"SELECT source_id, MAX(IF(ok, checked_at, NULL)) AS last_ok FROM `{table}` "
+        # Microseconds as INT64, not a TIMESTAMP column: the local BigQuery emulator returns
+        # timestamps as float seconds, which the Python client cannot parse.
+        f"SELECT source_id, UNIX_MICROS(MAX(IF(ok, checked_at, NULL))) AS last_ok_us FROM `{table}` "
         f"WHERE checked_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {HEALTH_WINDOW_DAYS} DAY) "
         "GROUP BY 1"
     )
@@ -61,7 +63,12 @@ def record_and_report(project: str, results: dict[str, str | None]) -> list[str]
     if errs := bq.insert_rows_json(table, rows):
         raise RuntimeError(f"insert into source_health failed: {errs}")
     q = health_query(table)
-    last_ok = {r.source_id: r.last_ok for r in bq.query(q).result()}
+    last_ok = {
+        r.source_id: None
+        if r.last_ok_us is None
+        else datetime.fromtimestamp(r.last_ok_us / 1_000_000, UTC)
+        for r in bq.query(q).result()
+    }
     bad = unhealthy(last_ok, now)
     for sid in bad:
         # structured line; the Terraform log-based metric alerts on event=source_unhealthy
